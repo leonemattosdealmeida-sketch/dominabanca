@@ -49,17 +49,21 @@ const css = `
   .plan-card{transition:all 0.2s ease;}
   @media(max-width:768px){
     .nav-desktop{display:none!important;}
-    .hero-grid{grid-template-columns:1fr!important;padding:40px 16px 32px!important;}
-    .features-grid{grid-template-columns:1fr!important;}
-    .plans-grid{grid-template-columns:1fr!important;}
+    .hero-section{grid-template-columns:1fr!important;padding:40px 16px 32px!important;}
     .redacao-grid{grid-template-columns:1fr!important;}
+    .plans-grid{grid-template-columns:1fr!important;}
     .footer-inner{flex-direction:column!important;gap:32px!important;}
-    .section-pad{padding:56px 16px!important;}
     .hero-btns{flex-direction:column!important;}
-    .hero-btns button, .hero-btns a{width:100%!important;text-align:center!important;}
-    .demo-col{display:none!important;}
-    .nav-wrap{padding:0 16px!important;}
-    .trust-row{gap:16px!important;flex-wrap:wrap!important;}
+    .hero-btns button{width:100%!important;text-align:center!important;}
+  }
+  @media(min-width:769px){
+    .hero-section{display:grid!important;grid-template-columns:1fr 1fr!important;gap:64px!important;align-items:center!important;padding:88px 28px 72px!important;}
+    .redacao-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:64px!important;align-items:center!important;}
+    .plans-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:24px!important;}
+    .testimonials-grid{display:grid!important;grid-template-columns:repeat(3,1fr)!important;gap:20px!important;}
+    .how-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:20px!important;}
+    .demo-show{display:block!important;}
+    .demo-mobile{display:none!important;}
   }
 `;
 
@@ -435,8 +439,12 @@ export default function DominaBancaLanding() {
       </nav>
 
       {/* ── HERO ── */}
-      <section style={{maxWidth:1100,margin:"0 auto",padding:"88px 28px 72px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:64,alignItems:"center"}} className="hero-grid">
+      <section className="hero-section" style={{maxWidth:1100,margin:"0 auto",padding:"72px 28px 60px"}}>
         <div style={{animation:"fadeUp 0.6s ease"}}>
+          <div style={{display:"inline-flex",alignItems:"center",gap:8,background:C.primaryXLight,border:`1px solid ${C.borderPurple}`,borderRadius:100,padding:"6px 16px",fontSize:12,fontWeight:700,color:C.primary,marginBottom:28}}>
+            <div style={{width:6,height:6,borderRadius:"50%",background:C.primary,animation:"pulse 2s infinite"}}/>
+            Plataforma de questões para concursos públicos
+          </div>
           <h1 style={{fontFamily:"'Lora',serif",fontSize:"clamp(30px,4vw,52px)",fontWeight:700,lineHeight:1.18,color:C.text,marginBottom:22}}>
             Transforme seu edital
             <br/>em um plano estruturado
@@ -450,21 +458,18 @@ export default function DominaBancaLanding() {
               Começar gratuitamente →
             </button>
           </div>
-          <div style={{display:"flex",gap:28,marginTop:40,flexWrap:"wrap"}}>
-            {[{icon:"📋",text:"Qualquer edital e banca"},{icon:"🆓",text:"Primeira semana grátis"},{icon:"⚡",text:"Cronograma em minutos"}].map(t=>(
-              <div key={t.text} style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:C.textMed}}>
-                <span>{t.icon}</span><span>{t.text}</span>
-              </div>
-            ))}
-          </div>
+        </div>
+        {/* Demo — aparece só no desktop */}
+        <div className="demo-show" style={{display:"none"}}>
+          <DemoPlayer/>
         </div>
       </section>
 
-      {/* ── DEMO ── */}
-      <section style={{background:C.bg,padding:"0 28px 72px"}}>
+      {/* ── DEMO MOBILE — esconde no desktop ── */}
+      <section className="demo-mobile" style={{background:C.bg,padding:"0 20px 56px"}}>
         <div style={{maxWidth:900,margin:"0 auto",textAlign:"center"}}>
           <div style={{fontSize:11,fontWeight:700,color:C.primary,letterSpacing:2.5,textTransform:"uppercase",marginBottom:16}}>Veja funcionando</div>
-          <h2 style={{fontFamily:"'Lora',serif",fontSize:"clamp(22px,3vw,36px)",fontWeight:700,color:C.text,marginBottom:40}}>
+          <h2 style={{fontFamily:"'Lora',serif",fontSize:"clamp(22px,3vw,36px)",fontWeight:700,color:C.text,marginBottom:32}}>
             Uma plataforma feita para o seu concurso
           </h2>
           <DemoPlayer/>
@@ -672,7 +677,7 @@ export default function DominaBancaLanding() {
                 Quem usa, não abre mão.
               </h3>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:20}} className="features-grid">
+            <div style={{display:"flex",flexDirection:"column",gap:20}} className="testimonials-grid">
               {[
                 {nome:"Leone Mattos",local:"Niterói/RJ",texto:"Nunca vi nada parecido no mercado de concursos. A plataforma leu meu edital, montou meu cronograma e já sabia exatamente o que eu precisava estudar. É como ter um preparador particular disponível 24 horas.",inicial:"L"},
                 {nome:"Mylena Athaydes",local:"São Paulo/SP",texto:"Estudei para concurso por anos sem organização nenhuma. O DominaBanca mudou completamente minha rotina de estudos. O cronograma semanal e o caderno de erros me mostraram exatamente onde eu estava falhando.",inicial:"M"},
