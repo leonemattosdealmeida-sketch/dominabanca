@@ -69,28 +69,17 @@ const css = `
 
 // ── Logo SVG ───────────────────────────────────────────────────────────────────
 const Logo = ({ size = 38 }) => (
-  <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="40" height="40" rx="12" fill="url(#logoGrad)"/>
-    <defs>
-      <linearGradient id="logoGrad" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stopColor="#5B3FD4"/>
-        <stop offset="100%" stopColor="#8B6FF0"/>
-      </linearGradient>
-    </defs>
-    {/* Livro aberto elegante */}
-    <path d="M20 10 C20 10 13 12 11 14 L11 30 C13 28 20 27 20 27 C20 27 27 28 29 30 L29 14 C27 12 20 10 20 10Z" fill="white" fillOpacity="0.15"/>
-    <path d="M20 10 L20 27" stroke="white" strokeWidth="1.2" strokeOpacity="0.5"/>
-    {/* Página esquerda */}
-    <path d="M11 14 C13 12 20 10 20 10 L20 27 C20 27 13 28 11 30 Z" fill="white" fillOpacity="0.22"/>
-    {/* Página direita */}
-    <path d="M29 14 C27 12 20 10 20 10 L20 27 C20 27 27 28 29 30 Z" fill="white" fillOpacity="0.12"/>
-    {/* Linhas na página esquerda */}
-    <line x1="13.5" y1="17" x2="18.5" y2="16" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeOpacity="0.75"/>
-    <line x1="13.5" y1="20" x2="18.5" y2="19.2" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeOpacity="0.75"/>
-    <line x1="13.5" y1="23" x2="17" y2="22.4" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeOpacity="0.75"/>
-    {/* Check na página direita */}
-    <path d="M22.5 20.5 L24.5 22.8 L28 18" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" strokeOpacity="0.95"/>
-  </svg>
+  <div style={{
+    width: size, height: size, borderRadius: 11,
+    background: C.primaryXLight, border: `2px solid ${C.borderPurple}`,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    flexShrink: 0
+  }}>
+    <span style={{
+      fontFamily: "'Lora', serif", fontWeight: 700,
+      fontSize: size * 0.38, color: C.primary, letterSpacing: "-0.5px"
+    }}>DB</span>
+  </div>
 );
 
 const LogoMark = () => (
