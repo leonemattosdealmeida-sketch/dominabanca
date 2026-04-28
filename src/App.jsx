@@ -427,14 +427,9 @@ export default function DominaBancaLanding() {
       <nav style={{background:C.white,borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,zIndex:100,boxShadow:"0 1px 8px rgba(0,0,0,0.04)"}}>
         <div style={{maxWidth:1100,margin:"0 auto",padding:"0 28px",height:66,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <LogoMark/>
-          <div className="nav-desktop" style={{display:"flex",alignItems:"center",gap:28}}>
-            {["Como funciona","Recursos","Redação","Planos"].map(l=>(
-              <a key={l} className="nav-link" href={`#${l.toLowerCase().replace(" ","-")}`} style={{fontSize:14,color:C.textMed,textDecoration:"none",fontWeight:500}}>{l}</a>
-            ))}
-            <button className="cta-btn" style={{padding:"10px 24px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:"pointer",boxShadow:C.shadowMd}}>
-              Começar gratuitamente
-            </button>
-          </div>
+          <button className="cta-btn" style={{padding:"10px 24px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:"pointer",boxShadow:C.shadowMd}}>
+            Área do aluno
+          </button>
         </div>
       </nav>
 
