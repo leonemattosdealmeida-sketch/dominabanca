@@ -1071,7 +1071,7 @@ const Sucesso = ({ nome, onContinue }) => (
 // ══════════════════════════════════════════════════════════════════════════════
 // ROOT
 // ══════════════════════════════════════════════════════════════════════════════
-function Cadastro({ onBack }) {
+function Cadastro({ onBack, onSuccess }) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -1114,7 +1114,7 @@ function Cadastro({ onBack }) {
             {!done && <ProgressBar step={step} total={TOTAL_STEPS}/>}
 
             {done ? (
-              <Sucesso nome={form.nome} onContinue={() => alert("Ir para o onboarding!")}/>
+              <Sucesso nome={form.nome} onContinue={()=>onSuccess&&onSuccess(form)}/>
             ) : step === 1 ? (
               <Etapa1 data={form} onChange={handleChange} onNext={()=>setStep(2)} onLogin={()=>alert("Ir para o login")}/>
             ) : step === 2 ? (
@@ -1316,7 +1316,8 @@ function Login({ onBack, onCadastro, onSuccess }) {
 // ROOT — Gerencia navegação entre telas
 // ══════════════════════════════════════════════════════════════════════════════
 export default function App() {
-  const [screen, setScreen] = useState("landing"); // "landing" | "cadastro" | "login"
+  const [screen, setScreen] = useState("landing"); // "landing" | "cadastro" | "login" | "onboarding"
+  const [userData, setUserData] = useState(null);
 
   useEffect(() => {
     const s = document.createElement("style");
@@ -1325,7 +1326,725 @@ export default function App() {
     document.head.appendChild(s);
   }, []);
 
-  if(screen === "cadastro") return <Cadastro onBack={()=>setScreen("landing")}/>;
-  if(screen === "login") return <Login onBack={()=>setScreen("landing")} onCadastro={()=>setScreen("cadastro")} onSuccess={()=>setScreen("landing")}/>;
+  if(screen === "cadastro") return <Cadastro onBack={()=>setScreen("landing")} onSuccess={u=>{setUserData(u);setScreen("onboarding");}}/>;
+  if(screen === "login") return <Login onBack={()=>setScreen("landing")} onCadastro={()=>setScreen("cadastro")} onSuccess={u=>{setUserData(u);setScreen("onboarding");}}/>;
+  if(screen === "onboarding") return <Onboarding user={userData} onComplete={plan=>{ console.log("Plano criado:", plan); setScreen("landing"); }} onBack={()=>setScreen("landing")}/>;
   return <Landing onCadastro={()=>setScreen("cadastro")} onLogin={()=>setScreen("login")}/>;
+}
+// ══════════════════════════════════════════════════════════════════════════════
+// ONBOARDING — Fluxo completo do edital ao cronograma
+// ══════════════════════════════════════════════════════════════════════════════
+
+const ONBOARDING_CSS = `
+  @keyframes ob-fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes ob-fadeIn { from{opacity:0} to{opacity:1} }
+  @keyframes ob-spin { to{transform:rotate(360deg)} }
+  @keyframes ob-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  @keyframes ob-pop { from{transform:scale(0.92);opacity:0} to{transform:scale(1);opacity:1} }
+  @keyframes ob-slide { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:translateX(0)} }
+  .ob-btn:hover{transform:translateY(-1px);box-shadow:0 8px 28px rgba(91,79,207,0.28)!important;}
+  .ob-btn{transition:all 0.2s ease;}
+  .ob-chip:hover{border-color:#7C6FE0!important;background:#EFEFFD!important;transform:translateY(-1px);}
+  .ob-chip{transition:all 0.15s ease;cursor:pointer;}
+  .ob-chip.sel{border-color:#5B4FCF!important;background:#EFEFFD!important;}
+  .ob-card:hover{border-color:#7C6FE0!important;transform:translateY(-2px);}
+  .ob-card{transition:all 0.2s ease;cursor:pointer;}
+  .ob-card.sel{border-color:#5B4FCF!important;background:#EFEFFD!important;}
+  .ob-inp:focus{border-color:#5B4FCF!important;box-shadow:0 0 0 3px rgba(91,79,207,0.1)!important;outline:none;}
+  .ob-inp{transition:all 0.15s ease;}
+  input[type=range].ob-range{-webkit-appearance:none;height:4px;background:#DDDDF5;border-radius:4px;outline:none;width:100%;}
+  input[type=range].ob-range::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;background:#5B4FCF;border-radius:50%;cursor:pointer;box-shadow:0 2px 8px rgba(91,79,207,0.4);}
+`;
+
+// ── Constantes de design ──────────────────────────────────────────────────────
+const OB = {
+  primary: "#5B4FCF",
+  primaryLight: "#7C6FE0",
+  primaryXLight: "#EFEFFD",
+  accent: "#00C48C",
+  accentLight: "#E0FBF3",
+  warning: "#F5A623",
+  warningLight: "#FEF3DC",
+  danger: "#F25A5A",
+  bg: "#F7F7FC",
+  white: "#FFFFFF",
+  text: "#1A1A2E",
+  textMed: "#4A4A6A",
+  textLight: "#9898B8",
+  border: "#E8E8F0",
+};
+
+// ── Sub-componentes ───────────────────────────────────────────────────────────
+const ObSpinner = () => (
+  <div style={{width:20,height:20,border:"2px solid rgba(255,255,255,0.3)",borderTop:"2px solid white",borderRadius:"50%",animation:"ob-spin 0.8s linear infinite",flexShrink:0}}/>
+);
+
+const ObChip = ({label, selected, onClick, color}) => (
+  <button className={`ob-chip${selected?" sel":""}`} onClick={onClick}
+    style={{padding:"9px 18px",borderRadius:100,border:`1.5px solid ${selected?(color||OB.primary):OB.border}`,background:selected?OB.primaryXLight:OB.white,color:selected?(color||OB.primary):OB.textMed,fontSize:13,fontWeight:selected?700:500,cursor:"pointer"}}>
+    {label}
+  </button>
+);
+
+const ObProgress = ({step, total, label}) => (
+  <div style={{marginBottom:32}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+      <span style={{fontSize:12,fontWeight:700,color:OB.primary}}>{label}</span>
+      <span style={{fontSize:11,color:OB.textLight}}>{step} de {total}</span>
+    </div>
+    <div style={{height:4,background:OB.border,borderRadius:99,overflow:"hidden"}}>
+      <div style={{height:"100%",width:`${(step/total)*100}%`,background:`linear-gradient(90deg,${OB.primary},${OB.primaryLight})`,borderRadius:99,transition:"width 0.5s ease"}}/>
+    </div>
+  </div>
+);
+
+const ObCard = ({icon, title, desc, selected, onClick}) => (
+  <div className={`ob-card${selected?" sel":""}`} onClick={onClick}
+    style={{padding:"20px",border:`1.5px solid ${selected?OB.primary:OB.border}`,borderRadius:16,background:selected?OB.primaryXLight:OB.white,position:"relative"}}>
+    {selected && <div style={{position:"absolute",top:12,right:12,width:20,height:20,borderRadius:"50%",background:OB.primary,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontSize:10,fontWeight:700}}>✓</div>}
+    <div style={{fontSize:28,marginBottom:10}}>{icon}</div>
+    <div style={{fontWeight:700,fontSize:14,color:selected?OB.primary:OB.text,marginBottom:4}}>{title}</div>
+    <div style={{fontSize:12,color:OB.textMed,lineHeight:1.6}}>{desc}</div>
+  </div>
+);
+
+// ── API helper ────────────────────────────────────────────────────────────────
+const obApi = async (messages, system) => {
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      model:"claude-sonnet-4-20250514",
+      max_tokens:1000,
+      system: system||"Você é um especialista em concursos públicos brasileiros. Responda sempre em português do Brasil.",
+      messages,
+    }),
+  });
+  const d = await r.json();
+  return d.content?.[0]?.text||"";
+};
+
+const safeJson = t => { try{ return JSON.parse(t.replace(/```json|```/g,"").trim()); }catch{ return null; } };
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ONBOARDING PRINCIPAL
+// ══════════════════════════════════════════════════════════════════════════════
+function Onboarding({ user, onComplete, onBack }) {
+  const [step, setStep] = useState(0);
+  const [modo, setModo] = useState(null); // "aberto" | "semEdital"
+  const [editalText, setEditalText] = useState("");
+  const [inputMode, setInputMode] = useState("texto"); // "texto" | "pdf"
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfName, setPdfName] = useState(null);
+  const [analisando, setAnalisando] = useState(false);
+  const [parsed, setParsed] = useState(null);
+  const [cargo, setCargo] = useState("");
+  const [materias, setMaterias] = useState([]);
+  const [dificeis, setDificeis] = useState([]);
+  const [faceis, setFaceis] = useState([]);
+  const [horas, setHoras] = useState(3);
+  const [simFreq, setSimFreq] = useState("semanal");
+  const [simDia, setSimDia] = useState("Sábado");
+  const [discDia, setDiscDia] = useState("Quarta");
+  const [discFreq, setDiscFreq] = useState(2);
+  const [concursoAlvo, setConcursoAlvo] = useState("");
+  const fileRef = useRef(null);
+  const nome = user?.nome?.split(" ")[0] || "aluno";
+
+  useEffect(() => {
+    const s = document.getElementById("ob-css");
+    if(!s){
+      const el = document.createElement("style");
+      el.id = "ob-css";
+      el.textContent = ONBOARDING_CSS;
+      document.head.appendChild(el);
+    }
+  }, []);
+
+  // ── Processar PDF ────────────────────────────────────────────────────────────
+  const processPDF = async file => {
+    if(!file || file.type !== "application/pdf") return;
+    setPdfName(file.name);
+    setPdfLoading(true);
+    try {
+      const base64 = await new Promise((res,rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result.split(",")[1]);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          model:"claude-sonnet-4-20250514",
+          max_tokens:1000,
+          messages:[{role:"user",content:[
+            {type:"document",source:{type:"base64",media_type:"application/pdf",data:base64}},
+            {type:"text",text:"Extraia APENAS o conteúdo programático: todas as disciplinas, matérias e tópicos cobrados. Texto simples, sem JSON. Se não for edital responda: 'Documento não reconhecido como edital.'"}
+          ]}]
+        })
+      });
+      const d = await resp.json();
+      const text = d.content?.[0]?.text||"";
+      if(text.includes("não reconhecido")){
+        setPdfName(null);
+        alert("Este arquivo não parece ser um edital. Tente colar o texto manualmente.");
+      } else {
+        setEditalText(text);
+        setInputMode("texto");
+      }
+    } catch(e) {
+      alert("Erro ao ler o PDF. Tente colar o texto manualmente.");
+    }
+    setPdfLoading(false);
+  };
+
+  // ── Analisar edital ──────────────────────────────────────────────────────────
+  const analisarEdital = async () => {
+    if(!editalText.trim()) return;
+    setAnalisando(true);
+    const raw = await obApi([{role:"user",content:`Analise este edital e retorne APENAS JSON válido:
+${editalText.slice(0,5000)}
+{
+  "cargos":["Cargo 1"],
+  "orgao":"Nome do órgão",
+  "banca":"Nome da banca ou null",
+  "dataProva":"dd/mm/aaaa ou null",
+  "periodo":"manhã ou tarde ou null",
+  "etapas":["Prova Objetiva"],
+  "temDiscursiva":false,
+  "totalQuestoes":120,
+  "materias":[{"nome":"Matéria","peso":20,"subtopicos":["sub1"]}]
+}`}]);
+    setAnalisando(false);
+    const data = safeJson(raw) || {
+      cargos:["Cargo Geral"],orgao:"Órgão",banca:null,dataProva:null,
+      etapas:["Prova Objetiva"],temDiscursiva:false,totalQuestoes:100,
+      materias:[
+        {nome:"Língua Portuguesa",peso:25,subtopicos:["Interpretação","Gramática"]},
+        {nome:"Raciocínio Lógico",peso:25,subtopicos:["Proposições"]},
+        {nome:"Conhecimentos Específicos",peso:50,subtopicos:["Conteúdo do cargo"]},
+      ]
+    };
+    setParsed(data);
+    setMaterias(data.materias);
+    if(data.cargos.length === 1) { setCargo(data.cargos[0]); setStep(3); }
+    else setStep(2);
+  };
+
+  const TOTAL_STEPS = parsed?.temDiscursiva ? 7 : 6;
+
+  const Wrapper = ({children, stepAtual, stepLabel}) => (
+    <div style={{fontFamily:"'Sora',sans-serif",minHeight:"100vh",background:OB.bg,display:"flex",flexDirection:"column"}}>
+      {/* Nav */}
+      <nav style={{background:OB.white,borderBottom:`1px solid ${OB.border}`,height:64,display:"flex",alignItems:"center",padding:"0 28px",justifyContent:"space-between",boxShadow:"0 1px 6px rgba(0,0,0,0.04)",position:"sticky",top:0,zIndex:50}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:36,height:36,borderRadius:11,background:OB.primary,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <span style={{fontFamily:"'Lora',serif",fontWeight:700,fontSize:14,color:"white"}}>DB</span>
+          </div>
+          <div>
+            <div style={{fontFamily:"'Lora',serif",fontWeight:700,fontSize:15,color:OB.text,lineHeight:1}}>DominaBanca</div>
+            <div style={{fontSize:9,color:OB.textLight,letterSpacing:1.5,textTransform:"uppercase",marginTop:1}}>Preparação Inteligente</div>
+          </div>
+        </div>
+        {stepAtual > 0 && (
+          <div style={{fontSize:11,color:OB.textLight,fontWeight:600}}>{stepLabel}</div>
+        )}
+      </nav>
+
+      {/* Content */}
+      <div style={{flex:1,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"40px 16px"}}>
+        <div style={{width:"100%",maxWidth:560}}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // STEP 0 — Bifurcação: edital aberto ou não
+  // ══════════════════════════════════════════════════════════════════════════
+  if(step === 0) return (
+    <Wrapper stepAtual={0} stepLabel="">
+      <div style={{animation:"ob-fadeUp 0.4s ease"}}>
+        <div style={{marginBottom:36}}>
+          <div style={{fontSize:11,fontWeight:700,color:OB.primary,letterSpacing:2,textTransform:"uppercase",marginBottom:12}}>
+            Vamos começar, {nome}!
+          </div>
+          <h1 style={{fontFamily:"'Lora',serif",fontSize:"clamp(24px,4vw,36px)",fontWeight:700,color:OB.text,lineHeight:1.25,marginBottom:12}}>
+            O edital do seu concurso<br/>já foi publicado?
+          </h1>
+          <p style={{fontSize:15,color:OB.textMed,lineHeight:1.7}}>
+            Sua resposta define como vamos montar seu plano de estudos.
+          </p>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:32}}>
+          <ObCard
+            icon="📋" selected={modo==="aberto"}
+            title="Sim, o edital já saiu"
+            desc="Vou enviar o edital para montar um plano exato para o meu concurso."
+            onClick={()=>setModo("aberto")}
+          />
+          <ObCard
+            icon="⏳" selected={modo==="semEdital"}
+            title="Ainda não saiu"
+            desc="Quero me preparar com base nas edições anteriores deste concurso."
+            onClick={()=>setModo("semEdital")}
+          />
+        </div>
+
+        {modo && (
+          <div style={{animation:"ob-pop 0.25s ease"}}>
+            {modo === "aberto" && (
+              <div style={{background:OB.primaryXLight,border:`1px solid #DDDDF5`,borderRadius:14,padding:"14px 18px",marginBottom:20}}>
+                <div style={{fontSize:13,fontWeight:700,color:OB.primary,marginBottom:4}}>🎯 Preparação cirúrgica</div>
+                <p style={{fontSize:13,color:OB.textMed,lineHeight:1.7,margin:0}}>
+                  Com o edital em mãos, montamos um cronograma baseado exatamente no que vai cair na sua prova.
+                </p>
+              </div>
+            )}
+            {modo === "semEdital" && (
+              <div style={{background:OB.warningLight,border:`1px solid #FDE68A`,borderRadius:14,padding:"14px 18px",marginBottom:20}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#92400E",marginBottom:4}}>⚡ Modo pré-edital ativado</div>
+                <p style={{fontSize:13,color:"#78350F",lineHeight:1.7,margin:0}}>
+                  Vamos usar o histórico de edições anteriores. Quando o edital sair, você atualiza sem perder nenhuma evolução.
+                </p>
+              </div>
+            )}
+            <button className="ob-btn" onClick={()=>setStep(modo==="aberto"?1:1)}
+              style={{width:"100%",padding:"15px",background:OB.primary,color:"white",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:`0 6px 24px rgba(91,79,207,0.28)`}}>
+              Continuar →
+            </button>
+          </div>
+        )}
+      </div>
+    </Wrapper>
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // STEP 1 — Enviar edital (aberto ou última edição)
+  // ══════════════════════════════════════════════════════════════════════════
+  if(step === 1) return (
+    <Wrapper stepAtual={1} stepLabel="Etapa 1 de 6">
+      <div style={{animation:"ob-fadeUp 0.4s ease"}}>
+        <ObProgress step={1} total={TOTAL_STEPS} label="Enviando o edital"/>
+
+        <div style={{marginBottom:28}}>
+          <h2 style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:700,color:OB.text,marginBottom:8}}>
+            {modo==="aberto" ? "Envie o seu edital" : "Envie o edital da última edição"}
+          </h2>
+          <p style={{fontSize:14,color:OB.textMed,lineHeight:1.7}}>
+            {modo==="aberto"
+              ? "Cole o conteúdo programático ou anexe o PDF. Vamos identificar cargo, banca, matérias e datas automaticamente."
+              : "Use o edital anterior para montar a base. Quando o edital novo sair, você atualiza com um clique."}
+          </p>
+        </div>
+
+        {/* Modo toggle */}
+        <div style={{display:"flex",gap:8,marginBottom:16}}>
+          {[{k:"texto",l:"✏️ Colar texto"},{k:"pdf",l:"📎 Anexar PDF"}].map(m=>(
+            <button key={m.k} onClick={()=>setInputMode(m.k)}
+              style={{padding:"8px 16px",border:`1.5px solid ${inputMode===m.k?OB.primary:OB.border}`,background:inputMode===m.k?OB.primaryXLight:OB.white,color:inputMode===m.k?OB.primary:OB.textMed,borderRadius:100,fontSize:12,fontWeight:inputMode===m.k?700:500,cursor:"pointer"}}>
+              {m.l}
+            </button>
+          ))}
+        </div>
+
+        {inputMode === "texto" ? (
+          <div>
+            <textarea value={editalText} onChange={e=>setEditalText(e.target.value)}
+              placeholder="Cole aqui o conteúdo programático do edital — matérias, disciplinas, tópicos, pesos..."
+              className="ob-inp"
+              style={{width:"100%",minHeight:140,background:OB.white,border:`1.5px solid ${OB.border}`,borderRadius:14,color:OB.text,padding:"14px 16px",fontSize:13,lineHeight:1.7,resize:"none",fontFamily:"'Sora',sans-serif"}}>
+            </textarea>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8,marginBottom:20}}>
+              <span style={{fontSize:11,color:OB.textLight}}>
+                {editalText.length > 0 ? `${editalText.length} caracteres` : "Quanto mais detalhe, mais preciso o seu cronograma"}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div style={{marginBottom:20}}>
+            <div onClick={()=>!pdfLoading&&fileRef.current?.click()}
+              onDragOver={e=>{e.preventDefault();}}
+              onDrop={e=>{e.preventDefault();processPDF(e.dataTransfer.files[0]);}}
+              style={{border:`2px dashed ${pdfName?OB.accent:OB.border}`,borderRadius:14,padding:"32px 20px",textAlign:"center",cursor:pdfLoading?"default":"pointer",background:pdfName?OB.accentLight:OB.bg,transition:"all 0.2s"}}>
+              <input ref={fileRef} type="file" accept=".pdf" style={{display:"none"}} onChange={e=>processPDF(e.target.files[0])}/>
+              {pdfLoading ? (
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
+                  <div style={{width:32,height:32,border:`3px solid ${OB.primaryXLight}`,borderTop:`3px solid ${OB.primary}`,borderRadius:"50%",animation:"ob-spin 0.8s linear infinite"}}/>
+                  <p style={{fontSize:13,color:OB.primary,fontWeight:600}}>Lendo o PDF...</p>
+                </div>
+              ) : pdfName ? (
+                <div>
+                  <div style={{fontSize:28,marginBottom:8}}>✅</div>
+                  <p style={{fontSize:13,fontWeight:700,color:OB.accent}}>PDF lido com sucesso!</p>
+                  <p style={{fontSize:11,color:OB.textLight,marginTop:4}}>{pdfName}</p>
+                  <button onClick={e=>{e.stopPropagation();setInputMode("texto");}} style={{marginTop:10,padding:"6px 14px",background:"transparent",border:`1px solid ${OB.accent}`,borderRadius:8,fontSize:11,color:OB.accent,cursor:"pointer",fontWeight:600}}>
+                    Revisar texto extraído
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div style={{fontSize:32,marginBottom:10}}>📎</div>
+                  <p style={{fontSize:14,fontWeight:700,color:OB.text,marginBottom:6}}>Arraste o PDF ou clique para selecionar</p>
+                  <p style={{fontSize:12,color:OB.textLight}}>Edital completo ou só o conteúdo programático · PDF até 10MB</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={()=>setStep(0)}
+            style={{padding:"14px 20px",background:OB.white,color:OB.textMed,border:`1.5px solid ${OB.border}`,borderRadius:12,fontSize:14,fontWeight:600,cursor:"pointer"}}>
+            ← Voltar
+          </button>
+          <button className="ob-btn" onClick={analisarEdital}
+            disabled={(!editalText.trim()&&!pdfName)||analisando}
+            style={{flex:1,padding:"14px",background:(editalText.trim()||pdfName)&&!analisando?OB.primary:"#E8E8F0",color:(editalText.trim()||pdfName)&&!analisando?"white":OB.textLight,border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:(editalText.trim()||pdfName)&&!analisando?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            {analisando && <div style={{width:16,height:16,border:"2px solid rgba(255,255,255,0.3)",borderTop:"2px solid white",borderRadius:"50%",animation:"ob-spin 0.8s linear infinite"}}/>}
+            {analisando ? "Analisando edital..." : "Analisar edital →"}
+          </button>
+        </div>
+      </div>
+    </Wrapper>
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // STEP 2 — Selecionar cargo (só quando há mais de 1)
+  // ══════════════════════════════════════════════════════════════════════════
+  if(step === 2 && parsed) return (
+    <Wrapper stepAtual={2} stepLabel="Etapa 2 de 6">
+      <div style={{animation:"ob-fadeUp 0.4s ease"}}>
+        <ObProgress step={2} total={TOTAL_STEPS} label="Confirmando cargo"/>
+
+        <div style={{marginBottom:28}}>
+          <h2 style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:700,color:OB.text,marginBottom:8}}>
+            Para qual cargo você está se preparando?
+          </h2>
+          <p style={{fontSize:14,color:OB.textMed,lineHeight:1.7}}>
+            Identificamos <strong>{parsed.cargos.length} cargos</strong> no edital do <strong>{parsed.orgao}</strong>. Selecione o seu.
+          </p>
+        </div>
+
+        <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:28}}>
+          {parsed.cargos.map(c=>(
+            <div key={c} className={`ob-card${cargo===c?" sel":""}`} onClick={()=>setCargo(c)}
+              style={{padding:"16px 18px",border:`1.5px solid ${cargo===c?OB.primary:OB.border}`,borderRadius:14,background:cargo===c?OB.primaryXLight:OB.white,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <span style={{fontSize:14,fontWeight:cargo===c?700:500,color:cargo===c?OB.primary:OB.text}}>{c}</span>
+              {cargo===c && <span style={{color:OB.primary,fontSize:18}}>✓</span>}
+            </div>
+          ))}
+        </div>
+
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={()=>setStep(1)} style={{padding:"14px 20px",background:OB.white,color:OB.textMed,border:`1.5px solid ${OB.border}`,borderRadius:12,fontSize:14,fontWeight:600,cursor:"pointer"}}>← Voltar</button>
+          <button className="ob-btn" onClick={()=>setStep(3)} disabled={!cargo}
+            style={{flex:1,padding:"14px",background:cargo?OB.primary:"#E8E8F0",color:cargo?"white":OB.textLight,border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:cargo?"pointer":"not-allowed"}}>
+            Confirmar cargo →
+          </button>
+        </div>
+      </div>
+    </Wrapper>
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // STEP 3 — Confirmar matérias
+  // ══════════════════════════════════════════════════════════════════════════
+  if(step === 3 && parsed) return (
+    <Wrapper stepAtual={3} stepLabel="Etapa 2 de 6">
+      <div style={{animation:"ob-fadeUp 0.4s ease"}}>
+        <ObProgress step={2} total={TOTAL_STEPS} label="Confirmando matérias"/>
+
+        <div style={{marginBottom:24}}>
+          <h2 style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:700,color:OB.text,marginBottom:8}}>
+            Confirmando as matérias
+          </h2>
+          <p style={{fontSize:14,color:OB.textMed,lineHeight:1.7}}>
+            Identificamos <strong>{parsed.materias.length} disciplinas</strong> para o cargo <strong>{cargo}</strong>. Está correto?
+          </p>
+        </div>
+
+        {/* Dados da prova */}
+        <div style={{background:OB.primaryXLight,border:`1px solid #DDDDF5`,borderRadius:14,padding:"16px 18px",marginBottom:20}}>
+          <div style={{display:"flex",flexDirection:"column",gap:8,fontSize:13}}>
+            <div style={{display:"flex",gap:8}}><span style={{color:OB.textLight,minWidth:60}}>Órgão</span><strong style={{color:OB.text}}>{parsed.orgao}</strong></div>
+            <div style={{display:"flex",gap:8}}><span style={{color:OB.textLight,minWidth:60}}>Banca</span><strong style={{color:OB.text}}>{parsed.banca||"Não identificada"}</strong></div>
+            <div style={{display:"flex",gap:8}}><span style={{color:OB.textLight,minWidth:60}}>Data</span><strong style={{color:OB.text}}>{parsed.dataProva||"Não informada"}</strong></div>
+            {parsed.temDiscursiva && <div style={{display:"flex",gap:8}}><span style={{color:OB.textLight,minWidth:60}}>Discursiva</span><strong style={{color:OB.accent}}>✓ Sim — incluiremos no cronograma</strong></div>}
+          </div>
+        </div>
+
+        {/* Matérias */}
+        <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:28}}>
+          {parsed.materias.map(m=>(
+            <div key={m.nome} style={{background:OB.white,border:`1px solid ${OB.border}`,borderRadius:100,padding:"6px 14px",fontSize:12,fontWeight:600,color:OB.textMed,display:"flex",alignItems:"center",gap:6}}>
+              <span>{m.nome}</span>
+              <span style={{background:OB.primaryXLight,color:OB.primary,borderRadius:100,padding:"1px 6px",fontSize:10,fontWeight:700}}>{m.peso}%</span>
+            </div>
+          ))}
+        </div>
+
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={()=>setStep(parsed?.cargos?.length>1?2:1)} style={{padding:"14px 20px",background:OB.white,color:OB.textMed,border:`1.5px solid ${OB.border}`,borderRadius:12,fontSize:14,fontWeight:600,cursor:"pointer"}}>← Voltar</button>
+          <button className="ob-btn" onClick={()=>setStep(4)}
+            style={{flex:1,padding:"14px",background:OB.primary,color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer"}}>
+            Está correto, continuar →
+          </button>
+        </div>
+      </div>
+    </Wrapper>
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // STEP 4 — Dificuldades e facilidades
+  // ══════════════════════════════════════════════════════════════════════════
+  if(step === 4 && parsed) return (
+    <Wrapper stepAtual={4} stepLabel="Etapa 3 de 6">
+      <div style={{animation:"ob-fadeUp 0.4s ease"}}>
+        <ObProgress step={3} total={TOTAL_STEPS} label="Seu perfil de estudos"/>
+
+        <div style={{marginBottom:24}}>
+          <h2 style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:700,color:OB.text,marginBottom:8}}>
+            Como você se sente em cada matéria?
+          </h2>
+          <p style={{fontSize:14,color:OB.textMed,lineHeight:1.7}}>
+            Isso nos ajuda a priorizar o que precisa de mais atenção no seu cronograma.
+          </p>
+        </div>
+
+        {/* Dificuldades */}
+        <div style={{marginBottom:24}}>
+          <div style={{fontSize:13,fontWeight:700,color:OB.danger,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+            <span>⚠️</span> Matérias que você ainda não domina ou nunca estudou
+          </div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+            {parsed.materias.map(m=>(
+              <button key={m.nome} className={`ob-chip${dificeis.includes(m.nome)?" sel":""}`}
+                onClick={()=>setDificeis(p=>p.includes(m.nome)?p.filter(x=>x!==m.nome):[...p,m.nome])}
+                style={{padding:"8px 16px",borderRadius:100,border:`1.5px solid ${dificeis.includes(m.nome)?OB.danger:OB.border}`,background:dificeis.includes(m.nome)?"#FEE8E8":OB.white,color:dificeis.includes(m.nome)?OB.danger:OB.textMed,fontSize:13,fontWeight:dificeis.includes(m.nome)?700:500,cursor:"pointer"}}>
+                {dificeis.includes(m.nome)?"⚠️ ":""}{m.nome}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Facilidades */}
+        <div style={{marginBottom:28}}>
+          <div style={{fontSize:13,fontWeight:700,color:OB.accent,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
+            <span>✅</span> Matérias que você já domina bem
+          </div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+            {parsed.materias.filter(m=>!dificeis.includes(m.nome)).map(m=>(
+              <button key={m.nome} className={`ob-chip${faceis.includes(m.nome)?" sel":""}`}
+                onClick={()=>setFaceis(p=>p.includes(m.nome)?p.filter(x=>x!==m.nome):[...p,m.nome])}
+                style={{padding:"8px 16px",borderRadius:100,border:`1.5px solid ${faceis.includes(m.nome)?OB.accent:OB.border}`,background:faceis.includes(m.nome)?OB.accentLight:OB.white,color:faceis.includes(m.nome)?OB.accent:OB.textMed,fontSize:13,fontWeight:faceis.includes(m.nome)?700:500,cursor:"pointer"}}>
+                {faceis.includes(m.nome)?"✅ ":""}{m.nome}
+              </button>
+            ))}
+          </div>
+          {parsed.materias.filter(m=>!dificeis.includes(m.nome)).length === 0 && (
+            <p style={{fontSize:12,color:OB.textLight,fontStyle:"italic"}}>Selecione menos matérias difíceis para liberar esta seção.</p>
+          )}
+        </div>
+
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={()=>setStep(3)} style={{padding:"14px 20px",background:OB.white,color:OB.textMed,border:`1.5px solid ${OB.border}`,borderRadius:12,fontSize:14,fontWeight:600,cursor:"pointer"}}>← Voltar</button>
+          <button className="ob-btn" onClick={()=>setStep(5)}
+            style={{flex:1,padding:"14px",background:OB.primary,color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer"}}>
+            Continuar →
+          </button>
+        </div>
+      </div>
+    </Wrapper>
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // STEP 5 — Horas diárias + simulado
+  // ══════════════════════════════════════════════════════════════════════════
+  if(step === 5) return (
+    <Wrapper stepAtual={5} stepLabel="Etapa 4 de 6">
+      <div style={{animation:"ob-fadeUp 0.4s ease"}}>
+        <ObProgress step={4} total={TOTAL_STEPS} label="Sua rotina de estudos"/>
+
+        <div style={{marginBottom:28}}>
+          <h2 style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:700,color:OB.text,marginBottom:8}}>
+            Como é a sua rotina?
+          </h2>
+          <p style={{fontSize:14,color:OB.textMed,lineHeight:1.7}}>
+            Vamos montar um cronograma que respeita o seu tempo disponível.
+          </p>
+        </div>
+
+        {/* Horas por dia */}
+        <div style={{background:OB.white,border:`1.5px solid ${OB.border}`,borderRadius:16,padding:"20px",marginBottom:16}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <div>
+              <div style={{fontSize:14,fontWeight:700,color:OB.text}}>⏰ Horas de estudo por dia</div>
+              <div style={{fontSize:12,color:OB.textLight,marginTop:2}}>Seja realista — consistência vale mais que intensidade.</div>
+            </div>
+            <div style={{fontFamily:"'Lora',serif",fontSize:32,fontWeight:700,color:OB.primary,lineHeight:1}}>{horas}h</div>
+          </div>
+          <input type="range" min={1} max={8} value={horas} onChange={e=>setHoras(+e.target.value)} className="ob-range"/>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:OB.textLight,marginTop:6}}>
+            <span>1h</span><span>4h</span><span>8h</span>
+          </div>
+        </div>
+
+        {/* Frequência simulado */}
+        <div style={{background:OB.white,border:`1.5px solid ${OB.border}`,borderRadius:16,padding:"20px",marginBottom:16}}>
+          <div style={{fontSize:14,fontWeight:700,color:OB.text,marginBottom:4}}>🎯 Frequência dos simulados</div>
+          <div style={{fontSize:12,color:OB.textLight,marginBottom:14}}>O simulado semanal é o padrão recomendado.</div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {(modo==="semEdital"?["Semanal","Quinzenal","Mensal"]:["Semanal","Quinzenal"]).map(f=>(
+              <button key={f} className={`ob-chip${simFreq===f.toLowerCase()?" sel":""}`}
+                onClick={()=>setSimFreq(f.toLowerCase())}
+                style={{padding:"9px 18px",borderRadius:100,border:`1.5px solid ${simFreq===f.toLowerCase()?OB.primary:OB.border}`,background:simFreq===f.toLowerCase()?OB.primaryXLight:OB.bg,color:simFreq===f.toLowerCase()?OB.primary:OB.textMed,fontSize:13,fontWeight:simFreq===f.toLowerCase()?700:500,cursor:"pointer"}}>
+                {f} {f==="Semanal"&&"⭐"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Dia do simulado */}
+        <div style={{background:OB.white,border:`1.5px solid ${OB.border}`,borderRadius:16,padding:"20px",marginBottom:24}}>
+          <div style={{fontSize:14,fontWeight:700,color:OB.text,marginBottom:4}}>📅 Melhor dia para o simulado</div>
+          <div style={{fontSize:12,color:OB.textLight,marginBottom:14}}>Escolha um dia em que você terá mais tranquilidade.</div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"].map(d=>(
+              <button key={d} className={`ob-chip${simDia===d?" sel":""}`}
+                onClick={()=>setSimDia(d)}
+                style={{padding:"8px 14px",borderRadius:100,border:`1.5px solid ${simDia===d?OB.primary:OB.border}`,background:simDia===d?OB.primaryXLight:OB.bg,color:simDia===d?OB.primary:OB.textMed,fontSize:12,fontWeight:simDia===d?700:500,cursor:"pointer"}}>
+                {d}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={()=>setStep(4)} style={{padding:"14px 20px",background:OB.white,color:OB.textMed,border:`1.5px solid ${OB.border}`,borderRadius:12,fontSize:14,fontWeight:600,cursor:"pointer"}}>← Voltar</button>
+          <button className="ob-btn" onClick={()=>setStep(parsed?.temDiscursiva?6:7)}
+            style={{flex:1,padding:"14px",background:OB.primary,color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer"}}>
+            Continuar →
+          </button>
+        </div>
+      </div>
+    </Wrapper>
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // STEP 6 — Discursiva (só se tiver no edital)
+  // ══════════════════════════════════════════════════════════════════════════
+  if(step === 6 && parsed?.temDiscursiva) return (
+    <Wrapper stepAtual={6} stepLabel="Etapa 5 de 6">
+      <div style={{animation:"ob-fadeUp 0.4s ease"}}>
+        <ObProgress step={5} total={TOTAL_STEPS} label="Prova discursiva"/>
+
+        <div style={{marginBottom:28}}>
+          <h2 style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:700,color:OB.text,marginBottom:8}}>
+            ✍️ Sua prova tem discursiva
+          </h2>
+          <p style={{fontSize:14,color:OB.textMed,lineHeight:1.7}}>
+            Vamos incluir o treino de redação no seu cronograma. Como prefere organizar?
+          </p>
+        </div>
+
+        {/* Dia da discursiva */}
+        <div style={{background:OB.white,border:`1.5px solid ${OB.border}`,borderRadius:16,padding:"20px",marginBottom:16}}>
+          <div style={{fontSize:14,fontWeight:700,color:OB.text,marginBottom:4}}>📅 Melhor dia para treinar redação</div>
+          <div style={{fontSize:12,color:OB.textLight,marginBottom:14}}>Escolha um dia diferente do simulado.</div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {["Segunda","Terça","Quarta","Quinta","Sexta"].map(d=>(
+              <button key={d} className={`ob-chip${discDia===d?" sel":""}`}
+                onClick={()=>setDiscDia(d)}
+                style={{padding:"8px 14px",borderRadius:100,border:`1.5px solid ${discDia===d?OB.primary:OB.border}`,background:discDia===d?OB.primaryXLight:OB.bg,color:discDia===d?OB.primary:OB.textMed,fontSize:12,fontWeight:discDia===d?700:500,cursor:"pointer"}}>
+                {d}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Frequência */}
+        <div style={{background:OB.white,border:`1.5px solid ${OB.border}`,borderRadius:16,padding:"20px",marginBottom:24}}>
+          <div style={{fontSize:14,fontWeight:700,color:OB.text,marginBottom:4}}>🔁 Quantas vezes por semana?</div>
+          <div style={{fontSize:12,color:OB.textLight,marginBottom:14}}>Recomendamos pelo menos 2x por semana.</div>
+          <div style={{display:"flex",gap:8}}>
+            {[1,2,3].map(n=>(
+              <button key={n} className={`ob-chip${discFreq===n?" sel":""}`}
+                onClick={()=>setDiscFreq(n)}
+                style={{flex:1,padding:"12px",borderRadius:12,border:`1.5px solid ${discFreq===n?OB.primary:OB.border}`,background:discFreq===n?OB.primaryXLight:OB.bg,color:discFreq===n?OB.primary:OB.textMed,fontSize:13,fontWeight:discFreq===n?700:500,cursor:"pointer",textAlign:"center"}}>
+                {n}x por semana {n===2&&<span style={{fontSize:10}}>⭐</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={()=>setStep(5)} style={{padding:"14px 20px",background:OB.white,color:OB.textMed,border:`1.5px solid ${OB.border}`,borderRadius:12,fontSize:14,fontWeight:600,cursor:"pointer"}}>← Voltar</button>
+          <button className="ob-btn" onClick={()=>setStep(7)}
+            style={{flex:1,padding:"14px",background:OB.primary,color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer"}}>
+            Continuar →
+          </button>
+        </div>
+      </div>
+    </Wrapper>
+  );
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // STEP 7 — Resumo + confirmar
+  // ══════════════════════════════════════════════════════════════════════════
+  if(step === 7) return (
+    <Wrapper stepAtual={7} stepLabel="Última etapa">
+      <div style={{animation:"ob-fadeUp 0.4s ease"}}>
+        <ObProgress step={TOTAL_STEPS} total={TOTAL_STEPS} label="Tudo pronto!"/>
+
+        <div style={{marginBottom:24}}>
+          <h2 style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:700,color:OB.text,marginBottom:8}}>
+            Seu plano está pronto, {nome}! 🎉
+          </h2>
+          <p style={{fontSize:14,color:OB.textMed,lineHeight:1.7}}>
+            Revise e confirme para acessar seu cronograma personalizado.
+          </p>
+        </div>
+
+        {/* Resumo */}
+        <div style={{background:OB.white,border:`1.5px solid ${OB.border}`,borderRadius:16,padding:"20px",marginBottom:24,display:"flex",flexDirection:"column",gap:12}}>
+          {[
+            {icon:"🏛️",label:"Concurso",value:`${parsed?.orgao} — ${cargo}`},
+            {icon:"📋",label:"Banca",value:parsed?.banca||"Não identificada"},
+            {icon:"📅",label:"Data da prova",value:parsed?.dataProva||"A confirmar"},
+            {icon:"📚",label:"Matérias",value:`${parsed?.materias?.length} disciplinas`},
+            {icon:"⏰",label:"Estudo diário",value:`${horas}h por dia`},
+            {icon:"🎯",label:"Simulados",value:`${simFreq.charAt(0).toUpperCase()+simFreq.slice(1)} — ${simDia}s`},
+            ...(parsed?.temDiscursiva?[{icon:"✍️",label:"Discursiva",value:`${discFreq}x por semana — ${discDia}s`}]:[]),
+            ...(dificeis.length>0?[{icon:"⚠️",label:"Foco reforçado",value:dificeis.join(", ")}]:[]),
+          ].map(r=>(
+            <div key={r.label} style={{display:"flex",gap:12,alignItems:"flex-start",paddingBottom:12,borderBottom:`1px solid ${OB.border}`}}>
+              <span style={{fontSize:18,flexShrink:0}}>{r.icon}</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:11,color:OB.textLight,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,marginBottom:2}}>{r.label}</div>
+                <div style={{fontSize:14,fontWeight:600,color:OB.text}}>{r.value}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {modo === "semEdital" && (
+          <div style={{background:OB.warningLight,border:`1px solid #FDE68A`,borderRadius:12,padding:"12px 16px",marginBottom:20,fontSize:13,color:"#92400E",lineHeight:1.7}}>
+            📢 <strong>Lembre:</strong> quando o edital oficial for publicado, atualize aqui para recalibrar sem perder sua evolução.
+          </div>
+        )}
+
+        <button className="ob-btn" onClick={()=>onComplete({parsed,cargo,horas,simFreq,simDia,discDia,discFreq,dificeis,faceis,modo})}
+          style={{width:"100%",padding:"16px",background:OB.primary,color:"white",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:`0 6px 24px rgba(91,79,207,0.28)`}}>
+          Criar meu cronograma →
+        </button>
+      </div>
+    </Wrapper>
+  );
+
+  return null;
 }
