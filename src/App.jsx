@@ -1094,8 +1094,14 @@ function Cadastro({ onBack }) {
     <div style={{ fontFamily:"'Sora',sans-serif", minHeight:"100vh", background:C.bg, display:"flex", flexDirection:"column" }}>
 
       {/* Nav */}
-      <nav style={{ background:C.white, borderBottom:`1px solid ${C.border}`, height:64, display:"flex", alignItems:"center", padding:"0 28px", boxShadow:"0 1px 6px rgba(0,0,0,0.04)" }}>
-        <CadastroLogo/>
+      <nav style={{ background:C.white, borderBottom:`1px solid ${C.border}`, height:64, display:"flex", alignItems:"center", padding:"0 28px", boxShadow:"0 1px 6px rgba(0,0,0,0.04)", justifyContent:"space-between" }}>
+        <button onClick={onBack} style={{ background:"none", border:"none", cursor:"pointer", padding:0 }}>
+          <CadastroLogo/>
+        </button>
+        <button onClick={onBack} className="btn-back"
+          style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:`1.5px solid ${C.border}`, borderRadius:10, padding:"7px 16px", fontSize:13, fontWeight:600, color:C.textMed, cursor:"pointer" }}>
+          ← Voltar ao início
+        </button>
       </nav>
 
       {/* Content */}
