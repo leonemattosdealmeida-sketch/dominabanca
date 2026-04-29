@@ -878,7 +878,7 @@ const Etapa1 = ({ data, onChange, onNext, onLogin }) => {
     <div style={{ display:"flex", flexDirection:"column", gap:20, animation:"fadeUp 0.4s ease" }}>
       <div style={{ marginBottom:4 }}>
         <h2 style={{ fontFamily:"'Lora',serif", fontSize:26, fontWeight:700, color:C.text, marginBottom:8 }}>Crie sua conta</h2>
-        <p style={{ fontSize:14, color:C.textMed, lineHeight:1.6 }}>Sua preparação começa agora. É grátis na primeira semana.</p>
+        <p style={{ fontSize:14, color:C.textMed, lineHeight:1.6 }}>Sua aprovação começa agora e você <span style={{color:C.primary, fontWeight:700}}>não paga nada</span> para dar o primeiro passo.</p>
       </div>
 
       <Field label="Email" name="email" type="email" value={data.email} onChange={onChange} error={errors.email} placeholder="seu@email.com" autoFocus/>
