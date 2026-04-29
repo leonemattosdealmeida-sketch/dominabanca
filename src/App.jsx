@@ -407,7 +407,7 @@ const RedacaoCarrossel = () => {
   );
 };
 
-function Landing({ onCadastro }) {
+function Landing({ onCadastro, onLogin }) {
   return(
     <div style={{fontFamily:"'Sora',sans-serif",background:C.bg,color:C.text}}>
 
@@ -415,7 +415,7 @@ function Landing({ onCadastro }) {
       <nav style={{background:C.white,borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,zIndex:100,boxShadow:"0 1px 8px rgba(0,0,0,0.04)"}}>
         <div style={{maxWidth:1100,margin:"0 auto",padding:"0 28px",height:66,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <LogoMark/>
-          <button className="cta-btn" style={{padding:"10px 24px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:"pointer",boxShadow:C.shadowMd}}>
+          <button className="cta-btn" onClick={onLogin} style={{padding:"10px 24px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:"pointer",boxShadow:C.shadowMd}}>
             Área do aluno
           </button>
         </div>
@@ -1138,10 +1138,185 @@ function Cadastro({ onBack }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// LOGIN
+// ══════════════════════════════════════════════════════════════════════════════
+function Login({ onBack, onCadastro, onSuccess }) {
+  const [tela, setTela] = useState("login");
+  const [showPass, setShowPass] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({ email:"", senha:"", emailRecuperar:"" });
+  const [errors, setErrors] = useState({});
+
+  const handleChange = (name, value) => {
+    setForm(f => ({...f, [name]:value}));
+    if(errors[name]) setErrors(e => ({...e, [name]:""}));
+  };
+
+  const validateLogin = () => {
+    const e = {};
+    if(!form.email) e.email = "Email obrigatório";
+    else if(!/\S+@\S+\.\S+/.test(form.email)) e.email = "Email inválido";
+    if(!form.senha) e.senha = "Senha obrigatória";
+    return e;
+  };
+
+  const handleLogin = async () => {
+    const e = validateLogin();
+    if(Object.keys(e).length > 0){ setErrors(e); return; }
+    setLoading(true);
+    await new Promise(r => setTimeout(r, 1500));
+    setLoading(false);
+    onSuccess && onSuccess(form);
+  };
+
+  const handleRecuperar = async () => {
+    if(!form.emailRecuperar || !/\S+@\S+\.\S+/.test(form.emailRecuperar)){
+      setErrors({ emailRecuperar:"Email inválido" });
+      return;
+    }
+    setLoading(true);
+    await new Promise(r => setTimeout(r, 1200));
+    setLoading(false);
+    setTela("confirmado");
+  };
+
+  const NavLogin = ({ voltarPara, voltarLabel }) => (
+    <nav style={{ background:"white", borderBottom:`1px solid ${C.border}`, height:64, display:"flex", alignItems:"center", padding:"0 28px", justifyContent:"space-between", boxShadow:"0 1px 6px rgba(0,0,0,0.04)" }}>
+      <button onClick={onBack} style={{ background:"none", border:"none", cursor:"pointer", padding:0 }}>
+        <CadastroLogo/>
+      </button>
+      <button onClick={voltarPara} className="btn-back"
+        style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:`1.5px solid ${C.border}`, borderRadius:10, padding:"7px 16px", fontSize:13, fontWeight:600, color:C.textMed, cursor:"pointer" }}>
+        ← {voltarLabel}
+      </button>
+    </nav>
+  );
+
+  const Wrapper = ({ children }) => (
+    <div style={{ fontFamily:"'Sora',sans-serif", minHeight:"100vh", background:C.bg, display:"flex", flexDirection:"column" }}>
+      {children}
+    </div>
+  );
+
+  if(tela === "login") return (
+    <Wrapper>
+      <NavLogin voltarPara={onBack} voltarLabel="Voltar ao início"/>
+      <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:"40px 16px" }}>
+        <div style={{ width:"100%", maxWidth:420, animation:"fadeUp 0.4s ease" }}>
+          <div style={{ background:"white", borderRadius:24, padding:"40px 36px", boxShadow:C.shadowLg, border:`1px solid ${C.border}` }}>
+            <div style={{ textAlign:"center", marginBottom:32 }}>
+              <h1 style={{ fontFamily:"'Lora',serif", fontSize:26, fontWeight:700, color:C.text, marginBottom:8 }}>Bem-vindo de volta</h1>
+              <p style={{ fontSize:14, color:C.textMed, lineHeight:1.6 }}>Entre na sua conta para continuar estudando.</p>
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
+              <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                <label style={{ fontSize:13, fontWeight:700, color:C.textMed }}>Email</label>
+                <input type="email" value={form.email} onChange={e=>handleChange("email",e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+                  placeholder="seu@email.com" autoFocus className="inp"
+                  style={{ padding:"13px 16px", border:`1.5px solid ${errors.email?C.danger:C.border}`, borderRadius:12, fontSize:14, color:C.text, background:"white", width:"100%", outline:"none" }}/>
+                {errors.email && <span style={{ fontSize:11, color:C.danger, fontWeight:600 }}>{errors.email}</span>}
+              </div>
+              <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <label style={{ fontSize:13, fontWeight:700, color:C.textMed }}>Senha</label>
+                  <button onClick={()=>setTela("recuperar")} style={{ background:"none", border:"none", color:C.primary, fontSize:12, fontWeight:600, cursor:"pointer", padding:0 }}>
+                    Esqueci minha senha
+                  </button>
+                </div>
+                <div style={{ position:"relative" }}>
+                  <input type={showPass?"text":"password"} value={form.senha} onChange={e=>handleChange("senha",e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+                    placeholder="Sua senha" className="inp"
+                    style={{ padding:"13px 48px 13px 16px", border:`1.5px solid ${errors.senha?C.danger:C.border}`, borderRadius:12, fontSize:14, color:C.text, background:"white", width:"100%", outline:"none" }}/>
+                  <button onClick={()=>setShowPass(!showPass)} style={{ position:"absolute", right:14, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:C.textLight, fontSize:16 }}>
+                    {showPass?"🙈":"👁️"}
+                  </button>
+                </div>
+                {errors.senha && <span style={{ fontSize:11, color:C.danger, fontWeight:600 }}>{errors.senha}</span>}
+              </div>
+              <button className="btn-main" onClick={handleLogin} disabled={loading}
+                style={{ padding:"15px", background:C.primary, color:"white", border:"none", borderRadius:12, fontSize:15, fontWeight:700, cursor:"pointer", boxShadow:C.shadowMd, marginTop:4, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+                {loading&&<div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,0.3)", borderTop:"2px solid white", borderRadius:"50%", animation:"spin 0.8s linear infinite" }}/>}
+                {loading?"Entrando...":"Entrar →"}
+              </button>
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:12, margin:"24px 0" }}>
+              <div style={{ flex:1, height:1, background:C.border }}/>
+              <span style={{ fontSize:11, color:C.textLight, fontWeight:600 }}>ou</span>
+              <div style={{ flex:1, height:1, background:C.border }}/>
+            </div>
+            <p style={{ textAlign:"center", fontSize:13, color:C.textMed }}>
+              Ainda não tem conta?{" "}
+              <button onClick={onCadastro} style={{ background:"none", border:"none", color:C.primary, fontWeight:700, cursor:"pointer", fontSize:13 }}>
+                Criar gratuitamente
+              </button>
+            </p>
+          </div>
+          <div style={{ display:"flex", justifyContent:"center", marginTop:28 }}><CadastroLogo/></div>
+        </div>
+      </div>
+    </Wrapper>
+  );
+
+  if(tela === "recuperar") return (
+    <Wrapper>
+      <NavLogin voltarPara={()=>setTela("login")} voltarLabel="Voltar ao login"/>
+      <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:"40px 16px" }}>
+        <div style={{ width:"100%", maxWidth:420, animation:"fadeUp 0.4s ease" }}>
+          <div style={{ background:"white", borderRadius:24, padding:"40px 36px", boxShadow:C.shadowLg, border:`1px solid ${C.border}` }}>
+            <div style={{ textAlign:"center", marginBottom:32 }}>
+              <div style={{ width:56, height:56, borderRadius:"50%", background:C.primaryXLight, display:"flex", alignItems:"center", justifyContent:"center", fontSize:26, margin:"0 auto 16px" }}>🔐</div>
+              <h1 style={{ fontFamily:"'Lora',serif", fontSize:24, fontWeight:700, color:C.text, marginBottom:8 }}>Recuperar senha</h1>
+              <p style={{ fontSize:14, color:C.textMed, lineHeight:1.7 }}>Informe o email da sua conta. Vamos enviar um link para você criar uma nova senha.</p>
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
+              <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                <label style={{ fontSize:13, fontWeight:700, color:C.textMed }}>Email da conta</label>
+                <input type="email" value={form.emailRecuperar} onChange={e=>handleChange("emailRecuperar",e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleRecuperar()}
+                  placeholder="seu@email.com" autoFocus className="inp"
+                  style={{ padding:"13px 16px", border:`1.5px solid ${errors.emailRecuperar?C.danger:C.border}`, borderRadius:12, fontSize:14, color:C.text, background:"white", width:"100%", outline:"none" }}/>
+                {errors.emailRecuperar && <span style={{ fontSize:11, color:C.danger, fontWeight:600 }}>{errors.emailRecuperar}</span>}
+              </div>
+              <button className="btn-main" onClick={handleRecuperar} disabled={loading}
+                style={{ padding:"15px", background:C.primary, color:"white", border:"none", borderRadius:12, fontSize:15, fontWeight:700, cursor:"pointer", boxShadow:C.shadowMd, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+                {loading&&<div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,0.3)", borderTop:"2px solid white", borderRadius:"50%", animation:"spin 0.8s linear infinite" }}/>}
+                {loading?"Enviando...":"Enviar link de recuperação →"}
+              </button>
+            </div>
+          </div>
+          <div style={{ display:"flex", justifyContent:"center", marginTop:28 }}><CadastroLogo/></div>
+        </div>
+      </div>
+    </Wrapper>
+  );
+
+  return (
+    <Wrapper>
+      <NavLogin voltarPara={onBack} voltarLabel="Voltar ao início"/>
+      <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:"40px 16px" }}>
+        <div style={{ width:"100%", maxWidth:420, animation:"fadeUp 0.5s ease" }}>
+          <div style={{ background:"white", borderRadius:24, padding:"40px 36px", boxShadow:C.shadowLg, border:`1px solid ${C.border}`, textAlign:"center" }}>
+            <div style={{ width:64, height:64, borderRadius:"50%", background:C.accentLight, border:`3px solid ${C.accent}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, margin:"0 auto 20px" }}>✉️</div>
+            <h2 style={{ fontFamily:"'Lora',serif", fontSize:24, fontWeight:700, color:C.text, marginBottom:10 }}>Email enviado!</h2>
+            <p style={{ fontSize:14, color:C.textMed, lineHeight:1.75, marginBottom:8 }}>Enviamos um link de recuperação para:</p>
+            <p style={{ fontSize:15, fontWeight:700, color:C.primary, marginBottom:28 }}>{form.emailRecuperar}</p>
+            <p style={{ fontSize:13, color:C.textLight, lineHeight:1.7, marginBottom:32 }}>Verifique sua caixa de entrada e a pasta de spam. O link expira em 30 minutos.</p>
+            <button className="btn-main" onClick={()=>setTela("login")}
+              style={{ width:"100%", padding:"14px", background:C.primary, color:"white", border:"none", borderRadius:12, fontSize:14, fontWeight:700, cursor:"pointer", boxShadow:C.shadowMd }}>
+              Voltar ao login
+            </button>
+          </div>
+          <div style={{ display:"flex", justifyContent:"center", marginTop:28 }}><CadastroLogo/></div>
+        </div>
+      </div>
+    </Wrapper>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // ROOT — Gerencia navegação entre telas
 // ══════════════════════════════════════════════════════════════════════════════
 export default function App() {
-  const [screen, setScreen] = useState("landing"); // "landing" | "cadastro"
+  const [screen, setScreen] = useState("landing"); // "landing" | "cadastro" | "login"
 
   useEffect(() => {
     const s = document.createElement("style");
@@ -1150,6 +1325,7 @@ export default function App() {
     document.head.appendChild(s);
   }, []);
 
-  if (screen === "cadastro") return <Cadastro onBack={() => setScreen("landing")} />;
-  return <Landing onCadastro={() => setScreen("cadastro")} />;
+  if(screen === "cadastro") return <Cadastro onBack={()=>setScreen("landing")}/>;
+  if(screen === "login") return <Login onBack={()=>setScreen("landing")} onCadastro={()=>setScreen("cadastro")} onSuccess={()=>setScreen("landing")}/>;
+  return <Landing onCadastro={()=>setScreen("cadastro")} onLogin={()=>setScreen("login")}/>;
 }
