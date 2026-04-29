@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 
-import { useState, useEffect, useRef } from "react";
 
 const C = {
   primary: "#6C3CE1",
@@ -409,12 +408,6 @@ const RedacaoCarrossel = () => {
 };
 
 function Landing({ onCadastro }) {
-  useEffect(()=>{
-    const s=document.createElement("style");
-    s.textContent=css;
-    document.head.appendChild(s);
-  },[]);
-
   return(
     <div style={{fontFamily:"'Sora',sans-serif",background:C.bg,color:C.text}}>
 
@@ -651,7 +644,7 @@ function Landing({ onCadastro }) {
                 </div>
               </div>
 
-              <button className="cta-btn" onClick={onCadastro} style={{width:"100%",padding:14,background:C.white,color:C.primary,border:"none",borderRadius:12,fontSize:14,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 20px rgba(0,0,0,0.2)"}}>
+              <button className="cta-btn" style={{width:"100%",padding:14,background:C.white,color:C.primary,border:"none",borderRadius:12,fontSize:14,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 20px rgba(0,0,0,0.2)"}}>
                 Assinar por R$67/mês →
               </button>
               <p style={{fontSize:11,color:"rgba(255,255,255,0.35)",textAlign:"center",marginTop:12}}>
@@ -1085,12 +1078,6 @@ function Cadastro({ onBack }) {
   const [form, setForm] = useState({
     email:"", senha:"", nome:"", nascimento:"", sexo:"", estado:"", cidade:""
   });
-
-  useEffect(() => {
-    const s = document.createElement("style");
-    s.textContent = css;
-    document.head.appendChild(s);
-  }, []);
 
   const handleChange = (name, value) => setForm(f => ({...f, [name]:value}));
 
