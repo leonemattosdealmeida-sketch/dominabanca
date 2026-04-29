@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 
+import { useState, useEffect, useRef } from "react";
+
 const C = {
   primary: "#6C3CE1",
   primaryLight: "#8B5CF6",
@@ -406,8 +408,7 @@ const RedacaoCarrossel = () => {
   );
 };
 
-// ── Main ───────────────────────────────────────────────────────────────────────
-export default function DominaBancaLanding() {
+function Landing({ onCadastro }) {
   useEffect(()=>{
     const s=document.createElement("style");
     s.textContent=css;
@@ -443,7 +444,7 @@ export default function DominaBancaLanding() {
             Questões, cronograma e simulados personalizados para o seu estudo diário.
           </p>
           <div style={{display:"flex",gap:12,flexWrap:"wrap"}} className="hero-btns">
-            <button className="cta-btn" style={{padding:"15px 32px",background:C.primary,color:"white",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:C.shadowMd}}>
+            <button className="cta-btn" onClick={onCadastro} style={{padding:"15px 32px",background:C.primary,color:"white",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:C.shadowMd}}>
               Começar gratuitamente →
             </button>
           </div>
@@ -605,7 +606,7 @@ export default function DominaBancaLanding() {
                 </div>
               </div>
 
-              <button className="cta-btn" style={{width:"100%",padding:14,background:"transparent",color:C.primary,border:`2px solid ${C.primary}`,borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer"}}>
+              <button className="cta-btn" onClick={onCadastro} style={{width:"100%",padding:14,background:"transparent",color:C.primary,border:`2px solid ${C.primary}`,borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer"}}>
                 Começar gratuitamente
               </button>
             </div>
@@ -650,7 +651,7 @@ export default function DominaBancaLanding() {
                 </div>
               </div>
 
-              <button className="cta-btn" style={{width:"100%",padding:14,background:C.white,color:C.primary,border:"none",borderRadius:12,fontSize:14,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 20px rgba(0,0,0,0.2)"}}>
+              <button className="cta-btn" onClick={onCadastro} style={{width:"100%",padding:14,background:C.white,color:C.primary,border:"none",borderRadius:12,fontSize:14,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 20px rgba(0,0,0,0.2)"}}>
                 Assinar por R$67/mês →
               </button>
               <p style={{fontSize:11,color:"rgba(255,255,255,0.35)",textAlign:"center",marginTop:12}}>
@@ -732,4 +733,430 @@ export default function DominaBancaLanding() {
       </footer>
     </div>
   );
+}
+
+const ESTADOS = [
+  "AC","AL","AP","AM","BA","CE","DF","ES","GO","MA",
+  "MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN",
+  "RS","RO","RR","SC","SP","SE","TO"
+];
+
+const CadastroLogo = () => (
+  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+    <div style={{
+      width:40, height:40,
+      borderRadius:12,
+      background:C.primary,
+      display:"flex", alignItems:"center", justifyContent:"center",
+      boxShadow:`0 4px 12px rgba(91,79,207,0.35)`
+    }}>
+      <span style={{ fontFamily:"'Lora',serif", fontWeight:700, fontSize:16, color:"white", letterSpacing:"-0.5px" }}>DB</span>
+    </div>
+    <div>
+      <div style={{ fontFamily:"'Lora',serif", fontWeight:700, fontSize:16, color:C.text, lineHeight:1 }}>DominaBanca</div>
+      <div style={{ fontSize:9, color:C.textLight, letterSpacing:1.5, textTransform:"uppercase", marginTop:2 }}>Preparação Inteligente</div>
+    </div>
+  </div>
+);
+
+const ProgressBar = ({ step, total }) => (
+  <div style={{ marginBottom:32 }}>
+    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+      <span style={{ fontSize:12, fontWeight:700, color:C.primary }}>Etapa {step} de {total}</span>
+      <span style={{ fontSize:11, color:C.textLight }}>{Math.round((step/total)*100)}% concluído</span>
+    </div>
+    <div style={{ height:4, background:C.border, borderRadius:99, overflow:"hidden" }}>
+      <div style={{
+        height:"100%",
+        width:`${(step/total)*100}%`,
+        background:`linear-gradient(90deg,${C.primary},${C.primaryLight})`,
+        borderRadius:99,
+        transition:"width 0.4s ease"
+      }}/>
+    </div>
+    <div style={{ display:"flex", gap:8, marginTop:12 }}>
+      {Array.from({length:total},(_,i)=>(
+        <div key={i} style={{
+          flex:1, height:3, borderRadius:99,
+          background: i < step ? C.primary : C.border,
+          transition:"background 0.3s ease"
+        }}/>
+      ))}
+    </div>
+  </div>
+);
+
+const Field = ({ label, name, type="text", value, onChange, error, placeholder, hint, autoFocus }) => (
+  <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+    <label style={{ fontSize:13, fontWeight:700, color:C.textMed }}>{label}</label>
+    <input
+      type={type}
+      value={value}
+      onChange={e=>onChange(name,e.target.value)}
+      placeholder={placeholder}
+      autoFocus={autoFocus}
+      className={`inp${error?" error":""}`}
+      style={{
+        padding:"13px 16px",
+        border:`1.5px solid ${error?C.danger:C.border}`,
+        borderRadius:12,
+        fontSize:14,
+        color:C.text,
+        background:C.white,
+        width:"100%"
+      }}
+    />
+    {error && <span style={{ fontSize:11, color:C.danger, fontWeight:600 }}>{error}</span>}
+    {hint && !error && <span style={{ fontSize:11, color:C.textLight }}>{hint}</span>}
+  </div>
+);
+
+const SelectField = ({ label, name, value, onChange, error, options, placeholder }) => (
+  <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+    <label style={{ fontSize:13, fontWeight:700, color:C.textMed }}>{label}</label>
+    <div style={{ position:"relative" }}>
+      <select
+        value={value}
+        onChange={e=>onChange(name,e.target.value)}
+        className={`inp${error?" error":""}`}
+        style={{
+          padding:"13px 40px 13px 16px",
+          border:`1.5px solid ${error?C.danger:C.border}`,
+          borderRadius:12,
+          fontSize:14,
+          color:value?C.text:C.textLight,
+          background:C.white,
+          width:"100%",
+          cursor:"pointer"
+        }}
+      >
+        <option value="">{placeholder}</option>
+        {options.map(o=>(
+          <option key={o.v||o} value={o.v||o}>{o.l||o}</option>
+        ))}
+      </select>
+      <div style={{ position:"absolute", right:14, top:"50%", transform:"translateY(-50%)", pointerEvents:"none", color:C.textLight, fontSize:12 }}>▼</div>
+    </div>
+    {error && <span style={{ fontSize:11, color:C.danger, fontWeight:600 }}>{error}</span>}
+  </div>
+);
+
+const SexoSelector = ({ value, onChange }) => (
+  <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+    <label style={{ fontSize:13, fontWeight:700, color:C.textMed }}>Sexo</label>
+    <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10 }}>
+      {[{v:"M",l:"Masculino",icon:"👨"},{v:"F",l:"Feminino",icon:"👩"},{v:"O",l:"Prefiro não informar",icon:"🧑"}].map(o=>(
+        <div key={o.v} className={`opt-card${value===o.v?" sel":""}`} onClick={()=>onChange("sexo",o.v)}
+          style={{
+            padding:"12px 8px", borderRadius:12, border:`1.5px solid ${value===o.v?C.primary:C.border}`,
+            background:value===o.v?C.primaryXLight:C.white, textAlign:"center"
+          }}>
+          <div style={{ fontSize:22, marginBottom:4 }}>{o.icon}</div>
+          <div style={{ fontSize:11, fontWeight:value===o.v?700:500, color:value===o.v?C.primary:C.textMed, lineHeight:1.3 }}>{o.l}</div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ETAPA 1 — Acesso
+// ══════════════════════════════════════════════════════════════════════════════
+const Etapa1 = ({ data, onChange, onNext, onLogin }) => {
+  const [errors, setErrors] = useState({});
+  const [showPass, setShowPass] = useState(false);
+
+  const validate = () => {
+    const e = {};
+    if(!data.email) e.email = "Email obrigatório";
+    else if(!/\S+@\S+\.\S+/.test(data.email)) e.email = "Email inválido";
+    if(!data.senha) e.senha = "Senha obrigatória";
+    else if(data.senha.length < 6) e.senha = "Mínimo de 6 caracteres";
+    return e;
+  };
+
+  const handleNext = () => {
+    const e = validate();
+    if(Object.keys(e).length > 0){ setErrors(e); return; }
+    onNext();
+  };
+
+  return(
+    <div style={{ display:"flex", flexDirection:"column", gap:20, animation:"fadeUp 0.4s ease" }}>
+      <div style={{ marginBottom:4 }}>
+        <h2 style={{ fontFamily:"'Lora',serif", fontSize:26, fontWeight:700, color:C.text, marginBottom:8 }}>Crie sua conta</h2>
+        <p style={{ fontSize:14, color:C.textMed, lineHeight:1.6 }}>Sua preparação começa agora. É grátis na primeira semana.</p>
+      </div>
+
+      <Field label="Email" name="email" type="email" value={data.email} onChange={onChange} error={errors.email} placeholder="seu@email.com" autoFocus/>
+
+      <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+        <label style={{ fontSize:13, fontWeight:700, color:C.textMed }}>Senha</label>
+        <div style={{ position:"relative" }}>
+          <input
+            type={showPass?"text":"password"}
+            value={data.senha}
+            onChange={e=>onChange("senha",e.target.value)}
+            placeholder="Mínimo 6 caracteres"
+            className={`inp${errors.senha?" error":""}`}
+            style={{ padding:"13px 48px 13px 16px", border:`1.5px solid ${errors.senha?C.danger:C.border}`, borderRadius:12, fontSize:14, color:C.text, background:C.white, width:"100%" }}
+          />
+          <button onClick={()=>setShowPass(!showPass)}
+            style={{ position:"absolute", right:14, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:C.textLight, fontSize:16 }}>
+            {showPass?"🙈":"👁️"}
+          </button>
+        </div>
+        {errors.senha && <span style={{ fontSize:11, color:C.danger, fontWeight:600 }}>{errors.senha}</span>}
+
+        {/* Força da senha */}
+        {data.senha.length > 0 && (
+          <div style={{ display:"flex", gap:4, marginTop:4 }}>
+            {[1,2,3].map(i=>{
+              const strength = data.senha.length < 6 ? 0 : data.senha.length < 8 ? 1 : /[A-Z]/.test(data.senha) && /[0-9]/.test(data.senha) ? 3 : 2;
+              return <div key={i} style={{ flex:1, height:3, borderRadius:99, background:i<=strength?(strength===1?C.danger:strength===2?"#F5A623":C.accent):C.border, transition:"background 0.3s" }}/>;
+            })}
+            <span style={{ fontSize:10, color:C.textLight, marginLeft:4 }}>
+              {data.senha.length < 6 ? "Fraca" : data.senha.length < 8 ? "Média" : /[A-Z]/.test(data.senha) && /[0-9]/.test(data.senha) ? "Forte" : "Boa"}
+            </span>
+          </div>
+        )}
+      </div>
+
+      <button className="btn-main" onClick={handleNext}
+        style={{ padding:"15px", background:C.primary, color:"white", border:"none", borderRadius:12, fontSize:15, fontWeight:700, cursor:"pointer", boxShadow:C.shadowMd, marginTop:4 }}>
+        Continuar →
+      </button>
+
+      <p style={{ textAlign:"center", fontSize:11, color:C.textLight, lineHeight:1.6 }}>
+        Ao continuar você concorda com os <span style={{ color:C.primary, cursor:"pointer" }}>Termos de uso</span> e <span style={{ color:C.primary, cursor:"pointer" }}>Política de privacidade</span>.
+      </p>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ETAPA 2 — Quem é você
+// ══════════════════════════════════════════════════════════════════════════════
+const Etapa2 = ({ data, onChange, onNext, onBack }) => {
+  const [errors, setErrors] = useState({});
+
+  const validate = () => {
+    const e = {};
+    if(!data.nome.trim()) e.nome = "Nome obrigatório";
+    else if(data.nome.trim().split(" ").length < 2) e.nome = "Informe seu nome completo";
+    if(!data.nascimento) e.nascimento = "Data de nascimento obrigatória";
+    else {
+      const d = new Date(data.nascimento);
+      const age = (new Date() - d) / (365.25*24*3600*1000);
+      if(age < 14) e.nascimento = "Você precisa ter pelo menos 14 anos";
+      if(age > 100) e.nascimento = "Data inválida";
+    }
+    if(!data.sexo) e.sexo = "Selecione uma opção";
+    return e;
+  };
+
+  const handleNext = () => {
+    const e = validate();
+    if(Object.keys(e).length > 0){ setErrors(e); return; }
+    onNext();
+  };
+
+  return(
+    <div style={{ display:"flex", flexDirection:"column", gap:20, animation:"fadeUp 0.4s ease" }}>
+      <div style={{ marginBottom:4 }}>
+        <h2 style={{ fontFamily:"'Lora',serif", fontSize:26, fontWeight:700, color:C.text, marginBottom:8 }}>Quem é você?</h2>
+        <p style={{ fontSize:14, color:C.textMed, lineHeight:1.6 }}>Essas informações nos ajudam a personalizar sua experiência.</p>
+      </div>
+
+      <Field label="Nome completo" name="nome" value={data.nome} onChange={onChange} error={errors.nome} placeholder="Como você se chama?" autoFocus/>
+
+      <Field label="Data de nascimento" name="nascimento" type="date" value={data.nascimento} onChange={onChange} error={errors.nascimento}
+        hint="Usamos para entender o perfil dos nossos alunos"/>
+
+      <SexoSelector value={data.sexo} onChange={onChange}/>
+      {errors.sexo && <span style={{ fontSize:11, color:C.danger, fontWeight:600, marginTop:-12 }}>{errors.sexo}</span>}
+
+      <div style={{ display:"flex", gap:10, marginTop:4 }}>
+        <button className="btn-back" onClick={onBack}
+          style={{ flex:1, padding:"15px", background:C.bg, color:C.textMed, border:`1.5px solid ${C.border}`, borderRadius:12, fontSize:14, fontWeight:600, cursor:"pointer" }}>
+          ← Voltar
+        </button>
+        <button className="btn-main" onClick={handleNext}
+          style={{ flex:2, padding:"15px", background:C.primary, color:"white", border:"none", borderRadius:12, fontSize:15, fontWeight:700, cursor:"pointer", boxShadow:C.shadowMd }}>
+          Continuar →
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ETAPA 3 — Onde você está
+// ══════════════════════════════════════════════════════════════════════════════
+const Etapa3 = ({ data, onChange, onSubmit, onBack, loading }) => {
+  const [errors, setErrors] = useState({});
+
+  const validate = () => {
+    const e = {};
+    if(!data.estado) e.estado = "Selecione seu estado";
+    if(!data.cidade.trim()) e.cidade = "Informe sua cidade";
+    return e;
+  };
+
+  const handleSubmit = () => {
+    const e = validate();
+    if(Object.keys(e).length > 0){ setErrors(e); return; }
+    onSubmit();
+  };
+
+  return(
+    <div style={{ display:"flex", flexDirection:"column", gap:20, animation:"fadeUp 0.4s ease" }}>
+      <div style={{ marginBottom:4 }}>
+        <h2 style={{ fontFamily:"'Lora',serif", fontSize:26, fontWeight:700, color:C.text, marginBottom:8 }}>Onde você está?</h2>
+        <p style={{ fontSize:14, color:C.textMed, lineHeight:1.6 }}>Sua localização nos ajuda a entender de onde vêm nossos alunos.</p>
+      </div>
+
+      <SelectField label="Estado" name="estado" value={data.estado} onChange={onChange} error={errors.estado}
+        placeholder="Selecione seu estado" options={ESTADOS}/>
+
+      <Field label="Cidade" name="cidade" value={data.cidade} onChange={onChange} error={errors.cidade}
+        placeholder="Nome da sua cidade" autoFocus={false}/>
+
+      {/* Preview do perfil */}
+      {data.estado && data.cidade && (
+        <div style={{ background:C.primaryXLight, border:`1px solid #DDDDF5`, borderRadius:12, padding:"14px 16px", animation:"fadeIn 0.3s ease" }}>
+          <div style={{ fontSize:11, fontWeight:700, color:C.primary, marginBottom:8, textTransform:"uppercase", letterSpacing:1 }}>Seu perfil</div>
+          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+            <div style={{ width:44, height:44, borderRadius:"50%", background:C.primary, display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:16, fontWeight:700, flexShrink:0 }}>
+              {data.nome?.charAt(0)||"?"}
+            </div>
+            <div>
+              <div style={{ fontWeight:700, fontSize:14, color:C.text }}>{data.nome||"Seu nome"}</div>
+              <div style={{ fontSize:12, color:C.textMed }}>{data.cidade}, {data.estado}</div>
+              <div style={{ fontSize:11, color:C.textLight }}>{data.email}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display:"flex", gap:10, marginTop:4 }}>
+        <button className="btn-back" onClick={onBack}
+          style={{ flex:1, padding:"15px", background:C.bg, color:C.textMed, border:`1.5px solid ${C.border}`, borderRadius:12, fontSize:14, fontWeight:600, cursor:"pointer" }}>
+          ← Voltar
+        </button>
+        <button className="btn-main" onClick={handleSubmit} disabled={loading}
+          style={{ flex:2, padding:"15px", background:C.primary, color:"white", border:"none", borderRadius:12, fontSize:15, fontWeight:700, cursor:"pointer", boxShadow:C.shadowMd, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+          {loading && <div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,0.3)", borderTop:"2px solid white", borderRadius:"50%", animation:"spin 0.8s linear infinite" }}/>}
+          {loading ? "Criando sua conta..." : "Criar minha conta →"}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SUCESSO
+// ══════════════════════════════════════════════════════════════════════════════
+const Sucesso = ({ nome, onContinue }) => (
+  <div style={{ textAlign:"center", animation:"fadeUp 0.5s ease" }}>
+    <div style={{ width:72, height:72, borderRadius:"50%", background:C.accentLight, border:`3px solid ${C.accent}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:32, margin:"0 auto 20px" }}>
+      ✓
+    </div>
+    <h2 style={{ fontFamily:"'Lora',serif", fontSize:26, fontWeight:700, color:C.text, marginBottom:10 }}>
+      Bem-vindo ao DominaBanca, {nome?.split(" ")[0]}!
+    </h2>
+    <p style={{ fontSize:14, color:C.textMed, lineHeight:1.7, marginBottom:32, maxWidth:320, margin:"0 auto 32px" }}>
+      Sua conta foi criada. Agora vamos montar seu plano de estudos personalizado.
+    </p>
+    <button className="btn-main" onClick={onContinue}
+      style={{ width:"100%", padding:"15px", background:C.primary, color:"white", border:"none", borderRadius:12, fontSize:15, fontWeight:700, cursor:"pointer", boxShadow:C.shadowMd }}>
+      Montar meu plano de estudos →
+    </button>
+  </div>
+);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ROOT
+// ══════════════════════════════════════════════════════════════════════════════
+function Cadastro({ onBack }) {
+  const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+  const [form, setForm] = useState({
+    email:"", senha:"", nome:"", nascimento:"", sexo:"", estado:"", cidade:""
+  });
+
+  useEffect(() => {
+    const s = document.createElement("style");
+    s.textContent = css;
+    document.head.appendChild(s);
+  }, []);
+
+  const handleChange = (name, value) => setForm(f => ({...f, [name]:value}));
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    await new Promise(r => setTimeout(r, 1800));
+    setLoading(false);
+    setDone(true);
+  };
+
+  const TOTAL_STEPS = 3;
+
+  return (
+    <div style={{ fontFamily:"'Sora',sans-serif", minHeight:"100vh", background:C.bg, display:"flex", flexDirection:"column" }}>
+
+      {/* Nav */}
+      <nav style={{ background:C.white, borderBottom:`1px solid ${C.border}`, height:64, display:"flex", alignItems:"center", padding:"0 28px", boxShadow:"0 1px 6px rgba(0,0,0,0.04)" }}>
+        <CadastroLogo/>
+      </nav>
+
+      {/* Content */}
+      <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:"40px 16px" }}>
+        <div style={{ width:"100%", maxWidth:460 }}>
+
+          {/* Card */}
+          <div style={{ background:C.white, borderRadius:24, padding:"36px 32px", boxShadow:C.shadowLg, border:`1px solid ${C.border}` }}>
+
+            {!done && <ProgressBar step={step} total={TOTAL_STEPS}/>}
+
+            {done ? (
+              <Sucesso nome={form.nome} onContinue={() => alert("Ir para o onboarding!")}/>
+            ) : step === 1 ? (
+              <Etapa1 data={form} onChange={handleChange} onNext={()=>setStep(2)} onLogin={()=>alert("Ir para o login")}/>
+            ) : step === 2 ? (
+              <Etapa2 data={form} onChange={handleChange} onNext={()=>setStep(3)} onBack={()=>setStep(1)}/>
+            ) : (
+              <Etapa3 data={form} onChange={handleChange} onSubmit={handleSubmit} onBack={()=>setStep(2)} loading={loading}/>
+            )}
+          </div>
+
+          {/* Marca */}
+          {!done && (
+            <div style={{ display:"flex", justifyContent:"center", marginTop:28, animation:"fadeIn 0.5s ease" }}>
+              <CadastroLogo/>
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ROOT — Gerencia navegação entre telas
+// ══════════════════════════════════════════════════════════════════════════════
+export default function App() {
+  const [screen, setScreen] = useState("landing"); // "landing" | "cadastro"
+
+  useEffect(() => {
+    const s = document.createElement("style");
+    s.id = "db-global";
+    s.textContent = css;
+    document.head.appendChild(s);
+  }, []);
+
+  if (screen === "cadastro") return <Cadastro onBack={() => setScreen("landing")} />;
+  return <Landing onCadastro={() => setScreen("cadastro")} />;
 }
