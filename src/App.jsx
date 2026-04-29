@@ -70,14 +70,19 @@ const css = `
 // ── Logo SVG ───────────────────────────────────────────────────────────────────
 const Logo = ({ size = 38 }) => (
   <div style={{
-    width: size, height: size, borderRadius: 11,
-    background: C.primaryXLight, border: `2px solid ${C.borderPurple}`,
+    width: size, height: size,
+    borderRadius: Math.round(size * 0.18),
+    background: C.primary,
     display: "flex", alignItems: "center", justifyContent: "center",
-    flexShrink: 0
+    flexShrink: 0, boxShadow: `0 2px 8px rgba(91,79,207,0.3)`
   }}>
     <span style={{
-      fontFamily: "'Lora', serif", fontWeight: 700,
-      fontSize: size * 0.38, color: C.primary, letterSpacing: "-0.5px"
+      fontFamily: "'Lora', serif",
+      fontWeight: 700,
+      fontSize: Math.round(size * 0.42),
+      color: "white",
+      letterSpacing: "-0.5px",
+      lineHeight: 1
     }}>DB</span>
   </div>
 );
