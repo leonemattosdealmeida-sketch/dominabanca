@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     });
 
     const systemInstruction = system ? { parts: [{ text: system }] } : undefined;
-    const geminiModel = 'gemini-1.5-flash-latest';
+    const geminiModel = 'gemini-1.5-flash';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`;
 
     const body = {
