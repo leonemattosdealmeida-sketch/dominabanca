@@ -1410,7 +1410,7 @@ const ObCard = ({icon, title, desc, selected, onClick}) => (
 
 // ── API helper ────────────────────────────────────────────────────────────────
 const obApi = async (messages, system) => {
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
+  const r = await fetch("/api", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
@@ -1436,7 +1436,7 @@ const PROMPT_EDITAL = (orgao, cargo) => `Analise este edital do ${orgao} para o 
 {"dataProva":"dd/mm/aaaa ou null","totalQuestoes":120,"temDiscursiva":false,"pesoDiscursiva":0,"banca":"null","grupos":[{"nome":"Nome do grupo","materias":[{"nome":"Matéria","questoes":20,"topicos":["Tópico 1","Tópico 2","Tópico 3"]}]}]}`;
 
 async function obAI(messages, maxTokens=300) {
-  const r = await fetch("https://api.anthropic.com/v1/messages",{
+  const r = await fetch("/api",{
     method:"POST", headers:{"Content-Type":"application/json"},
     body:JSON.stringify({model:"claude-haiku-4-5-20251001", max_tokens:maxTokens, system:OB_SYSTEM, messages})
   });
@@ -1445,7 +1445,7 @@ async function obAI(messages, maxTokens=300) {
 }
 
 async function obAIJson(messages, maxTokens=4000) {
-  const r = await fetch("https://api.anthropic.com/v1/messages",{
+  const r = await fetch("/api",{
     method:"POST", headers:{"Content-Type":"application/json"},
     body:JSON.stringify({model:"claude-haiku-4-5-20251001", max_tokens:maxTokens,
       system:"Você é especialista em concursos públicos brasileiros. Retorne APENAS JSON válido sem texto adicional.",
@@ -1804,7 +1804,7 @@ function Onboarding({ user, onComplete, onBack }) {
       await bot("Lendo o edital completo — aguarde alguns segundos...",400);
       setTyping(true);
 
-      const resp = await fetch("https://api.anthropic.com/v1/messages",{
+      const resp = await fetch("/api",{
         method:"POST", headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
           model:"claude-haiku-4-5-20251001", max_tokens:4000,
