@@ -33,20 +33,21 @@ export default async function handler(req, res) {
       return { role: m.role === 'assistant' ? 'model' : 'user', parts };
     });
 
-    const systemInstruction = system ? { parts: [{ text: system }] } : undefined;
+    if (system) {
+      contents.unshift({ role: 'user', parts: [{ text: `Instruções: ${system}` }] });
+      contents.splice(1, 0, { role: 'model', parts: [{ text: 'Entendido.' }] });
+    }
+
     const geminiModel = 'gemini-1.5-flash';
     const url = `https://generativelanguage.googleapis.com/v1/models/${geminiModel}:generateContent?key=${apiKey}`;
-
-    const body = {
-      contents,
-      ...(systemInstruction && { systemInstruction }),
-      generationConfig: { maxOutputTokens: max_tokens || 4000 }
-    };
 
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify({
+        contents,
+        generationConfig: { maxOutputTokens: max_tokens || 4000 }
+      })
     });
 
     const data = await response.json();
