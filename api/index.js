@@ -7,7 +7,7 @@ export default async function handler(req, res) {
   
   if (req.method === 'GET') {
     const hasKey = !!process.env.ANTHROPIC_API_KEY;
-    const keyStart = process.env.ANTHROPIC_API_KEY?.slice(0, 10) || 'NOT FOUND';
+    const keyStart = process.env.ANTHROPIC_API_KEY?.slice(0, 20) || 'NOT FOUND';
     return res.status(200).json({ hasKey, keyStart });
   }
 
