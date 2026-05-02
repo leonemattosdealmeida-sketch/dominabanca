@@ -19,12 +19,10 @@ export default async function handler(req, res) {
   try {
     const { model, messages, system, max_tokens } = req.body;
 
-    // Converter formato Anthropic para Gemini
     const contents = messages.map(m => {
       if (typeof m.content === 'string') {
         return { role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] };
       }
-      // Suporte a PDF (base64)
       const parts = m.content.map(c => {
         if (c.type === 'text') return { text: c.text };
         if (c.type === 'document') return {
@@ -36,14 +34,13 @@ export default async function handler(req, res) {
     });
 
     const systemInstruction = system ? { parts: [{ text: system }] } : undefined;
-
     const geminiModel = 'gemini-1.5-flash';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`;
 
     const body = {
       contents,
       ...(systemInstruction && { systemInstruction }),
-      generationConfig: { maxOutputTokens: max_tokens || 1000 }
+      generationConfig: { maxOutputTokens: max_tokens || 4000 }
     };
 
     const response = await fetch(url, {
@@ -53,13 +50,20 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
+    
+    // Log completo para debug
+    console.log('Gemini response:', JSON.stringify(data).slice(0, 500));
 
     if (data.error) {
       return res.status(400).json({ error: data.error.message });
     }
 
-    // Converter resposta Gemini para formato Anthropic
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    if (!text) {
+      return res.status(500).json({ error: 'Empty response', raw: JSON.stringify(data).slice(0, 200) });
+    }
+
     res.status(200).json({ content: [{ type: 'text', text }] });
 
   } catch (error) {
