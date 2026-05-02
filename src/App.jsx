@@ -1427,624 +1427,551 @@ const obApi = async (messages, system) => {
 const safeJson = t => { try{ return JSON.parse(t.replace(/```json|```/g,"").trim()); }catch{ return null; } };
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ONBOARDING PRINCIPAL
+// ONBOARDING — Fluxo completo P1→P5
 // ══════════════════════════════════════════════════════════════════════════════
+
+const OB_SYSTEM = `Você é assistente do DominaBanca. Responda em português. Máximo 2 linhas. Nunca faça outras perguntas além do solicitado. Ao validar órgão: NUNCA mencione cargo. Ao validar cargo: NUNCA mencione órgão.`;
+
+const PROMPT_EDITAL = (orgao, cargo) => `Analise este edital do ${orgao} para o cargo ${cargo}. Extraia TUDO de uma vez: grupos, matérias, questões E tópicos completos de cada matéria. Use nomes EXATOS do edital. Retorne APENAS JSON válido:
+{"dataProva":"dd/mm/aaaa ou null","totalQuestoes":120,"temDiscursiva":false,"pesoDiscursiva":0,"banca":"null","grupos":[{"nome":"Nome do grupo","materias":[{"nome":"Matéria","questoes":20,"topicos":["Tópico 1","Tópico 2","Tópico 3"]}]}]}`;
+
+async function obAI(messages, maxTokens=300) {
+  const r = await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({model:"claude-haiku-4-5-20251001", max_tokens:maxTokens, system:OB_SYSTEM, messages})
+  });
+  const d = await r.json();
+  return d.content?.[0]?.text||"";
+}
+
+async function obAIJson(messages, maxTokens=4000) {
+  const r = await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({model:"claude-haiku-4-5-20251001", max_tokens:maxTokens,
+      system:"Você é especialista em concursos públicos brasileiros. Retorne APENAS JSON válido sem texto adicional.",
+      messages})
+  });
+  const d = await r.json();
+  const t = d.content?.[0]?.text||"";
+  try{return JSON.parse(t.replace(/```json|```/g,"").trim());}catch{return null;}
+}
+
+// ── Sub-componentes ───────────────────────────────────────────────────────────
+const ObBotMsg = ({children}) => (
+  <div style={{display:"flex",gap:10,alignItems:"flex-start",animation:"fadeUp 0.3s ease",marginBottom:8}}>
+    <div style={{width:32,height:32,borderRadius:"50%",background:"linear-gradient(135deg,#5B4FCF,#7C6FE0)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"white",flexShrink:0,fontFamily:"'Lora',serif"}}>DB</div>
+    <div style={{background:"white",border:"1px solid #E8E8F0",borderRadius:"4px 14px 14px 14px",padding:"10px 14px",maxWidth:"82%",fontSize:13,lineHeight:1.7,color:"#1A1A2E",boxShadow:"0 1px 8px rgba(91,79,207,0.06)"}}>{children}</div>
+  </div>
+);
+
+const ObUserMsg = ({text}) => (
+  <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8,animation:"fadeUp 0.2s ease"}}>
+    <div style={{background:"#5B4FCF",borderRadius:"14px 4px 14px 14px",padding:"10px 14px",maxWidth:"72%",fontSize:13,lineHeight:1.7,color:"white"}}>{text}</div>
+  </div>
+);
+
+const ObDots = () => (
+  <div style={{display:"flex",gap:10,alignItems:"flex-start",marginBottom:8}}>
+    <div style={{width:32,height:32,borderRadius:"50%",background:"linear-gradient(135deg,#5B4FCF,#7C6FE0)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"white",flexShrink:0,fontFamily:"'Lora',serif"}}>DB</div>
+    <div style={{background:"white",border:"1px solid #E8E8F0",borderRadius:"4px 14px 14px 14px",padding:"12px 16px",display:"flex",gap:5,alignItems:"center"}}>
+      {[0,.2,.4].map((d,i)=><div key={i} style={{width:7,height:7,borderRadius:"50%",background:"#5B4FCF",animation:`pulse ${1.2}s ease ${d}s infinite`}}/>)}
+    </div>
+  </div>
+);
+
+const ObConfirmCard = ({label,value,onEdit,onConfirm}) => (
+  <div style={{background:"#EFEFFD",border:"1.5px solid #DDDDF5",borderRadius:14,padding:"12px 14px",marginBottom:8,animation:"fadeUp 0.3s ease"}}>
+    <div style={{fontSize:10,fontWeight:700,color:"#5B4FCF",letterSpacing:1.5,textTransform:"uppercase",marginBottom:5}}>Confirmar {label}</div>
+    <div style={{fontSize:15,fontWeight:700,color:"#1A1A2E",marginBottom:12}}>{value}</div>
+    <div style={{display:"flex",gap:8}}>
+      <button onClick={onEdit} style={{flex:1,padding:"9px",background:"white",color:"#4A4A6A",border:"1.5px solid #E8E8F0",borderRadius:9,fontSize:12,fontWeight:600,cursor:"pointer"}}>✏️ Corrigir</button>
+      <button onClick={onConfirm} style={{flex:2,padding:"9px",background:"#5B4FCF",color:"white",border:"none",borderRadius:9,fontSize:12,fontWeight:700,cursor:"pointer"}}>✓ Confirmar</button>
+    </div>
+  </div>
+);
+
+// ── P3: Revisão de matérias ───────────────────────────────────────────────────
+const ObRevisaoMaterias = ({dados, onConfirm}) => {
+  const [grupos, setGrupos] = useState(dados.grupos||[]);
+  const [exp, setExp] = useState({});
+  const toggle = k => setExp(e=>({...e,[k]:!e[k]}));
+  const updM = (gi,mi,f,v) => setGrupos(gs=>gs.map((g,i)=>i!==gi?g:{...g,materias:g.materias.map((m,j)=>j!==mi?m:{...m,[f]:v})}));
+  const remM = (gi,mi) => setGrupos(gs=>gs.map((g,i)=>i!==gi?g:{...g,materias:g.materias.filter((_,j)=>j!==mi)}));
+  const addM = gi => setGrupos(gs=>gs.map((g,i)=>i!==gi?g:{...g,materias:[...g.materias,{nome:"",questoes:0,topicos:[]}]}));
+  const updT = (gi,mi,ti,v) => setGrupos(gs=>gs.map((g,i)=>i!==gi?g:{...g,materias:g.materias.map((m,j)=>j!==mi?m:{...m,topicos:(m.topicos||[]).map((t,k)=>k!==ti?t:v)})}));
+  const remT = (gi,mi,ti) => setGrupos(gs=>gs.map((g,i)=>i!==gi?g:{...g,materias:g.materias.map((m,j)=>j!==mi?m:{...m,topicos:(m.topicos||[]).filter((_,k)=>k!==ti)})}));
+  const addT = (gi,mi) => setGrupos(gs=>gs.map((g,i)=>i!==gi?g:{...g,materias:g.materias.map((m,j)=>j!==mi?m:{...m,topicos:[...(m.topicos||[]),""]})}));
+  const totalM = grupos.reduce((a,g)=>a+g.materias.length,0);
+  return (
+    <div style={{animation:"fadeUp 0.4s ease"}}>
+      <div style={{background:"#EFEFFD",border:"1px solid #DDDDF5",borderRadius:12,padding:"10px 14px",marginBottom:10,fontSize:12,color:"#5B4FCF",fontWeight:600}}>
+        {grupos.length} grupos · {totalM} matérias — clique em cada matéria para editar os tópicos
+      </div>
+      {grupos.map((g,gi)=>(
+        <div key={gi} style={{border:"1px solid #E8E8F0",borderRadius:12,overflow:"hidden",marginBottom:8}}>
+          <div style={{background:"linear-gradient(135deg,#5B4FCF,#7C6FE0)",padding:"9px 12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{fontSize:12,fontWeight:800,color:"white"}}>{g.nome} <span style={{fontSize:10,fontWeight:400,opacity:.7}}>({g.materias.length} mat.)</span></span>
+            <button onClick={()=>addM(gi)} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:6,padding:"3px 9px",fontSize:10,fontWeight:700,color:"white",cursor:"pointer"}}>+ matéria</button>
+          </div>
+          <div style={{padding:"7px 10px",display:"flex",flexDirection:"column",gap:4}}>
+            {g.materias.map((m,mi)=>{
+              const k=`${gi}-${mi}`;
+              const pct=dados.totalQuestoes?Math.round((m.questoes/dados.totalQuestoes)*100):0;
+              return (
+                <div key={mi} style={{border:"1px solid #E8E8F0",borderRadius:9,overflow:"hidden"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:"#F7F7FC",cursor:"pointer"}} onClick={()=>toggle(k)}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:12,fontWeight:600,color:"#1A1A2E"}}>{m.nome}</div>
+                      <div style={{display:"flex",gap:5,alignItems:"center",marginTop:2}}>
+                        <div style={{height:2,width:60,background:"#E8E8F0",borderRadius:99,overflow:"hidden"}}>
+                          <div style={{height:"100%",width:`${pct}%`,background:"#5B4FCF",borderRadius:99}}/>
+                        </div>
+                        <span style={{fontSize:10,color:"#9898B8"}}>{m.questoes}q · {pct}% · {(m.topicos||[]).length} tópicos</span>
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:5,alignItems:"center"}}>
+                      <span style={{fontSize:11,color:"#9898B8"}}>{exp[k]?"▲":"▼"}</span>
+                      <button onClick={e=>{e.stopPropagation();remM(gi,mi)}} style={{background:"none",border:"none",color:"#F25A5A",cursor:"pointer",fontSize:13}}>✕</button>
+                    </div>
+                  </div>
+                  {exp[k]&&(
+                    <div style={{background:"white",padding:"8px 10px",borderTop:"1px solid #E8E8F0"}}>
+                      <div style={{display:"flex",gap:7,marginBottom:7}}>
+                        <input value={m.nome} onChange={e=>updM(gi,mi,"nome",e.target.value)} style={{flex:1,padding:"6px 9px",border:"1px solid #E8E8F0",borderRadius:7,fontSize:12,color:"#1A1A2E",background:"#F7F7FC",outline:"none"}} placeholder="Nome da matéria"/>
+                        <input type="number" value={m.questoes||""} onChange={e=>updM(gi,mi,"questoes",parseInt(e.target.value)||0)} style={{width:52,padding:"6px 7px",border:"1px solid #E8E8F0",borderRadius:7,fontSize:12,color:"#1A1A2E",background:"#F7F7FC",outline:"none",textAlign:"center"}} placeholder="q"/>
+                      </div>
+                      {(m.topicos||[]).map((t,ti)=>(
+                        <div key={ti} style={{display:"flex",gap:5,alignItems:"center",marginBottom:3}}>
+                          <span style={{color:"#9898B8",fontSize:10}}>•</span>
+                          <input value={t} onChange={e=>updT(gi,mi,ti,e.target.value)} style={{flex:1,padding:"4px 8px",border:"1px solid #E8E8F0",borderRadius:6,fontSize:11,color:"#4A4A6A",background:"#F7F7FC",outline:"none"}} placeholder="Tópico"/>
+                          <button onClick={()=>remT(gi,mi,ti)} style={{background:"none",border:"none",color:"#F25A5A",cursor:"pointer",fontSize:11}}>✕</button>
+                        </div>
+                      ))}
+                      <button onClick={()=>addT(gi,mi)} style={{padding:"4px 8px",background:"transparent",border:"1px dashed #E8E8F0",borderRadius:6,fontSize:10,color:"#9898B8",cursor:"pointer",marginTop:3}}>+ tópico</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      <button onClick={()=>onConfirm(grupos)} style={{width:"100%",padding:"13px",background:"#5B4FCF",color:"white",border:"none",borderRadius:12,fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 20px rgba(91,79,207,0.28)"}}>
+        ✓ Confirmar matérias e tópicos →
+      </button>
+    </div>
+  );
+};
+
+// ── P4: Discursiva ────────────────────────────────────────────────────────────
+const ObDiscursiva = ({banca, onConfirm, onSkip}) => {
+  const [tipo, setTipo] = useState(null);
+  const [peso, setPeso] = useState("");
+  const [freq, setFreq] = useState(2);
+  return (
+    <div style={{animation:"fadeUp 0.4s ease"}}>
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E",marginBottom:5}}>Qual é o tipo da prova discursiva?</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          {[
+            {v:"redacao",icon:"✍️",t:"Redação",d:"Texto dissertativo-argumentativo (estilo ENEM/CESPE)"},
+            {v:"dissertativa",icon:"📝",t:"Questões dissertativas",d:"Respostas técnicas por tema (estilo FGV/ESAF)"},
+          ].map(op=>(
+            <div key={op.v} onClick={()=>setTipo(op.v)}
+              style={{padding:"14px",border:`1.5px solid ${tipo===op.v?"#5B4FCF":"#E8E8F0"}`,borderRadius:12,background:tipo===op.v?"#EFEFFD":"white",cursor:"pointer",position:"relative"}}>
+              {tipo===op.v&&<div style={{position:"absolute",top:8,right:8,width:18,height:18,borderRadius:"50%",background:"#5B4FCF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,color:"white",fontWeight:700}}>✓</div>}
+              <div style={{fontSize:20,marginBottom:6}}>{op.icon}</div>
+              <div style={{fontSize:12,fontWeight:700,color:tipo===op.v?"#5B4FCF":"#1A1A2E",marginBottom:3}}>{op.t}</div>
+              <div style={{fontSize:11,color:"#9898B8",lineHeight:1.5}}>{op.d}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {tipo&&(
+        <div style={{marginBottom:14,animation:"fadeUp 0.3s ease"}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E",marginBottom:8}}>Quantas vezes por semana quer treinar?</div>
+          <div style={{display:"flex",gap:8}}>
+            {[1,2,3].map(n=>(
+              <button key={n} onClick={()=>setFreq(n)}
+                style={{flex:1,padding:"10px",border:`1.5px solid ${freq===n?"#5B4FCF":"#E8E8F0"}`,borderRadius:10,background:freq===n?"#EFEFFD":"white",color:freq===n?"#5B4FCF":"#4A4A6A",fontSize:13,fontWeight:freq===n?700:500,cursor:"pointer"}}>
+                {n}x {n===2&&"⭐"}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {tipo&&(
+        <div style={{marginBottom:16,animation:"fadeUp 0.3s ease"}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E",marginBottom:6}}>Peso na nota final (opcional)</div>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <input type="number" value={peso} onChange={e=>setPeso(e.target.value)} placeholder="Ex: 30" min="0" max="100"
+              style={{width:80,padding:"9px 12px",border:"1.5px solid #E8E8F0",borderRadius:10,fontSize:14,color:"#1A1A2E",background:"#F7F7FC",outline:"none",textAlign:"center"}}/>
+            <span style={{fontSize:13,color:"#4A4A6A"}}>% da nota total</span>
+          </div>
+        </div>
+      )}
+      <div style={{display:"flex",gap:10}}>
+        <button onClick={onSkip} style={{flex:1,padding:"12px",background:"white",color:"#4A4A6A",border:"1.5px solid #E8E8F0",borderRadius:12,fontSize:12,fontWeight:600,cursor:"pointer"}}>Pular por agora</button>
+        <button onClick={()=>tipo&&onConfirm({tipo,freq,peso:parseInt(peso)||0})} disabled={!tipo}
+          style={{flex:2,padding:"12px",background:tipo?"#5B4FCF":"#E8E8F0",color:tipo?"white":"#9898B8",border:"none",borderRadius:12,fontSize:13,fontWeight:700,cursor:tipo?"pointer":"not-allowed"}}>
+          ✓ Confirmar discursiva →
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── P5: Horas + Resumo ────────────────────────────────────────────────────────
+const ObHorasResumo = ({dados, onConfirm}) => {
+  const DIAS = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
+  const [horas, setHoras] = useState({Seg:2,Ter:2,Qua:2,Qui:2,Sex:2,Sáb:3,Dom:3});
+  const totalHoras = Object.values(horas).reduce((a,b)=>a+b,0);
+  const totalMats = dados.grupos?.reduce((a,g)=>a+g.materias.length,0)||0;
+  return (
+    <div style={{animation:"fadeUp 0.4s ease"}}>
+      {/* Horas por dia */}
+      <div style={{background:"white",border:"1px solid #E8E8F0",borderRadius:14,padding:"16px",marginBottom:12}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E",marginBottom:4}}>⏰ Horas de estudo por dia</div>
+        <div style={{fontSize:11,color:"#9898B8",marginBottom:14}}>Seja realista — consistência vale mais que intensidade.</div>
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {DIAS.map(d=>(
+            <div key={d} style={{display:"flex",alignItems:"center",gap:12}}>
+              <span style={{fontSize:12,fontWeight:600,color:"#4A4A6A",width:30}}>{d}</span>
+              <input type="range" min={0} max={8} value={horas[d]} onChange={e=>setHoras(h=>({...h,[d]:+e.target.value}))}
+                style={{flex:1,accentColor:"#5B4FCF"}}/>
+              <div style={{width:40,textAlign:"center"}}>
+                {horas[d]===0
+                  ? <span style={{fontSize:11,color:"#9898B8"}}>folga</span>
+                  : <span style={{fontSize:13,fontWeight:700,color:"#5B4FCF"}}>{horas[d]}h</span>
+                }
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{marginTop:12,padding:"8px 12px",background:"#EFEFFD",borderRadius:9,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontSize:12,color:"#5B4FCF",fontWeight:600}}>Total semanal</span>
+          <span style={{fontSize:16,fontWeight:700,color:"#5B4FCF"}}>{totalHoras}h/semana</span>
+        </div>
+      </div>
+
+      {/* Resumo final */}
+      <div style={{background:"white",border:"1.5px solid #E8E8F0",borderRadius:14,overflow:"hidden",marginBottom:12}}>
+        <div style={{background:"linear-gradient(135deg,#5B4FCF,#7C6FE0)",padding:"12px 16px"}}>
+          <div style={{fontSize:13,fontWeight:800,color:"white"}}>📋 Resumo do seu plano</div>
+        </div>
+        <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
+          {[
+            {icon:"🏛️",l:"Concurso",v:`${dados.orgao||"—"} — ${dados.cargo||"—"}`},
+            {icon:"📋",l:"Banca",v:dados.banca||"—"},
+            {icon:"📅",l:"Data da prova",v:dados.dataProva||"A confirmar"},
+            {icon:"📚",l:"Matérias",v:`${totalMats} disciplinas em ${dados.grupos?.length||0} grupos`},
+            {icon:"❓",l:"Total de questões",v:dados.totalQuestoes?`${dados.totalQuestoes} questões`:"—"},
+            ...(dados.discursiva?[{icon:"✍️",l:"Discursiva",v:`${dados.discursiva.tipo==="redacao"?"Redação":"Questões dissertativas"} · ${dados.discursiva.freq}x/semana${dados.discursiva.peso?` · ${dados.discursiva.peso}% da nota`:`"`}`}]:[]),
+            {icon:"⏰",l:"Estudo semanal",v:`${totalHoras}h/semana`},
+          ].map(r=>(
+            <div key={r.l} style={{display:"flex",gap:10,alignItems:"flex-start",paddingBottom:8,borderBottom:"1px solid #E8E8F0"}}>
+              <span style={{fontSize:16,flexShrink:0}}>{r.icon}</span>
+              <div>
+                <div style={{fontSize:10,color:"#9898B8",fontWeight:600,textTransform:"uppercase",letterSpacing:.5,marginBottom:1}}>{r.l}</div>
+                <div style={{fontSize:13,fontWeight:600,color:"#1A1A2E"}}>{r.v}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <button onClick={()=>onConfirm(horas)}
+        style={{width:"100%",padding:"15px",background:"#5B4FCF",color:"white",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:"0 6px 24px rgba(91,79,207,0.28)"}}>
+        Criar meu cronograma →
+      </button>
+    </div>
+  );
+};
+
+// ── ONBOARDING PRINCIPAL ──────────────────────────────────────────────────────
 function Onboarding({ user, onComplete, onBack }) {
-  const [step, setStep] = useState(0);
-  const [modo, setModo] = useState(null); // "aberto" | "semEdital"
-  const [editalText, setEditalText] = useState("");
-  const [inputMode, setInputMode] = useState("texto"); // "texto" | "pdf"
+  const nome = user?.nome?.split(" ")[0]||"aluno";
+  const [msgs, setMsgs] = useState([]);
+  const [typing, setTyping] = useState(false);
+  const [phase, setPhase] = useState("init");
+  const [input, setInput] = useState("");
+  const [orgao, setOrgao] = useState("");
+  const [cargo, setCargo] = useState("");
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfName, setPdfName] = useState(null);
-  const [analisando, setAnalisando] = useState(false);
-  const [parsed, setParsed] = useState(null);
-  const [cargo, setCargo] = useState("");
-  const [materias, setMaterias] = useState([]);
-  const [dificeis, setDificeis] = useState([]);
-  const [faceis, setFaceis] = useState([]);
-  const [horas, setHoras] = useState(3);
-  const [simFreq, setSimFreq] = useState("semanal");
-  const [simDia, setSimDia] = useState("Sábado");
-  const [discDia, setDiscDia] = useState("Quarta");
-  const [discFreq, setDiscFreq] = useState(2);
-  const [concursoAlvo, setConcursoAlvo] = useState("");
+  const [dadosEdital, setDadosEdital] = useState(null);
+  const [dataProva, setDataProva] = useState("");
+  const [grupos, setGrupos] = useState([]);
+  const [discursiva, setDiscursiva] = useState(null);
+  const [erro, setErro] = useState("");
+  const chatRef = useRef(null);
+  const inputRef = useRef(null);
   const fileRef = useRef(null);
-  const nome = user?.nome?.split(" ")[0] || "aluno";
 
-  useEffect(() => {
-    const s = document.getElementById("ob-css");
-    if(!s){
-      const el = document.createElement("style");
-      el.id = "ob-css";
-      el.textContent = ONBOARDING_CSS;
-      document.head.appendChild(el);
-    }
-  }, []);
+  useEffect(()=>{
+    setTimeout(()=>{ if(chatRef.current) chatRef.current.scrollTop=chatRef.current.scrollHeight; },120);
+  },[msgs,typing,phase]);
 
-  // ── Processar PDF ────────────────────────────────────────────────────────────
-  const processPDF = async file => {
-    if(!file || file.type !== "application/pdf") return;
-    setPdfName(file.name);
-    setPdfLoading(true);
-    try {
-      const base64 = await new Promise((res,rej) => {
+  const addMsg = (role,content) => setMsgs(m=>[...m,{role,content}]);
+  const bot = (content,delay=700) => new Promise(res=>{
+    setTyping(true);
+    setTimeout(()=>{setTyping(false);addMsg("bot",content);res();},delay);
+  });
+  const userMsg = t => addMsg("user",t);
+  const rb = t => {
+    if(typeof t!=="string") return t;
+    return t.split(/(<b>.*?<\/b>)/g).map((p,i)=>p.startsWith("<b>")?<strong key={i}>{p.replace(/<\/?b>/g,"")}</strong>:p);
+  };
+
+  useEffect(()=>{
+    (async()=>{
+      await bot(`Olá, ${nome}! 👋 Vou te ajudar a montar seu plano de estudos personalizado.`);
+      await bot(`Para começar, qual é o <b>órgão</b> do concurso que você está se preparando?`,600);
+      setPhase("orgao");
+      setTimeout(()=>inputRef.current?.focus(),100);
+    })();
+  },[]);
+
+  const send = async()=>{
+    const val=input.trim(); if(!val||typing) return;
+    setInput(""); setErro("");
+    if(phase==="orgao") await handleOrgao(val);
+    else if(phase==="cargo") await handleCargo(val);
+    else if(phase==="data") await handleData(val);
+  };
+
+  const handleOrgao = async val=>{
+    userMsg(val); setPhase("aguardando"); setTyping(true);
+    try{
+      const raw=await obAI([{role:"user",content:`Valide este órgão público concursal: "${val}". UMA linha. NÃO mencione cargo. NÃO faça perguntas.`}]);
+      setTyping(false); addMsg("bot",<span>{raw}</span>);
+      const prob=["não parece","não encontrei","misturou","pode confirmar"].some(x=>raw.toLowerCase().includes(x));
+      if(prob){setPhase("orgao");setTimeout(()=>inputRef.current?.focus(),100);}
+      else{setOrgao(val.toUpperCase());addMsg("confirm",{label:"órgão",value:val.toUpperCase(),onEdit:()=>{setOrgao("");setMsgs(m=>m.filter(x=>x.role!=="confirm"));setPhase("orgao");setTimeout(()=>inputRef.current?.focus(),100);},onConfirm:confirmOrgao});}
+    }catch(e){setTyping(false);setErro("Erro: "+e.message);setPhase("orgao");}
+  };
+
+  const handleCargo = async val=>{
+    userMsg(val); setPhase("aguardando"); setTyping(true);
+    try{
+      const raw=await obAI([{role:"user",content:`Valide este cargo concursal: "${val}" para o órgão ${orgao}. UMA linha. NÃO mencione órgão. NÃO faça perguntas.`}]);
+      setTyping(false); addMsg("bot",<span>{raw}</span>);
+      const prob=["não parece","não encontrei","misturou","pode confirmar"].some(x=>raw.toLowerCase().includes(x));
+      if(prob){setPhase("cargo");setTimeout(()=>inputRef.current?.focus(),100);}
+      else{setCargo(val);addMsg("confirm",{label:"cargo",value:val,onEdit:()=>{setCargo("");setMsgs(m=>m.filter(x=>x.role!=="confirm"));setPhase("cargo");setTimeout(()=>inputRef.current?.focus(),100);},onConfirm:confirmCargo});}
+    }catch(e){setTyping(false);setErro("Erro: "+e.message);setPhase("cargo");}
+  };
+
+  const handleData = async val=>{
+    userMsg(val); setDataProva(val);
+    setMsgs(m=>m.filter(x=>x.role!=="confirm"));
+    addMsg("confirm",{label:"data da prova",value:val,onEdit:()=>{setDataProva("");setPhase("data");setTimeout(()=>inputRef.current?.focus(),100);},onConfirm:()=>confirmData(val)});
+  };
+
+  const confirmOrgao = async()=>{
+    setMsgs(m=>m.filter(x=>x.role!=="confirm")); userMsg("Confirmo: "+orgao);
+    await bot(`Ótimo! E qual é o <b>cargo</b> que você busca neste concurso?`);
+    setPhase("cargo"); setTimeout(()=>inputRef.current?.focus(),100);
+  };
+
+  const confirmCargo = async()=>{
+    setMsgs(m=>m.filter(x=>x.role!=="confirm")); userMsg("Confirmo: "+cargo);
+    await bot(`Perfeito! Agora envie o <b>edital</b> do seu concurso.`,600);
+    await bot(`Anexe o PDF do edital abaixo. A IA vai fazer a leitura completa e extrair todas as informações automaticamente.`,500);
+    setPhase("pdf");
+  };
+
+  const confirmData = async(data)=>{
+    setMsgs(m=>m.filter(x=>x.role!=="confirm")); userMsg("Confirmo: "+data);
+    setDataProva(data);
+    await bot(`Data confirmada! Agora vou mostrar as <b>matérias identificadas</b> no edital. Revise, edite se precisar e confirme.`,600);
+    setPhase("materias");
+  };
+
+  // ── PDF Upload ──────────────────────────────────────────────────────────────
+  const processarPDF = async file=>{
+    if(!file||file.type!=="application/pdf") return;
+    setPdfName(file.name); setPdfLoading(true); setErro("");
+    try{
+      const base64 = await new Promise((res,rej)=>{
         const r = new FileReader();
-        r.onload = () => res(r.result.split(",")[1]);
+        r.onload = ()=>res(r.result.split(",")[1]);
         r.onerror = rej;
         r.readAsDataURL(file);
       });
-      const resp = await fetch("https://api.anthropic.com/v1/messages", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
+      userMsg(`Edital enviado: ${file.name}`);
+      setPhase("lendo");
+      await bot("Lendo o edital completo — aguarde alguns segundos...",400);
+      setTyping(true);
+
+      const resp = await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST", headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
-          model:"claude-sonnet-4-20250514",
-          max_tokens:1000,
+          model:"claude-haiku-4-5-20251001", max_tokens:4000,
+          system:"Você é especialista em concursos públicos brasileiros. Retorne APENAS JSON válido sem texto adicional.",
           messages:[{role:"user",content:[
             {type:"document",source:{type:"base64",media_type:"application/pdf",data:base64}},
-            {type:"text",text:"Extraia APENAS o conteúdo programático: todas as disciplinas, matérias e tópicos cobrados. Texto simples, sem JSON. Se não for edital responda: 'Documento não reconhecido como edital.'"}
+            {type:"text",text:PROMPT_EDITAL(orgao,cargo)}
           ]}]
         })
       });
       const d = await resp.json();
-      const text = d.content?.[0]?.text||"";
-      if(text.includes("não reconhecido")){
-        setPdfName(null);
-        alert("Este arquivo não parece ser um edital. Tente colar o texto manualmente.");
-      } else {
-        setEditalText(text);
-        setInputMode("texto");
+      const raw = d.content?.[0]?.text||"";
+      let dados = null;
+      try{dados=JSON.parse(raw.replace(/```json|```/g,"").trim());}catch{}
+
+      setTyping(false); setPdfLoading(false);
+
+      if(!dados?.grupos?.length){
+        addMsg("bot",<span>Não consegui extrair as informações do edital. Verifique se o PDF contém o conteúdo programático e tente novamente.</span>);
+        setPhase("pdf"); return;
       }
-    } catch(e) {
-      alert("Erro ao ler o PDF. Tente colar o texto manualmente.");
+
+      setDadosEdital(dados);
+      setGrupos(dados.grupos);
+      const nM = dados.grupos.reduce((a,g)=>a+g.materias.length,0);
+
+      await bot(<span>
+        Leitura completa! Encontrei <strong>{dados.grupos.length} grupos</strong> com <strong>{nM} matérias</strong>.
+        {dados.temDiscursiva?" Sua prova tem prova discursiva.":""}
+        <br/>Banca: <strong>{dados.banca||"identificada"}</strong> · Questões: <strong>{dados.totalQuestoes||"—"}</strong>
+      </span>,400);
+
+      // Confirmar data da prova
+      if(dados.dataProva && dados.dataProva!=="null"){
+        setDataProva(dados.dataProva);
+        await bot(<span>Identifiquei a data da prova: <strong>{dados.dataProva}</strong>. Está correta?</span>,500);
+        addMsg("confirm",{label:"data da prova",value:dados.dataProva,onEdit:()=>{setDataProva("");setMsgs(m=>m.filter(x=>x.role!=="confirm"));setPhase("data");setTimeout(()=>inputRef.current?.focus(),100);},onConfirm:()=>confirmData(dados.dataProva)});
+        setPhase("aguardando_data");
+      } else {
+        await bot("Não encontrei a data da prova no edital. Qual é a data? (formato dd/mm/aaaa)",500);
+        setPhase("data");
+        setTimeout(()=>inputRef.current?.focus(),100);
+      }
+    }catch(e){
+      setTyping(false); setPdfLoading(false);
+      setErro("Erro ao ler o PDF: "+e.message);
+      setPhase("pdf");
     }
-    setPdfLoading(false);
   };
 
-  // ── Analisar edital ──────────────────────────────────────────────────────────
-  const analisarEdital = async () => {
-    if(!editalText.trim()) return;
-    setAnalisando(true);
-    const raw = await obApi([{role:"user",content:`Analise este edital e retorne APENAS JSON válido:
-${editalText.slice(0,5000)}
-{
-  "cargos":["Cargo 1"],
-  "orgao":"Nome do órgão",
-  "banca":"Nome da banca ou null",
-  "dataProva":"dd/mm/aaaa ou null",
-  "periodo":"manhã ou tarde ou null",
-  "etapas":["Prova Objetiva"],
-  "temDiscursiva":false,
-  "totalQuestoes":120,
-  "materias":[{"nome":"Matéria","peso":20,"subtopicos":["sub1"]}]
-}`}]);
-    setAnalisando(false);
-    const data = safeJson(raw) || {
-      cargos:["Cargo Geral"],orgao:"Órgão",banca:null,dataProva:null,
-      etapas:["Prova Objetiva"],temDiscursiva:false,totalQuestoes:100,
-      materias:[
-        {nome:"Língua Portuguesa",peso:25,subtopicos:["Interpretação","Gramática"]},
-        {nome:"Raciocínio Lógico",peso:25,subtopicos:["Proposições"]},
-        {nome:"Conhecimentos Específicos",peso:50,subtopicos:["Conteúdo do cargo"]},
-      ]
+  const confirmarMaterias = async gruposEditados=>{
+    setGrupos(gruposEditados);
+    userMsg("Confirmo as matérias e tópicos.");
+    if(dadosEdital?.temDiscursiva){
+      await bot(<span>Ótimo! Sua prova tem <b>prova discursiva</b>. Vamos configurar como você vai treinar.</span>,600);
+      setPhase("discursiva");
+    } else {
+      await bot("Matérias confirmadas! Agora vamos definir sua rotina de estudos.",600);
+      setPhase("horas");
+    }
+  };
+
+  const confirmarDiscursiva = async disc=>{
+    setDiscursiva(disc);
+    userMsg(`Confirmo: ${disc.tipo==="redacao"?"Redação":"Questões dissertativas"} · ${disc.freq}x/semana${disc.peso?` · ${disc.peso}%`:""}`);
+    await bot("Perfeito! Agora vamos definir sua rotina de estudos.",600);
+    setPhase("horas");
+  };
+
+  const confirmarHoras = horas=>{
+    const dadosFinais = {
+      orgao, cargo, dataProva, banca:dadosEdital?.banca,
+      totalQuestoes:dadosEdital?.totalQuestoes,
+      temDiscursiva:dadosEdital?.temDiscursiva,
+      grupos, discursiva, horas,
     };
-    setParsed(data);
-    setMaterias(data.materias);
-    if(data.cargos.length === 1) { setCargo(data.cargos[0]); setStep(3); }
-    else setStep(2);
+    onComplete(dadosFinais);
   };
 
-  const TOTAL_STEPS = parsed?.temDiscursiva ? 7 : 6;
+  const showInput = ["orgao","cargo","data"].includes(phase)&&!typing;
+  const showPDF = phase==="pdf";
+  const showMaterias = phase==="materias"&&!typing;
+  const showDiscursiva = phase==="discursiva"&&!typing;
+  const showHoras = phase==="horas"&&!typing;
+  const prog = {init:0,orgao:10,cargo:25,pdf:35,lendo:45,aguardando_data:50,data:50,materias:60,discursiva:75,horas:88,done:100}[phase]||0;
 
-  const Wrapper = ({children, stepAtual, stepLabel}) => (
-    <div style={{fontFamily:"'Sora',sans-serif",minHeight:"100vh",background:OB.bg,display:"flex",flexDirection:"column"}}>
+  return (
+    <div style={{fontFamily:"'Sora',sans-serif",height:"100vh",display:"flex",flexDirection:"column",background:"#F7F7FC"}}>
       {/* Nav */}
-      <nav style={{background:OB.white,borderBottom:`1px solid ${OB.border}`,height:64,display:"flex",alignItems:"center",padding:"0 28px",justifyContent:"space-between",boxShadow:"0 1px 6px rgba(0,0,0,0.04)",position:"sticky",top:0,zIndex:50}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:36,height:36,borderRadius:11,background:OB.primary,display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <span style={{fontFamily:"'Lora',serif",fontWeight:700,fontSize:14,color:"white"}}>DB</span>
-          </div>
-          <div>
-            <div style={{fontFamily:"'Lora',serif",fontWeight:700,fontSize:15,color:OB.text,lineHeight:1}}>DominaBanca</div>
-            <div style={{fontSize:9,color:OB.textLight,letterSpacing:1.5,textTransform:"uppercase",marginTop:1}}>Preparação Inteligente</div>
-          </div>
-        </div>
-        {stepAtual > 0 && (
-          <div style={{fontSize:11,color:OB.textLight,fontWeight:600}}>{stepLabel}</div>
-        )}
+      <nav style={{background:"white",borderBottom:"1px solid #E8E8F0",height:62,display:"flex",alignItems:"center",padding:"0 20px",justifyContent:"space-between",boxShadow:"0 1px 6px rgba(0,0,0,0.04)",flexShrink:0}}>
+        <LogoMark/>
+        <button onClick={onBack} className="btn-back" style={{display:"flex",alignItems:"center",gap:6,background:"transparent",border:"1.5px solid #E8E8F0",borderRadius:10,padding:"7px 14px",fontSize:12,fontWeight:600,color:"#4A4A6A",cursor:"pointer"}}>
+          ← Voltar ao início
+        </button>
       </nav>
 
-      {/* Content */}
-      <div style={{flex:1,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"40px 16px"}}>
-        <div style={{width:"100%",maxWidth:560}}>
-          {children}
+      {/* Progresso */}
+      <div style={{padding:"10px 20px",background:"white",borderBottom:"1px solid #E8E8F0",flexShrink:0}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+          <span style={{fontSize:11,fontWeight:700,color:"#5B4FCF"}}>Configurando seu plano</span>
+          <span style={{fontSize:10,color:"#9898B8"}}>{prog}% concluído</span>
+        </div>
+        <div style={{height:4,background:"#E8E8F0",borderRadius:99,overflow:"hidden"}}>
+          <div style={{height:"100%",width:`${prog}%`,background:"linear-gradient(90deg,#5B4FCF,#7C6FE0)",borderRadius:99,transition:"width 0.5s ease"}}/>
         </div>
       </div>
-    </div>
-  );
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // STEP 0 — Bifurcação: edital aberto ou não
-  // ══════════════════════════════════════════════════════════════════════════
-  if(step === 0) return (
-    <Wrapper stepAtual={0} stepLabel="">
-      <div style={{animation:"ob-fadeUp 0.4s ease"}}>
-        <div style={{marginBottom:36}}>
-          <div style={{fontSize:11,fontWeight:700,color:OB.primary,letterSpacing:2,textTransform:"uppercase",marginBottom:12}}>
-            Vamos começar, {nome}!
-          </div>
-          <h1 style={{fontFamily:"'Lora',serif",fontSize:"clamp(24px,4vw,36px)",fontWeight:700,color:OB.text,lineHeight:1.25,marginBottom:12}}>
-            O edital do seu concurso<br/>já foi publicado?
-          </h1>
-          <p style={{fontSize:15,color:OB.textMed,lineHeight:1.7}}>
-            Sua resposta define como vamos montar seu plano de estudos.
-          </p>
-        </div>
-
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:32}}>
-          <ObCard
-            icon="📋" selected={modo==="aberto"}
-            title="Sim, o edital já saiu"
-            desc="Vou enviar o edital para montar um plano exato para o meu concurso."
-            onClick={()=>setModo("aberto")}
-          />
-          <ObCard
-            icon="⏳" selected={modo==="semEdital"}
-            title="Ainda não saiu"
-            desc="Quero me preparar com base nas edições anteriores deste concurso."
-            onClick={()=>setModo("semEdital")}
-          />
-        </div>
-
-        {modo && (
-          <div style={{animation:"ob-pop 0.25s ease"}}>
-            {modo === "aberto" && (
-              <div style={{background:OB.primaryXLight,border:`1px solid #DDDDF5`,borderRadius:14,padding:"14px 18px",marginBottom:20}}>
-                <div style={{fontSize:13,fontWeight:700,color:OB.primary,marginBottom:4}}>🎯 Preparação cirúrgica</div>
-                <p style={{fontSize:13,color:OB.textMed,lineHeight:1.7,margin:0}}>
-                  Com o edital em mãos, montamos um cronograma baseado exatamente no que vai cair na sua prova.
-                </p>
-              </div>
-            )}
-            {modo === "semEdital" && (
-              <div style={{background:OB.warningLight,border:`1px solid #FDE68A`,borderRadius:14,padding:"14px 18px",marginBottom:20}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#92400E",marginBottom:4}}>⚡ Modo pré-edital ativado</div>
-                <p style={{fontSize:13,color:"#78350F",lineHeight:1.7,margin:0}}>
-                  Vamos usar o histórico de edições anteriores. Quando o edital sair, você atualiza sem perder nenhuma evolução.
-                </p>
-              </div>
-            )}
-            <button className="ob-btn" onClick={()=>setStep(modo==="aberto"?1:1)}
-              style={{width:"100%",padding:"15px",background:OB.primary,color:"white",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:`0 6px 24px rgba(91,79,207,0.28)`}}>
-              Continuar →
-            </button>
-          </div>
-        )}
+      {/* Chat */}
+      <div ref={chatRef} style={{flex:1,overflowY:"auto",padding:"16px",display:"flex",flexDirection:"column",maxWidth:640,width:"100%",margin:"0 auto",boxSizing:"border-box"}}>
+        {msgs.map((m,i)=>{
+          if(m.role==="bot") return <ObBotMsg key={i}>{typeof m.content==="string"?rb(m.content):m.content}</ObBotMsg>;
+          if(m.role==="user") return <ObUserMsg key={i} text={m.content}/>;
+          if(m.role==="confirm") return (
+            <ObConfirmCard key={i} label={m.content.label} value={m.content.value} onEdit={m.content.onEdit} onConfirm={m.content.onConfirm}/>
+          );
+          return null;
+        })}
+        {typing&&<ObDots/>}
+        {showMaterias&&<ObRevisaoMaterias dados={{...dadosEdital,grupos}} onConfirm={confirmarMaterias}/>}
+        {showDiscursiva&&<ObDiscursiva banca={dadosEdital?.banca} onConfirm={confirmarDiscursiva} onSkip={()=>{setDiscursiva(null);setPhase("horas");bot("Ok! Vamos definir sua rotina de estudos.",400);}}/>}
+        {showHoras&&<ObHorasResumo dados={{orgao,cargo,dataProva,banca:dadosEdital?.banca,totalQuestoes:dadosEdital?.totalQuestoes,grupos,discursiva}} onConfirm={confirmarHoras}/>}
+        {erro&&<div style={{background:"#FEE8E8",border:"1px solid #F25A5A",borderRadius:10,padding:"10px 14px",fontSize:12,color:"#F25A5A",marginBottom:8}}>{erro}</div>}
+        <div style={{height:8,flexShrink:0}}/>
       </div>
-    </Wrapper>
-  );
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // STEP 1 — Enviar edital (aberto ou última edição)
-  // ══════════════════════════════════════════════════════════════════════════
-  if(step === 1) return (
-    <Wrapper stepAtual={1} stepLabel="Etapa 1 de 6">
-      <div style={{animation:"ob-fadeUp 0.4s ease"}}>
-        <ObProgress step={1} total={TOTAL_STEPS} label="Enviando o edital"/>
-
-        <div style={{marginBottom:28}}>
-          <h2 style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:700,color:OB.text,marginBottom:8}}>
-            {modo==="aberto" ? "Envie o seu edital" : "Envie o edital da última edição"}
-          </h2>
-          <p style={{fontSize:14,color:OB.textMed,lineHeight:1.7}}>
-            {modo==="aberto"
-              ? "Cole o conteúdo programático ou anexe o PDF. Vamos identificar cargo, banca, matérias e datas automaticamente."
-              : "Use o edital anterior para montar a base. Quando o edital novo sair, você atualiza com um clique."}
+      {/* Input texto */}
+      {showInput&&(
+        <div style={{background:"white",borderTop:"1px solid #E8E8F0",padding:"10px 16px",flexShrink:0}}>
+          <div style={{maxWidth:640,margin:"0 auto",display:"flex",gap:8}}>
+            <input ref={inputRef} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()}
+              placeholder={phase==="orgao"?"Ex: BCB, INSS, Receita Federal...":phase==="cargo"?"Ex: Analista Administrativo, Auditor Fiscal...":"Ex: 15/08/2025"}
+              style={{flex:1,padding:"11px 14px",border:"1.5px solid #E8E8F0",borderRadius:10,fontSize:13,color:"#1A1A2E",background:"#F7F7FC",outline:"none",fontFamily:"inherit"}}/>
+            <button onClick={send} disabled={!input.trim()||typing}
+              style={{padding:"11px 18px",background:input.trim()&&!typing?"#5B4FCF":"#E8E8F0",color:input.trim()&&!typing?"white":"#9898B8",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:input.trim()&&!typing?"pointer":"not-allowed"}}>→</button>
+          </div>
+          <p style={{textAlign:"center",fontSize:10,color:"#9898B8",marginTop:5,maxWidth:640,margin:"5px auto 0"}}>
+            {phase==="orgao"?"Digite apenas o nome do órgão":phase==="cargo"?"Digite apenas o nome do cargo":"Data no formato dd/mm/aaaa"}
           </p>
         </div>
+      )}
 
-        {/* Modo toggle */}
-        <div style={{display:"flex",gap:8,marginBottom:16}}>
-          {[{k:"texto",l:"✏️ Colar texto"},{k:"pdf",l:"📎 Anexar PDF"}].map(m=>(
-            <button key={m.k} onClick={()=>setInputMode(m.k)}
-              style={{padding:"8px 16px",border:`1.5px solid ${inputMode===m.k?OB.primary:OB.border}`,background:inputMode===m.k?OB.primaryXLight:OB.white,color:inputMode===m.k?OB.primary:OB.textMed,borderRadius:100,fontSize:12,fontWeight:inputMode===m.k?700:500,cursor:"pointer"}}>
-              {m.l}
-            </button>
-          ))}
-        </div>
-
-        {inputMode === "texto" ? (
-          <div>
-            <textarea value={editalText} onChange={e=>setEditalText(e.target.value)}
-              placeholder="Cole aqui o conteúdo programático do edital — matérias, disciplinas, tópicos, pesos..."
-              className="ob-inp"
-              style={{width:"100%",minHeight:140,background:OB.white,border:`1.5px solid ${OB.border}`,borderRadius:14,color:OB.text,padding:"14px 16px",fontSize:13,lineHeight:1.7,resize:"none",fontFamily:"'Sora',sans-serif"}}>
-            </textarea>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8,marginBottom:20}}>
-              <span style={{fontSize:11,color:OB.textLight}}>
-                {editalText.length > 0 ? `${editalText.length} caracteres` : "Quanto mais detalhe, mais preciso o seu cronograma"}
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div style={{marginBottom:20}}>
+      {/* Upload PDF */}
+      {showPDF&&(
+        <div style={{background:"white",borderTop:"1px solid #E8E8F0",padding:"14px 16px",flexShrink:0}}>
+          <div style={{maxWidth:640,margin:"0 auto"}}>
+            <input ref={fileRef} type="file" accept=".pdf" style={{display:"none"}} onChange={e=>e.target.files[0]&&processarPDF(e.target.files[0])}/>
             <div onClick={()=>!pdfLoading&&fileRef.current?.click()}
-              onDragOver={e=>{e.preventDefault();}}
-              onDrop={e=>{e.preventDefault();processPDF(e.dataTransfer.files[0]);}}
-              style={{border:`2px dashed ${pdfName?OB.accent:OB.border}`,borderRadius:14,padding:"32px 20px",textAlign:"center",cursor:pdfLoading?"default":"pointer",background:pdfName?OB.accentLight:OB.bg,transition:"all 0.2s"}}>
-              <input ref={fileRef} type="file" accept=".pdf" style={{display:"none"}} onChange={e=>processPDF(e.target.files[0])}/>
-              {pdfLoading ? (
+              onDragOver={e=>e.preventDefault()}
+              onDrop={e=>{e.preventDefault();processarPDF(e.dataTransfer.files[0]);}}
+              style={{border:`2px dashed ${pdfLoading?"#E8E8F0":"#5B4FCF"}`,borderRadius:14,padding:"28px 20px",textAlign:"center",cursor:pdfLoading?"default":"pointer",background:"#F7F7FC",transition:"all 0.2s"}}>
+              {pdfLoading?(
                 <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
-                  <div style={{width:32,height:32,border:`3px solid ${OB.primaryXLight}`,borderTop:`3px solid ${OB.primary}`,borderRadius:"50%",animation:"ob-spin 0.8s linear infinite"}}/>
-                  <p style={{fontSize:13,color:OB.primary,fontWeight:600}}>Lendo o PDF...</p>
+                  <div style={{width:28,height:28,border:"3px solid #EFEFFD",borderTop:"3px solid #5B4FCF",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+                  <p style={{fontSize:13,color:"#5B4FCF",fontWeight:600}}>Lendo o edital completo...</p>
+                  <p style={{fontSize:11,color:"#9898B8"}}>Isso pode levar alguns segundos</p>
                 </div>
-              ) : pdfName ? (
-                <div>
-                  <div style={{fontSize:28,marginBottom:8}}>✅</div>
-                  <p style={{fontSize:13,fontWeight:700,color:OB.accent}}>PDF lido com sucesso!</p>
-                  <p style={{fontSize:11,color:OB.textLight,marginTop:4}}>{pdfName}</p>
-                  <button onClick={e=>{e.stopPropagation();setInputMode("texto");}} style={{marginTop:10,padding:"6px 14px",background:"transparent",border:`1px solid ${OB.accent}`,borderRadius:8,fontSize:11,color:OB.accent,cursor:"pointer",fontWeight:600}}>
-                    Revisar texto extraído
-                  </button>
-                </div>
-              ) : (
+              ):(
                 <div>
                   <div style={{fontSize:32,marginBottom:10}}>📎</div>
-                  <p style={{fontSize:14,fontWeight:700,color:OB.text,marginBottom:6}}>Arraste o PDF ou clique para selecionar</p>
-                  <p style={{fontSize:12,color:OB.textLight}}>Edital completo ou só o conteúdo programático · PDF até 10MB</p>
+                  <p style={{fontSize:14,fontWeight:700,color:"#1A1A2E",marginBottom:6}}>Toque para anexar o PDF do edital</p>
+                  <p style={{fontSize:12,color:"#9898B8"}}>ou arraste o arquivo aqui</p>
                 </div>
               )}
             </div>
           </div>
-        )}
-
-        <div style={{display:"flex",gap:10}}>
-          <button onClick={()=>setStep(0)}
-            style={{padding:"14px 20px",background:OB.white,color:OB.textMed,border:`1.5px solid ${OB.border}`,borderRadius:12,fontSize:14,fontWeight:600,cursor:"pointer"}}>
-            ← Voltar
-          </button>
-          <button className="ob-btn" onClick={analisarEdital}
-            disabled={(!editalText.trim()&&!pdfName)||analisando}
-            style={{flex:1,padding:"14px",background:(editalText.trim()||pdfName)&&!analisando?OB.primary:"#E8E8F0",color:(editalText.trim()||pdfName)&&!analisando?"white":OB.textLight,border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:(editalText.trim()||pdfName)&&!analisando?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-            {analisando && <div style={{width:16,height:16,border:"2px solid rgba(255,255,255,0.3)",borderTop:"2px solid white",borderRadius:"50%",animation:"ob-spin 0.8s linear infinite"}}/>}
-            {analisando ? "Analisando edital..." : "Analisar edital →"}
-          </button>
         </div>
-      </div>
-    </Wrapper>
+      )}
+    </div>
   );
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // STEP 2 — Selecionar cargo (só quando há mais de 1)
-  // ══════════════════════════════════════════════════════════════════════════
-  if(step === 2 && parsed) return (
-    <Wrapper stepAtual={2} stepLabel="Etapa 2 de 6">
-      <div style={{animation:"ob-fadeUp 0.4s ease"}}>
-        <ObProgress step={2} total={TOTAL_STEPS} label="Confirmando cargo"/>
-
-        <div style={{marginBottom:28}}>
-          <h2 style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:700,color:OB.text,marginBottom:8}}>
-            Para qual cargo você está se preparando?
-          </h2>
-          <p style={{fontSize:14,color:OB.textMed,lineHeight:1.7}}>
-            Identificamos <strong>{parsed.cargos.length} cargos</strong> no edital do <strong>{parsed.orgao}</strong>. Selecione o seu.
-          </p>
-        </div>
-
-        <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:28}}>
-          {parsed.cargos.map(c=>(
-            <div key={c} className={`ob-card${cargo===c?" sel":""}`} onClick={()=>setCargo(c)}
-              style={{padding:"16px 18px",border:`1.5px solid ${cargo===c?OB.primary:OB.border}`,borderRadius:14,background:cargo===c?OB.primaryXLight:OB.white,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-              <span style={{fontSize:14,fontWeight:cargo===c?700:500,color:cargo===c?OB.primary:OB.text}}>{c}</span>
-              {cargo===c && <span style={{color:OB.primary,fontSize:18}}>✓</span>}
-            </div>
-          ))}
-        </div>
-
-        <div style={{display:"flex",gap:10}}>
-          <button onClick={()=>setStep(1)} style={{padding:"14px 20px",background:OB.white,color:OB.textMed,border:`1.5px solid ${OB.border}`,borderRadius:12,fontSize:14,fontWeight:600,cursor:"pointer"}}>← Voltar</button>
-          <button className="ob-btn" onClick={()=>setStep(3)} disabled={!cargo}
-            style={{flex:1,padding:"14px",background:cargo?OB.primary:"#E8E8F0",color:cargo?"white":OB.textLight,border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:cargo?"pointer":"not-allowed"}}>
-            Confirmar cargo →
-          </button>
-        </div>
-      </div>
-    </Wrapper>
-  );
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // STEP 3 — Confirmar matérias
-  // ══════════════════════════════════════════════════════════════════════════
-  if(step === 3 && parsed) return (
-    <Wrapper stepAtual={3} stepLabel="Etapa 2 de 6">
-      <div style={{animation:"ob-fadeUp 0.4s ease"}}>
-        <ObProgress step={2} total={TOTAL_STEPS} label="Confirmando matérias"/>
-
-        <div style={{marginBottom:24}}>
-          <h2 style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:700,color:OB.text,marginBottom:8}}>
-            Confirmando as matérias
-          </h2>
-          <p style={{fontSize:14,color:OB.textMed,lineHeight:1.7}}>
-            Identificamos <strong>{parsed.materias.length} disciplinas</strong> para o cargo <strong>{cargo}</strong>. Está correto?
-          </p>
-        </div>
-
-        {/* Dados da prova */}
-        <div style={{background:OB.primaryXLight,border:`1px solid #DDDDF5`,borderRadius:14,padding:"16px 18px",marginBottom:20}}>
-          <div style={{display:"flex",flexDirection:"column",gap:8,fontSize:13}}>
-            <div style={{display:"flex",gap:8}}><span style={{color:OB.textLight,minWidth:60}}>Órgão</span><strong style={{color:OB.text}}>{parsed.orgao}</strong></div>
-            <div style={{display:"flex",gap:8}}><span style={{color:OB.textLight,minWidth:60}}>Banca</span><strong style={{color:OB.text}}>{parsed.banca||"Não identificada"}</strong></div>
-            <div style={{display:"flex",gap:8}}><span style={{color:OB.textLight,minWidth:60}}>Data</span><strong style={{color:OB.text}}>{parsed.dataProva||"Não informada"}</strong></div>
-            {parsed.temDiscursiva && <div style={{display:"flex",gap:8}}><span style={{color:OB.textLight,minWidth:60}}>Discursiva</span><strong style={{color:OB.accent}}>✓ Sim — incluiremos no cronograma</strong></div>}
-          </div>
-        </div>
-
-        {/* Matérias */}
-        <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:28}}>
-          {parsed.materias.map(m=>(
-            <div key={m.nome} style={{background:OB.white,border:`1px solid ${OB.border}`,borderRadius:100,padding:"6px 14px",fontSize:12,fontWeight:600,color:OB.textMed,display:"flex",alignItems:"center",gap:6}}>
-              <span>{m.nome}</span>
-              <span style={{background:OB.primaryXLight,color:OB.primary,borderRadius:100,padding:"1px 6px",fontSize:10,fontWeight:700}}>{m.peso}%</span>
-            </div>
-          ))}
-        </div>
-
-        <div style={{display:"flex",gap:10}}>
-          <button onClick={()=>setStep(parsed?.cargos?.length>1?2:1)} style={{padding:"14px 20px",background:OB.white,color:OB.textMed,border:`1.5px solid ${OB.border}`,borderRadius:12,fontSize:14,fontWeight:600,cursor:"pointer"}}>← Voltar</button>
-          <button className="ob-btn" onClick={()=>setStep(4)}
-            style={{flex:1,padding:"14px",background:OB.primary,color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer"}}>
-            Está correto, continuar →
-          </button>
-        </div>
-      </div>
-    </Wrapper>
-  );
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // STEP 4 — Dificuldades e facilidades
-  // ══════════════════════════════════════════════════════════════════════════
-  if(step === 4 && parsed) return (
-    <Wrapper stepAtual={4} stepLabel="Etapa 3 de 6">
-      <div style={{animation:"ob-fadeUp 0.4s ease"}}>
-        <ObProgress step={3} total={TOTAL_STEPS} label="Seu perfil de estudos"/>
-
-        <div style={{marginBottom:24}}>
-          <h2 style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:700,color:OB.text,marginBottom:8}}>
-            Como você se sente em cada matéria?
-          </h2>
-          <p style={{fontSize:14,color:OB.textMed,lineHeight:1.7}}>
-            Isso nos ajuda a priorizar o que precisa de mais atenção no seu cronograma.
-          </p>
-        </div>
-
-        {/* Dificuldades */}
-        <div style={{marginBottom:24}}>
-          <div style={{fontSize:13,fontWeight:700,color:OB.danger,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
-            <span>⚠️</span> Matérias que você ainda não domina ou nunca estudou
-          </div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-            {parsed.materias.map(m=>(
-              <button key={m.nome} className={`ob-chip${dificeis.includes(m.nome)?" sel":""}`}
-                onClick={()=>setDificeis(p=>p.includes(m.nome)?p.filter(x=>x!==m.nome):[...p,m.nome])}
-                style={{padding:"8px 16px",borderRadius:100,border:`1.5px solid ${dificeis.includes(m.nome)?OB.danger:OB.border}`,background:dificeis.includes(m.nome)?"#FEE8E8":OB.white,color:dificeis.includes(m.nome)?OB.danger:OB.textMed,fontSize:13,fontWeight:dificeis.includes(m.nome)?700:500,cursor:"pointer"}}>
-                {dificeis.includes(m.nome)?"⚠️ ":""}{m.nome}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Facilidades */}
-        <div style={{marginBottom:28}}>
-          <div style={{fontSize:13,fontWeight:700,color:OB.accent,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
-            <span>✅</span> Matérias que você já domina bem
-          </div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-            {parsed.materias.filter(m=>!dificeis.includes(m.nome)).map(m=>(
-              <button key={m.nome} className={`ob-chip${faceis.includes(m.nome)?" sel":""}`}
-                onClick={()=>setFaceis(p=>p.includes(m.nome)?p.filter(x=>x!==m.nome):[...p,m.nome])}
-                style={{padding:"8px 16px",borderRadius:100,border:`1.5px solid ${faceis.includes(m.nome)?OB.accent:OB.border}`,background:faceis.includes(m.nome)?OB.accentLight:OB.white,color:faceis.includes(m.nome)?OB.accent:OB.textMed,fontSize:13,fontWeight:faceis.includes(m.nome)?700:500,cursor:"pointer"}}>
-                {faceis.includes(m.nome)?"✅ ":""}{m.nome}
-              </button>
-            ))}
-          </div>
-          {parsed.materias.filter(m=>!dificeis.includes(m.nome)).length === 0 && (
-            <p style={{fontSize:12,color:OB.textLight,fontStyle:"italic"}}>Selecione menos matérias difíceis para liberar esta seção.</p>
-          )}
-        </div>
-
-        <div style={{display:"flex",gap:10}}>
-          <button onClick={()=>setStep(3)} style={{padding:"14px 20px",background:OB.white,color:OB.textMed,border:`1.5px solid ${OB.border}`,borderRadius:12,fontSize:14,fontWeight:600,cursor:"pointer"}}>← Voltar</button>
-          <button className="ob-btn" onClick={()=>setStep(5)}
-            style={{flex:1,padding:"14px",background:OB.primary,color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer"}}>
-            Continuar →
-          </button>
-        </div>
-      </div>
-    </Wrapper>
-  );
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // STEP 5 — Horas diárias + simulado
-  // ══════════════════════════════════════════════════════════════════════════
-  if(step === 5) return (
-    <Wrapper stepAtual={5} stepLabel="Etapa 4 de 6">
-      <div style={{animation:"ob-fadeUp 0.4s ease"}}>
-        <ObProgress step={4} total={TOTAL_STEPS} label="Sua rotina de estudos"/>
-
-        <div style={{marginBottom:28}}>
-          <h2 style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:700,color:OB.text,marginBottom:8}}>
-            Como é a sua rotina?
-          </h2>
-          <p style={{fontSize:14,color:OB.textMed,lineHeight:1.7}}>
-            Vamos montar um cronograma que respeita o seu tempo disponível.
-          </p>
-        </div>
-
-        {/* Horas por dia */}
-        <div style={{background:OB.white,border:`1.5px solid ${OB.border}`,borderRadius:16,padding:"20px",marginBottom:16}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-            <div>
-              <div style={{fontSize:14,fontWeight:700,color:OB.text}}>⏰ Horas de estudo por dia</div>
-              <div style={{fontSize:12,color:OB.textLight,marginTop:2}}>Seja realista — consistência vale mais que intensidade.</div>
-            </div>
-            <div style={{fontFamily:"'Lora',serif",fontSize:32,fontWeight:700,color:OB.primary,lineHeight:1}}>{horas}h</div>
-          </div>
-          <input type="range" min={1} max={8} value={horas} onChange={e=>setHoras(+e.target.value)} className="ob-range"/>
-          <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:OB.textLight,marginTop:6}}>
-            <span>1h</span><span>4h</span><span>8h</span>
-          </div>
-        </div>
-
-        {/* Frequência simulado */}
-        <div style={{background:OB.white,border:`1.5px solid ${OB.border}`,borderRadius:16,padding:"20px",marginBottom:16}}>
-          <div style={{fontSize:14,fontWeight:700,color:OB.text,marginBottom:4}}>🎯 Frequência dos simulados</div>
-          <div style={{fontSize:12,color:OB.textLight,marginBottom:14}}>O simulado semanal é o padrão recomendado.</div>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            {(modo==="semEdital"?["Semanal","Quinzenal","Mensal"]:["Semanal","Quinzenal"]).map(f=>(
-              <button key={f} className={`ob-chip${simFreq===f.toLowerCase()?" sel":""}`}
-                onClick={()=>setSimFreq(f.toLowerCase())}
-                style={{padding:"9px 18px",borderRadius:100,border:`1.5px solid ${simFreq===f.toLowerCase()?OB.primary:OB.border}`,background:simFreq===f.toLowerCase()?OB.primaryXLight:OB.bg,color:simFreq===f.toLowerCase()?OB.primary:OB.textMed,fontSize:13,fontWeight:simFreq===f.toLowerCase()?700:500,cursor:"pointer"}}>
-                {f} {f==="Semanal"&&"⭐"}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Dia do simulado */}
-        <div style={{background:OB.white,border:`1.5px solid ${OB.border}`,borderRadius:16,padding:"20px",marginBottom:24}}>
-          <div style={{fontSize:14,fontWeight:700,color:OB.text,marginBottom:4}}>📅 Melhor dia para o simulado</div>
-          <div style={{fontSize:12,color:OB.textLight,marginBottom:14}}>Escolha um dia em que você terá mais tranquilidade.</div>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            {["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"].map(d=>(
-              <button key={d} className={`ob-chip${simDia===d?" sel":""}`}
-                onClick={()=>setSimDia(d)}
-                style={{padding:"8px 14px",borderRadius:100,border:`1.5px solid ${simDia===d?OB.primary:OB.border}`,background:simDia===d?OB.primaryXLight:OB.bg,color:simDia===d?OB.primary:OB.textMed,fontSize:12,fontWeight:simDia===d?700:500,cursor:"pointer"}}>
-                {d}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div style={{display:"flex",gap:10}}>
-          <button onClick={()=>setStep(4)} style={{padding:"14px 20px",background:OB.white,color:OB.textMed,border:`1.5px solid ${OB.border}`,borderRadius:12,fontSize:14,fontWeight:600,cursor:"pointer"}}>← Voltar</button>
-          <button className="ob-btn" onClick={()=>setStep(parsed?.temDiscursiva?6:7)}
-            style={{flex:1,padding:"14px",background:OB.primary,color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer"}}>
-            Continuar →
-          </button>
-        </div>
-      </div>
-    </Wrapper>
-  );
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // STEP 6 — Discursiva (só se tiver no edital)
-  // ══════════════════════════════════════════════════════════════════════════
-  if(step === 6 && parsed?.temDiscursiva) return (
-    <Wrapper stepAtual={6} stepLabel="Etapa 5 de 6">
-      <div style={{animation:"ob-fadeUp 0.4s ease"}}>
-        <ObProgress step={5} total={TOTAL_STEPS} label="Prova discursiva"/>
-
-        <div style={{marginBottom:28}}>
-          <h2 style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:700,color:OB.text,marginBottom:8}}>
-            ✍️ Sua prova tem discursiva
-          </h2>
-          <p style={{fontSize:14,color:OB.textMed,lineHeight:1.7}}>
-            Vamos incluir o treino de redação no seu cronograma. Como prefere organizar?
-          </p>
-        </div>
-
-        {/* Dia da discursiva */}
-        <div style={{background:OB.white,border:`1.5px solid ${OB.border}`,borderRadius:16,padding:"20px",marginBottom:16}}>
-          <div style={{fontSize:14,fontWeight:700,color:OB.text,marginBottom:4}}>📅 Melhor dia para treinar redação</div>
-          <div style={{fontSize:12,color:OB.textLight,marginBottom:14}}>Escolha um dia diferente do simulado.</div>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            {["Segunda","Terça","Quarta","Quinta","Sexta"].map(d=>(
-              <button key={d} className={`ob-chip${discDia===d?" sel":""}`}
-                onClick={()=>setDiscDia(d)}
-                style={{padding:"8px 14px",borderRadius:100,border:`1.5px solid ${discDia===d?OB.primary:OB.border}`,background:discDia===d?OB.primaryXLight:OB.bg,color:discDia===d?OB.primary:OB.textMed,fontSize:12,fontWeight:discDia===d?700:500,cursor:"pointer"}}>
-                {d}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Frequência */}
-        <div style={{background:OB.white,border:`1.5px solid ${OB.border}`,borderRadius:16,padding:"20px",marginBottom:24}}>
-          <div style={{fontSize:14,fontWeight:700,color:OB.text,marginBottom:4}}>🔁 Quantas vezes por semana?</div>
-          <div style={{fontSize:12,color:OB.textLight,marginBottom:14}}>Recomendamos pelo menos 2x por semana.</div>
-          <div style={{display:"flex",gap:8}}>
-            {[1,2,3].map(n=>(
-              <button key={n} className={`ob-chip${discFreq===n?" sel":""}`}
-                onClick={()=>setDiscFreq(n)}
-                style={{flex:1,padding:"12px",borderRadius:12,border:`1.5px solid ${discFreq===n?OB.primary:OB.border}`,background:discFreq===n?OB.primaryXLight:OB.bg,color:discFreq===n?OB.primary:OB.textMed,fontSize:13,fontWeight:discFreq===n?700:500,cursor:"pointer",textAlign:"center"}}>
-                {n}x por semana {n===2&&<span style={{fontSize:10}}>⭐</span>}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div style={{display:"flex",gap:10}}>
-          <button onClick={()=>setStep(5)} style={{padding:"14px 20px",background:OB.white,color:OB.textMed,border:`1.5px solid ${OB.border}`,borderRadius:12,fontSize:14,fontWeight:600,cursor:"pointer"}}>← Voltar</button>
-          <button className="ob-btn" onClick={()=>setStep(7)}
-            style={{flex:1,padding:"14px",background:OB.primary,color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer"}}>
-            Continuar →
-          </button>
-        </div>
-      </div>
-    </Wrapper>
-  );
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // STEP 7 — Resumo + confirmar
-  // ══════════════════════════════════════════════════════════════════════════
-  if(step === 7) return (
-    <Wrapper stepAtual={7} stepLabel="Última etapa">
-      <div style={{animation:"ob-fadeUp 0.4s ease"}}>
-        <ObProgress step={TOTAL_STEPS} total={TOTAL_STEPS} label="Tudo pronto!"/>
-
-        <div style={{marginBottom:24}}>
-          <h2 style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:700,color:OB.text,marginBottom:8}}>
-            Seu plano está pronto, {nome}! 🎉
-          </h2>
-          <p style={{fontSize:14,color:OB.textMed,lineHeight:1.7}}>
-            Revise e confirme para acessar seu cronograma personalizado.
-          </p>
-        </div>
-
-        {/* Resumo */}
-        <div style={{background:OB.white,border:`1.5px solid ${OB.border}`,borderRadius:16,padding:"20px",marginBottom:24,display:"flex",flexDirection:"column",gap:12}}>
-          {[
-            {icon:"🏛️",label:"Concurso",value:`${parsed?.orgao} — ${cargo}`},
-            {icon:"📋",label:"Banca",value:parsed?.banca||"Não identificada"},
-            {icon:"📅",label:"Data da prova",value:parsed?.dataProva||"A confirmar"},
-            {icon:"📚",label:"Matérias",value:`${parsed?.materias?.length} disciplinas`},
-            {icon:"⏰",label:"Estudo diário",value:`${horas}h por dia`},
-            {icon:"🎯",label:"Simulados",value:`${simFreq.charAt(0).toUpperCase()+simFreq.slice(1)} — ${simDia}s`},
-            ...(parsed?.temDiscursiva?[{icon:"✍️",label:"Discursiva",value:`${discFreq}x por semana — ${discDia}s`}]:[]),
-            ...(dificeis.length>0?[{icon:"⚠️",label:"Foco reforçado",value:dificeis.join(", ")}]:[]),
-          ].map(r=>(
-            <div key={r.label} style={{display:"flex",gap:12,alignItems:"flex-start",paddingBottom:12,borderBottom:`1px solid ${OB.border}`}}>
-              <span style={{fontSize:18,flexShrink:0}}>{r.icon}</span>
-              <div style={{flex:1}}>
-                <div style={{fontSize:11,color:OB.textLight,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5,marginBottom:2}}>{r.label}</div>
-                <div style={{fontSize:14,fontWeight:600,color:OB.text}}>{r.value}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {modo === "semEdital" && (
-          <div style={{background:OB.warningLight,border:`1px solid #FDE68A`,borderRadius:12,padding:"12px 16px",marginBottom:20,fontSize:13,color:"#92400E",lineHeight:1.7}}>
-            📢 <strong>Lembre:</strong> quando o edital oficial for publicado, atualize aqui para recalibrar sem perder sua evolução.
-          </div>
-        )}
-
-        <button className="ob-btn" onClick={()=>onComplete({parsed,cargo,horas,simFreq,simDia,discDia,discFreq,dificeis,faceis,modo})}
-          style={{width:"100%",padding:"16px",background:OB.primary,color:"white",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:`0 6px 24px rgba(91,79,207,0.28)`}}>
-          Criar meu cronograma →
-        </button>
-      </div>
-    </Wrapper>
-  );
-
-  return null;
 }
