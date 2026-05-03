@@ -146,7 +146,7 @@ const DemoCronograma = () => {
   ];
   return (
     <div style={{display:"flex",flexDirection:"column",gap:6}}>
-      <div style={{fontSize:11,fontWeight:700,color:C.textMed,marginBottom:2}}>Semana 3 de 12 — Agosto/2025</div>
+      <div style={{fontSize:11,fontWeight:700,color:C.textMed,marginBottom:2}}>Semana 3 de 12 | Agosto/2025</div>
       {days.map(d=>(
         <div key={d.day} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:d.active?`${d.color}12`:d.simulado?"#1E1B4B0A":C.white,border:`1.5px solid ${d.active?d.color:d.simulado?"#1E1B4B30":C.border}`,borderRadius:9}}>
           <div style={{width:28,fontSize:10,fontWeight:700,color:d.active?d.color:C.textLight,flexShrink:0}}>{d.day}</div>
@@ -475,11 +475,11 @@ function Landing({ onCadastro, onLogin }) {
 
             <div style={{display:"flex",flexDirection:"column",gap:0}}>
               {[
-                {n:"1",icon:"📋",title:"Envie seu edital",desc:"Cole o conteúdo programático ou anexe o PDF. A plataforma identifica cargo, banca, matérias e data da prova automaticamente — em segundos."},
+                {n:"1",icon:"📋",title:"Envie seu edital",desc:"Cole o conteúdo programático ou anexe o PDF. A plataforma identifica cargo, banca, matérias e data da prova automaticamente, em segundos."},
                 {n:"2",icon:"💬",title:"Onboarding personalizado",desc:"Informe suas dificuldades, facilidades e quantas horas tem disponíveis por dia. A plataforma usa tudo isso para montar a melhor preparação para você."},
                 {n:"3",icon:"🗓️",title:"Cronograma até o dia da prova",desc:"Plano semanal completo com matérias organizadas por prioridade, peso no edital e sua dificuldade. Ajusta automaticamente conforme você evolui."},
-                {n:"4",icon:"⏱️",title:"Simulados agendados no padrão da banca",desc:"Provas completas cronometradas com o número exato de questões do edital, no estilo real da sua banca. Você treina como se fosse o dia da prova — sem diferença."},
-                {n:"5",icon:"✍️",title:"Correção de redação ilimitada",desc:"Escreva à mão, fotografe e envie. A plataforma corrige com os critérios exatos do seu edital, atribui nota por critério e aponta o caminho para a nota máxima — quantas vezes precisar."},
+                {n:"4",icon:"⏱️",title:"Simulados agendados no padrão da banca",desc:"Provas completas cronometradas com o número exato de questões do edital, no estilo real da sua banca. Você treina como se fosse o dia da prova, sem diferença."},
+                {n:"5",icon:"✍️",title:"Correção de redação ilimitada",desc:"Escreva à mão, fotografe e envie. A plataforma corrige com os critérios exatos do seu edital, atribui nota por critério e aponta o caminho para a nota máxima, quantas vezes precisar."},
                 {n:"6",icon:"📊",title:"Acompanhamento personalizado",desc:"Análise contínua do seu desempenho, caderno de erros inteligente, revisão programada e alertas quando uma matéria precisar de mais atenção. Você nunca fica sem saber onde está."},
               ].map((s,i)=>(
                 <div key={i} style={{display:"flex",gap:24,position:"relative",zIndex:1,paddingBottom: i<5?48:0}}>
@@ -543,7 +543,7 @@ function Landing({ onCadastro, onLogin }) {
               Experimente de verdade. Assine quando quiser.
             </h2>
             <p style={{fontSize:16,color:C.textMed,maxWidth:520,margin:"0 auto",lineHeight:1.7}}>
-              Na primeira semana você tem acesso completo — sem limitação. Assim você decide com base na experiência real, não em promessas.
+              Na primeira semana você tem acesso completo, sem limitação. Assim você decide com base na experiência real, não em promessas.
             </p>
           </div>
 
@@ -560,7 +560,7 @@ function Landing({ onCadastro, onLogin }) {
               {/* Week 1 highlight */}
               <div style={{background:C.accentLight,border:`1.5px solid ${C.accent}30`,borderRadius:12,padding:"14px 16px",marginBottom:20}}>
                 <div style={{fontSize:12,fontWeight:800,color:C.accent,marginBottom:10,display:"flex",alignItems:"center",gap:6}}>
-                  <span>✨</span> Semana 1 — Experiência completa
+                  <span>✨</span> Semana 1: Experiência completa
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
                   {[
@@ -589,7 +589,7 @@ function Landing({ onCadastro, onLogin }) {
                     {t:"Cronograma bloqueado após semana 1",ok:false},
                     {t:"Simulados sem análise detalhada",ok:false},
                     {t:"Redação sem detalhamento por critério",ok:false},
-                    {t:"Caderno de erros — só visualização",ok:false},
+                    {t:"Caderno de erros: só visualização",ok:false},
                     {t:"Análise de progresso bloqueada",ok:false},
                   ].map(f=>(
                     <div key={f.t} style={{display:"flex",gap:8,alignItems:"flex-start",fontSize:12,color:f.ok?C.textMed:C.textLight}}>
@@ -621,7 +621,7 @@ function Landing({ onCadastro, onLogin }) {
               {/* All unlocked */}
               <div style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:12,padding:"14px 16px",marginBottom:28}}>
                 <div style={{fontSize:12,fontWeight:800,color:"#6EE7B7",marginBottom:12,display:"flex",alignItems:"center",gap:6}}>
-                  <span>🔓</span> Tudo desbloqueado — do início ao fim
+                  <span>🔓</span> Tudo desbloqueado, do início ao fim
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:10}}>
                   {[
@@ -664,7 +664,7 @@ function Landing({ onCadastro, onLogin }) {
               {[
                 {nome:"Leone Mattos",local:"Niterói/RJ",texto:"Nunca vi nada parecido no mercado de concursos. A plataforma leu meu edital, montou meu cronograma e já sabia exatamente o que eu precisava estudar. É como ter um preparador particular disponível 24 horas.",inicial:"L"},
                 {nome:"Mylena Athaydes",local:"São Paulo/SP",texto:"Estudei para concurso por anos sem organização nenhuma. O DominaBanca mudou completamente minha rotina de estudos. O cronograma semanal e o caderno de erros me mostraram exatamente onde eu estava falhando.",inicial:"M"},
-                {nome:"Sandro Almeida",local:"Porto Seguro/BA",texto:"O que mais me impressionou foi a qualidade das questões. São idênticas ao estilo da banca — cheguei no dia da prova sem nenhuma surpresa. Produto incrível.",inicial:"S"},
+                {nome:"Sandro Almeida",local:"Porto Seguro/BA",texto:"O que mais me impressionou foi a qualidade das questões. São idênticas ao estilo da banca. Cheguei no dia da prova sem nenhuma surpresa. Produto incrível.",inicial:"S"},
               ].map((d,i)=>(
                 <div key={i} style={{background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:16,padding:24,boxShadow:C.shadow}}>
                   <div style={{display:"flex",gap:2,marginBottom:12}}>{"★★★★★".split("").map((s,j)=><span key={j} style={{color:C.warning,fontSize:15}}>{s}</span>)}</div>
@@ -1140,6 +1140,24 @@ function Cadastro({ onBack, onSuccess }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // LOGIN
 // ══════════════════════════════════════════════════════════════════════════════
+const NavLogin = ({ onBack, voltarPara, voltarLabel }) => (
+  <nav style={{ background:"white", borderBottom:`1px solid ${C.border}`, height:64, display:"flex", alignItems:"center", padding:"0 28px", justifyContent:"space-between", boxShadow:"0 1px 6px rgba(0,0,0,0.04)" }}>
+    <button onClick={onBack} style={{ background:"none", border:"none", cursor:"pointer", padding:0 }}>
+      <CadastroLogo/>
+    </button>
+    <button onClick={voltarPara} className="btn-back"
+      style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:`1.5px solid ${C.border}`, borderRadius:10, padding:"7px 16px", fontSize:13, fontWeight:600, color:C.textMed, cursor:"pointer" }}>
+      ← {voltarLabel}
+    </button>
+  </nav>
+);
+
+const LoginWrapper = ({ children }) => (
+  <div style={{ fontFamily:"'Sora',sans-serif", minHeight:"100vh", background:C.bg, display:"flex", flexDirection:"column" }}>
+    {children}
+  </div>
+);
+
 function Login({ onBack, onCadastro, onSuccess }) {
   const [tela, setTela] = useState("login");
   const [showPass, setShowPass] = useState(false);
@@ -1180,27 +1198,9 @@ function Login({ onBack, onCadastro, onSuccess }) {
     setTela("confirmado");
   };
 
-  const NavLogin = ({ voltarPara, voltarLabel }) => (
-    <nav style={{ background:"white", borderBottom:`1px solid ${C.border}`, height:64, display:"flex", alignItems:"center", padding:"0 28px", justifyContent:"space-between", boxShadow:"0 1px 6px rgba(0,0,0,0.04)" }}>
-      <button onClick={onBack} style={{ background:"none", border:"none", cursor:"pointer", padding:0 }}>
-        <CadastroLogo/>
-      </button>
-      <button onClick={voltarPara} className="btn-back"
-        style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:`1.5px solid ${C.border}`, borderRadius:10, padding:"7px 16px", fontSize:13, fontWeight:600, color:C.textMed, cursor:"pointer" }}>
-        ← {voltarLabel}
-      </button>
-    </nav>
-  );
-
-  const Wrapper = ({ children }) => (
-    <div style={{ fontFamily:"'Sora',sans-serif", minHeight:"100vh", background:C.bg, display:"flex", flexDirection:"column" }}>
-      {children}
-    </div>
-  );
-
   if(tela === "login") return (
-    <Wrapper>
-      <NavLogin voltarPara={onBack} voltarLabel="Voltar ao início"/>
+    <LoginWrapper>
+      <NavLogin onBack={onBack} voltarPara={onBack} voltarLabel="Voltar ao início"/>
       <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:"40px 16px" }}>
         <div style={{ width:"100%", maxWidth:420, animation:"fadeUp 0.4s ease" }}>
           <div style={{ background:"white", borderRadius:24, padding:"40px 36px", boxShadow:C.shadowLg, border:`1px solid ${C.border}` }}>
@@ -1254,12 +1254,12 @@ function Login({ onBack, onCadastro, onSuccess }) {
           <div style={{ display:"flex", justifyContent:"center", marginTop:28 }}><CadastroLogo/></div>
         </div>
       </div>
-    </Wrapper>
+    </LoginWrapper>
   );
 
   if(tela === "recuperar") return (
-    <Wrapper>
-      <NavLogin voltarPara={()=>setTela("login")} voltarLabel="Voltar ao login"/>
+    <LoginWrapper>
+      <NavLogin onBack={onBack} voltarPara={()=>setTela("login")} voltarLabel="Voltar ao login"/>
       <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:"40px 16px" }}>
         <div style={{ width:"100%", maxWidth:420, animation:"fadeUp 0.4s ease" }}>
           <div style={{ background:"white", borderRadius:24, padding:"40px 36px", boxShadow:C.shadowLg, border:`1px solid ${C.border}` }}>
@@ -1286,12 +1286,12 @@ function Login({ onBack, onCadastro, onSuccess }) {
           <div style={{ display:"flex", justifyContent:"center", marginTop:28 }}><CadastroLogo/></div>
         </div>
       </div>
-    </Wrapper>
+    </LoginWrapper>
   );
 
   return (
-    <Wrapper>
-      <NavLogin voltarPara={onBack} voltarLabel="Voltar ao início"/>
+    <LoginWrapper>
+      <NavLogin onBack={onBack} voltarPara={onBack} voltarLabel="Voltar ao início"/>
       <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:"40px 16px" }}>
         <div style={{ width:"100%", maxWidth:420, animation:"fadeUp 0.5s ease" }}>
           <div style={{ background:"white", borderRadius:24, padding:"40px 36px", boxShadow:C.shadowLg, border:`1px solid ${C.border}`, textAlign:"center" }}>
@@ -1308,7 +1308,7 @@ function Login({ onBack, onCadastro, onSuccess }) {
           <div style={{ display:"flex", justifyContent:"center", marginTop:28 }}><CadastroLogo/></div>
         </div>
       </div>
-    </Wrapper>
+    </LoginWrapper>
   );
 }
 
@@ -1505,7 +1505,7 @@ const ObRevisaoMaterias = ({dados, onConfirm}) => {
   return (
     <div style={{animation:"fadeUp 0.4s ease"}}>
       <div style={{background:"#EFEFFD",border:"1px solid #DDDDF5",borderRadius:12,padding:"10px 14px",marginBottom:10,fontSize:12,color:"#5B4FCF",fontWeight:600}}>
-        {grupos.length} grupos · {totalM} matérias — clique em cada matéria para editar os tópicos
+        {grupos.length} grupos · {totalM} matérias. Clique em cada matéria para editar os tópicos
       </div>
       {grupos.map((g,gi)=>(
         <div key={gi} style={{border:"1px solid #E8E8F0",borderRadius:12,overflow:"hidden",marginBottom:8}}>
@@ -1602,7 +1602,8 @@ const ObDiscursiva = ({banca, onConfirm, onSkip}) => {
       )}
       {tipo&&(
         <div style={{marginBottom:16,animation:"fadeUp 0.3s ease"}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E",marginBottom:6}}>Peso na nota final (opcional)</div>
+          <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E",marginBottom:4}}>Qual é o peso da discursiva na nota final? <span style={{fontSize:11,color:"#9898B8",fontWeight:400}}>(opcional)</span></div>
+          <div style={{fontSize:11,color:"#9898B8",marginBottom:10}}>Ex: se objetiva vale 60% e discursiva 40%, coloque 40</div>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <input type="number" value={peso} onChange={e=>setPeso(e.target.value)} placeholder="Ex: 30" min="0" max="100"
               style={{width:80,padding:"9px 12px",border:"1.5px solid #E8E8F0",borderRadius:10,fontSize:14,color:"#1A1A2E",background:"#F7F7FC",outline:"none",textAlign:"center"}}/>
@@ -1632,7 +1633,7 @@ const ObHorasResumo = ({dados, onConfirm}) => {
       {/* Horas por dia */}
       <div style={{background:"white",border:"1px solid #E8E8F0",borderRadius:14,padding:"16px",marginBottom:12}}>
         <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E",marginBottom:4}}>⏰ Horas de estudo por dia</div>
-        <div style={{fontSize:11,color:"#9898B8",marginBottom:14}}>Seja realista — consistência vale mais que intensidade.</div>
+        <div style={{fontSize:11,color:"#9898B8",marginBottom:14}}>Seja realista: consistência vale mais que intensidade.</div>
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {DIAS.map(d=>(
             <div key={d} style={{display:"flex",alignItems:"center",gap:12}}>
@@ -1661,7 +1662,7 @@ const ObHorasResumo = ({dados, onConfirm}) => {
         </div>
         <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
           {[
-            {icon:"🏛️",l:"Concurso",v:`${dados.orgao||"—"} — ${dados.cargo||"—"}`},
+            {icon:"🏛️",l:"Concurso",v:`${dados.orgao||"?"} | ${dados.cargo||"?"}`},
             {icon:"📋",l:"Banca",v:dados.banca||"—"},
             {icon:"📅",l:"Data da prova",v:dados.dataProva||"A confirmar"},
             {icon:"📚",l:"Matérias",v:`${totalMats} disciplinas em ${dados.grupos?.length||0} grupos`},
@@ -1801,7 +1802,7 @@ function Onboarding({ user, onComplete, onBack }) {
       });
       userMsg(`Edital enviado: ${file.name}`);
       setPhase("lendo");
-      await bot("Lendo o edital completo — aguarde alguns segundos...",400);
+      await bot("Lendo o edital completo, aguarde alguns segundos...",400);
       setTyping(true);
 
       const resp = await fetch("/api/index",{
@@ -1925,8 +1926,6 @@ function Onboarding({ user, onComplete, onBack }) {
         })}
         {typing&&<ObDots/>}
         {showMaterias&&<ObRevisaoMaterias dados={{...dadosEdital,grupos}} onConfirm={confirmarMaterias}/>}
-        {showDiscursiva&&<ObDiscursiva banca={dadosEdital?.banca} onConfirm={confirmarDiscursiva} onSkip={()=>{setDiscursiva(null);setPhase("horas");bot("Ok! Vamos definir sua rotina de estudos.",400);}}/>}
-        {showHoras&&<ObHorasResumo dados={{orgao,cargo,dataProva,banca:dadosEdital?.banca,totalQuestoes:dadosEdital?.totalQuestoes,grupos,discursiva}} onConfirm={confirmarHoras}/>}
         {erro&&<div style={{background:"#FEE8E8",border:"1px solid #F25A5A",borderRadius:10,padding:"10px 14px",fontSize:12,color:"#F25A5A",marginBottom:8}}>{erro}</div>}
         <div style={{height:8,flexShrink:0}}/>
       </div>
@@ -1970,6 +1969,24 @@ function Onboarding({ user, onComplete, onBack }) {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Discursiva — painel fixo */}
+      {showDiscursiva&&(
+        <div style={{background:"white",borderTop:"1px solid #E8E8F0",padding:"12px 16px",flexShrink:0,maxHeight:"60vh",overflowY:"auto"}}>
+          <div style={{maxWidth:640,margin:"0 auto"}}>
+            <ObDiscursiva banca={dadosEdital?.banca} onConfirm={confirmarDiscursiva} onSkip={()=>{setDiscursiva(null);setPhase("horas");bot("Ok! Vamos definir sua rotina de estudos.",400);}}/>
+          </div>
+        </div>
+      )}
+
+      {/* Horas + Resumo — painel fixo */}
+      {showHoras&&(
+        <div style={{background:"white",borderTop:"1px solid #E8E8F0",padding:"12px 16px",flexShrink:0,maxHeight:"65vh",overflowY:"auto"}}>
+          <div style={{maxWidth:640,margin:"0 auto"}}>
+            <ObHorasResumo dados={{orgao,cargo,dataProva,banca:dadosEdital?.banca,totalQuestoes:dadosEdital?.totalQuestoes,grupos,discursiva}} onConfirm={confirmarHoras}/>
           </div>
         </div>
       )}
