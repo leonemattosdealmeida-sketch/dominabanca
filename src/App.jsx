@@ -1414,7 +1414,7 @@ const obApi = async (messages, system) => {
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({
-      model:"claude-sonnet-4-20250514",
+      model:"gpt-4o-mini",
       max_tokens:1000,
       system: system||"Você é um especialista em concursos públicos brasileiros. Responda sempre em português do Brasil.",
       messages,
@@ -1438,7 +1438,7 @@ const PROMPT_EDITAL = (orgao, cargo) => `Analise este edital do ${orgao} para o 
 async function obAI(messages, maxTokens=300) {
   const r = await fetch("/api/index",{
     method:"POST", headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({model:"claude-haiku-4-5-20251001", max_tokens:maxTokens, system:OB_SYSTEM, messages})
+    body:JSON.stringify({model:"gpt-4o-mini", max_tokens:maxTokens, system:OB_SYSTEM, messages})
   });
   const d = await r.json();
   return d.content?.[0]?.text||"";
@@ -1447,7 +1447,7 @@ async function obAI(messages, maxTokens=300) {
 async function obAIJson(messages, maxTokens=4000) {
   const r = await fetch("/api/index",{
     method:"POST", headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({model:"claude-haiku-4-5-20251001", max_tokens:maxTokens,
+    body:JSON.stringify({model:"gpt-4o-mini", max_tokens:maxTokens,
       system:"Você é especialista em concursos públicos brasileiros. Retorne APENAS JSON válido sem texto adicional.",
       messages})
   });
@@ -1808,7 +1808,7 @@ function Onboarding({ user, onComplete, onBack }) {
       const resp = await fetch("/api/index",{
         method:"POST", headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
-          model:"claude-sonnet-4-20250514", max_tokens:4000,
+          model:"gpt-4o-mini", max_tokens:4000,
           system:"Você é especialista em concursos públicos brasileiros. Retorne APENAS JSON válido sem texto adicional.",
           messages:[{role:"user",content:[
             {type:"document",source:{type:"base64",media_type:"application/pdf",data:base64}},
