@@ -2310,20 +2310,8 @@ function Onboarding({ user, onComplete, onBack }) {
   const confirmarTopicos = async gruposEditados=>{
     setGrupos(gruposEditados);
     userMsg("Confirmo os tópicos.");
-    if(dadosEdital?.temRedacao){
-      await bot(<span>Ótimo! Sua prova tem <b>redação</b>. Buscando os critérios de avaliação do edital...</span>,600);
-      setTyping(true);
-      // Busca critérios de redação do edital
-      try{
-        const raw = await obAIJson([{role:"user",content:PROMPT_REDACAO(orgao,cargo,editalTextoRaw)}],2000);
-        if(raw) setDadosRedacaoEdital(raw);
-      }catch{}
-      setTyping(false);
-      setPhase("discursiva");
-    } else {
-      await bot("Tudo confirmado! Agora informe suas horas de estudo.",600);
-      setPhase("horas");
-    }
+    await bot("Tópicos confirmados! Agora informe suas horas de estudo por dia.",600);
+    setPhase("horas");
   };
 
   const confirmarDiscursiva = async disc=>{
@@ -2336,8 +2324,19 @@ function Onboarding({ user, onComplete, onBack }) {
   const confirmarHoras = async horas=>{
     setHorasConfirmadas(horas);
     userMsg("Confirmo as horas de estudo.");
-    await bot("Ótimo! Agora confirme as matérias, tópicos e quantidade de questões de cada disciplina.",600);
-    setPhase("materias");
+    if(dadosEdital?.temRedacao){
+      await bot(<span>Ótimo! Sua prova tem <b>redação</b>. Buscando os critérios de avaliação do edital...</span>,600);
+      setTyping(true);
+      try{
+        const raw = await obAIJson([{role:"user",content:PROMPT_REDACAO(orgao,cargo,editalTextoRaw)}],2000);
+        if(raw) setDadosRedacaoEdital(raw);
+      }catch{}
+      setTyping(false);
+      setPhase("discursiva");
+    } else {
+      await bot("Perfeito! Vamos ao resumo final.",600);
+      setPhase("resumo");
+    }
   };
 
   const confirmarResumo = ()=>{
