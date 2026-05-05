@@ -1891,7 +1891,7 @@ const ObDiscursiva = ({banca, onConfirm, onSkip}) => {
 };
 
 // ── P5: Horas + Resumo ────────────────────────────────────────────────────────
-const ObHorasResumo = ({dados, onConfirm}) => {
+const ObHorasResumo = ({dados, onConfirm, modoResumo}) => {
   const DIAS = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
   const [horas, setHoras] = useState({Seg:2,Ter:2,Qua:2,Qui:2,Sex:2,Sáb:3,Dom:3});
   const totalHoras = Object.values(horas).reduce((a,b)=>a+b,0);
@@ -1951,7 +1951,7 @@ const ObHorasResumo = ({dados, onConfirm}) => {
 
       <button onClick={()=>onConfirm(horas)}
         style={{width:"100%",padding:"15px",background:"#5B4FCF",color:"white",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:"0 6px 24px rgba(91,79,207,0.28)"}}>
-        Criar meu cronograma →
+        {modoResumo ? "Confirmar e criar meu cronograma →" : "Confirmar horas →"}
       </button>
     </div>
   );
@@ -2053,8 +2053,8 @@ function Onboarding({ user, onComplete, onBack }) {
   const confirmData = async(data)=>{
     setMsgs(m=>m.filter(x=>x.role!=="confirm")); userMsg("Confirmo: "+data);
     setDataProva(data);
-    await bot(`Data confirmada! Agora vou mostrar as <b>matérias identificadas</b> no edital. Revise, edite se precisar e confirme.`,600);
-    setPhase("materias");
+    await bot(`Data confirmada! Agora vamos configurar seus estudos.`,600);
+    setPhase("aviso_p3");
   };
 
   // ── PDF Upload ──────────────────────────────────────────────────────────────
@@ -2132,19 +2132,25 @@ function Onboarding({ user, onComplete, onBack }) {
       await bot(<span>Ótimo! Sua prova tem <b>prova discursiva</b>. Vamos configurar como você vai treinar.</span>,600);
       setPhase("discursiva");
     } else {
-      await bot("Matérias confirmadas! Agora vamos definir sua rotina de estudos.",600);
-      setPhase("horas");
+      await bot("Tudo confirmado! Seu plano de estudos está pronto.",600);
+      setPhase("resumo");
     }
   };
 
   const confirmarDiscursiva = async disc=>{
     setDiscursiva(disc);
     userMsg(`Confirmo: ${disc.tipo==="redacao"?"Redação":"Questões dissertativas"} · ${disc.freq}x/semana${disc.peso?` · ${disc.peso}%`:""}`);
-    await bot("Perfeito! Agora vamos definir sua rotina de estudos.",600);
-    setPhase("horas");
+    await bot("Perfeito! Seu plano de estudos está completo.",600);
+    setPhase("resumo");
   };
 
-  const confirmarHoras = horas=>{
+  const confirmarHoras = async horas=>{
+    userMsg("Confirmo as horas de estudo.");
+    await bot("Ótimo! Agora confirme as matérias, tópicos e quantidade de questões de cada disciplina.",600);
+    setPhase("materias");
+  };
+
+  const confirmarResumo = horas=>{
     const dadosFinais = {
       orgao, cargo, dataProva, banca:dadosEdital?.banca,
       totalQuestoes:dadosEdital?.totalQuestoes,
@@ -2156,10 +2162,12 @@ function Onboarding({ user, onComplete, onBack }) {
 
   const showInput = ["orgao","cargo","data"].includes(phase)&&!typing;
   const showPDF = phase==="pdf";
+  const showAviso = phase==="aviso_p3";
+  const showHoras = phase==="horas"&&!typing;
   const showMaterias = phase==="materias"&&!typing;
   const showDiscursiva = phase==="discursiva"&&!typing;
-  const showHoras = phase==="horas"&&!typing;
-  const prog = {init:0,orgao:10,cargo:25,pdf:35,lendo:45,aguardando_data:50,data:50,materias:60,discursiva:75,horas:88,done:100}[phase]||0;
+  const showResumo = phase==="resumo"&&!typing;
+  const prog = {init:0,orgao:10,cargo:25,pdf:35,lendo:45,aguardando_data:48,data:50,aviso_p3:55,horas:65,materias:78,discursiva:88,resumo:95,done:100}[phase]||0;
 
   return (
     <div style={{fontFamily:"'Sora',sans-serif",height:"100vh",display:"flex",flexDirection:"column",background:"#F7F7FC"}}>
@@ -2241,20 +2249,54 @@ function Onboarding({ user, onComplete, onBack }) {
         </div>
       )}
 
-      {/* Discursiva — painel fixo */}
-      {showDiscursiva&&(
-        <div style={{background:"white",borderTop:"1px solid #E8E8F0",padding:"12px 16px",flexShrink:0,maxHeight:"60vh",overflowY:"auto"}}>
-          <div style={{maxWidth:640,margin:"0 auto"}}>
-            <ObDiscursiva banca={dadosEdital?.banca} onConfirm={confirmarDiscursiva} onSkip={()=>{setDiscursiva(null);setPhase("horas");bot("Ok! Vamos definir sua rotina de estudos.",400);}}/>
+      {/* Aviso P3 — questões objetivas */}
+      {showAviso&&(
+        <div style={{background:"white",borderTop:"1px solid #E8E8F0",padding:"16px",flexShrink:0,maxHeight:"60vh",overflowY:"auto"}}>
+          <div style={{maxWidth:640,margin:"0 auto",display:"flex",flexDirection:"column",gap:12}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E",marginBottom:4}}>📚 Próxima etapa: Questões objetivas</div>
+
+            {[
+              {icon:"⏰",bg:"#EDE9FE",text:"Informe quantas horas você tem disponível em cada dia da semana. Seja realista — consistência vale mais que intensidade."},
+              {icon:"📋",bg:"#D1FAE5",text:"Confirme as matérias, os tópicos de cada uma e a quantidade de questões. Você pode editar tudo antes de confirmar."},
+              {icon:"💡",bg:"#FEF3DC",text:"Tudo pode ser ajustado depois. Esta configuração inicial é só o ponto de partida do seu cronograma."},
+            ].map((c,i)=>(
+              <div key={i} style={{display:"flex",gap:12,alignItems:"flex-start",background:c.bg,borderRadius:12,padding:"12px 14px"}}>
+                <span style={{fontSize:18,flexShrink:0}}>{c.icon}</span>
+                <p style={{fontSize:12,color:"#1A1A2E",lineHeight:1.65,margin:0}}>{c.text}</p>
+              </div>
+            ))}
+
+            <button onClick={()=>setPhase("horas")}
+              style={{width:"100%",padding:"14px",background:"#5B4FCF",color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",marginTop:4}}>
+              Entendido, vamos lá →
+            </button>
           </div>
         </div>
       )}
 
-      {/* Horas + Resumo — painel fixo */}
+      {/* Horas — painel fixo */}
       {showHoras&&(
         <div style={{background:"white",borderTop:"1px solid #E8E8F0",padding:"12px 16px",flexShrink:0,maxHeight:"65vh",overflowY:"auto"}}>
           <div style={{maxWidth:640,margin:"0 auto"}}>
             <ObHorasResumo dados={{orgao,cargo,dataProva,banca:dadosEdital?.banca,totalQuestoes:dadosEdital?.totalQuestoes,grupos,discursiva}} onConfirm={confirmarHoras}/>
+          </div>
+        </div>
+      )}
+
+      {/* Discursiva — painel fixo */}
+      {showDiscursiva&&(
+        <div style={{background:"white",borderTop:"1px solid #E8E8F0",padding:"12px 16px",flexShrink:0,maxHeight:"60vh",overflowY:"auto"}}>
+          <div style={{maxWidth:640,margin:"0 auto"}}>
+            <ObDiscursiva banca={dadosEdital?.banca} onConfirm={confirmarDiscursiva} onSkip={()=>{setDiscursiva(null);setPhase("resumo");bot("Ok! Vamos ao resumo final.",400);}}/>
+          </div>
+        </div>
+      )}
+
+      {/* Resumo final */}
+      {showResumo&&(
+        <div style={{background:"white",borderTop:"1px solid #E8E8F0",padding:"12px 16px",flexShrink:0,maxHeight:"65vh",overflowY:"auto"}}>
+          <div style={{maxWidth:640,margin:"0 auto"}}>
+            <ObHorasResumo dados={{orgao,cargo,dataProva,banca:dadosEdital?.banca,totalQuestoes:dadosEdital?.totalQuestoes,grupos,discursiva}} onConfirm={confirmarResumo} modoResumo={true}/>
           </div>
         </div>
       )}
