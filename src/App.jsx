@@ -1441,7 +1441,7 @@ function Login({ onBack, onCadastro, onSuccess }) {
 // ROOT — Gerencia navegação entre telas
 // ══════════════════════════════════════════════════════════════════════════════
 export default function App() {
-  const [screen, setScreen] = useState("landing"); // "landing" | "cadastro" | "login" | "onboarding"
+  const [screen, setScreen] = useState("loading");
   const [userData, setUserData] = useState(null);
 
   useEffect(() => {
@@ -1451,9 +1451,86 @@ export default function App() {
     document.head.appendChild(s);
   }, []);
 
-  if(screen === "cadastro") return <Cadastro onBack={()=>setScreen("landing")} onSuccess={u=>{setUserData(u);setScreen("onboarding");}}/>;
+  useEffect(() => {
+    // Verifica sessão ativa
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if(session?.user) {
+        setUserData(session.user);
+        // Verifica se já fez onboarding
+        const { data } = await supabase.from("onboarding").select("concluido").eq("user_id", session.user.id).single();
+        if(data?.concluido) {
+          setScreen("dashboard");
+        } else {
+          setScreen("onboarding");
+        }
+      } else {
+        setScreen("landing");
+      }
+    };
+    checkSession();
+
+    // Escuta mudanças de autenticação (login Google redirect)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if(event === "SIGNED_IN" && session?.user) {
+        setUserData(session.user);
+        const { data } = await supabase.from("onboarding").select("concluido").eq("user_id", session.user.id).single();
+        if(data?.concluido) {
+          setScreen("dashboard");
+        } else {
+          setScreen("onboarding");
+        }
+      } else if(event === "SIGNED_OUT") {
+        setUserData(null);
+        setScreen("landing");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if(screen === "loading") return (
+    <div style={{height:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#F8F7FF"}}>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
+        <div style={{width:40,height:40,border:"4px solid #EDE9FE",borderTop:"4px solid #6C3CE1",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+        <p style={{fontSize:13,color:"#6C3CE1",fontWeight:600}}>Carregando...</p>
+      </div>
+    </div>
+  );
+
+  if(screen === "cadastro") return <Cadastro onBack={()=>setScreen("landing")} onLogin={()=>setScreen("login")} onSuccess={u=>{setUserData(u);setScreen("onboarding");}}/>;
   if(screen === "login") return <Login onBack={()=>setScreen("landing")} onCadastro={()=>setScreen("cadastro")} onSuccess={u=>{setUserData(u);setScreen("onboarding");}}/>;
-  if(screen === "onboarding") return <Onboarding user={userData} onComplete={plan=>{ console.log("Plano criado:", plan); setScreen("landing"); }} onBack={()=>setScreen("landing")}/>;
+  if(screen === "onboarding") return <Onboarding user={userData} onComplete={async plan=>{
+    if(userData?.id) {
+      await supabase.from("onboarding").upsert({
+        user_id: userData.id,
+        orgao: plan.orgao,
+        cargo: plan.cargo,
+        data_prova: plan.dataProva,
+        banca: plan.banca,
+        total_questoes: plan.totalQuestoes,
+        tem_discursiva: plan.temDiscursiva,
+        grupos: plan.grupos,
+        discursiva: plan.discursiva,
+        horas: plan.horas,
+        concluido: true,
+      });
+    }
+    setScreen("dashboard");
+  }} onBack={()=>setScreen("landing")}/>;
+
+  if(screen === "dashboard") return (
+    <div style={{height:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#F8F7FF",flexDirection:"column",gap:16}}>
+      <div style={{fontSize:32}}>🎉</div>
+      <h2 style={{fontFamily:"'Lora',serif",fontSize:24,color:"#1E1B4B"}}>Dashboard em construção!</h2>
+      <p style={{fontSize:14,color:"#6B7280"}}>Onboarding concluído com sucesso.</p>
+      <button onClick={async()=>{await supabase.auth.signOut();setScreen("landing");}}
+        style={{padding:"10px 24px",background:"#6C3CE1",color:"white",border:"none",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer"}}>
+        Sair
+      </button>
+    </div>
+  );
+
   return <Landing onCadastro={()=>setScreen("cadastro")} onLogin={()=>setScreen("login")}/>;
 }
 // ══════════════════════════════════════════════════════════════════════════════
