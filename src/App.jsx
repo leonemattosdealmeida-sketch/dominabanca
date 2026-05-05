@@ -1766,7 +1766,128 @@ const ObConfirmCard = ({label,value,onEdit,onConfirm}) => (
 );
 
 // ── P3: Revisão de matérias ───────────────────────────────────────────────────
-const ObRevisaoMaterias = ({dados, onConfirm, modoSoMaterias}) => {
+// ── Confirmar Matérias ────────────────────────────────────────────────────────
+const ObConfirmarMaterias = ({dados, onConfirm}) => {
+  const [grupos, setGrupos] = useState(dados.grupos||[]);
+  const totalQ = grupos.reduce((a,g)=>a+g.materias.reduce((b,m)=>b+(m.questoes||0),0),0);
+  const totalM = grupos.reduce((a,g)=>a+g.materias.length,0);
+  const updQ = (gi,mi,v) => setGrupos(gs=>gs.map((g,i)=>i!==gi?g:{...g,materias:g.materias.map((m,j)=>j!==mi?m:{...m,questoes:v})}));
+  const remM = (gi,mi) => setGrupos(gs=>gs.map((g,i)=>i!==gi?g:{...g,materias:g.materias.filter((_,j)=>j!==mi)}));
+  const addM = gi => setGrupos(gs=>gs.map((g,i)=>i!==gi?g:{...g,materias:[...g.materias,{nome:"",questoes:0}]}));
+  const updNome = (gi,mi,v) => setGrupos(gs=>gs.map((g,i)=>i!==gi?g:{...g,materias:g.materias.map((m,j)=>j!==mi?m:{...m,nome:v})}));
+  return (
+    <div style={{animation:"fadeUp 0.4s ease"}}>
+      <div style={{background:"#EFEFFD",border:"1px solid #DDDDF5",borderRadius:12,padding:"12px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:13,fontWeight:700,color:"#5B4FCF"}}>{totalM} matérias</div>
+          <div style={{fontSize:11,color:"#9898B8",marginTop:1}}>Edite o nome e a quantidade de questões</div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:16,fontWeight:700,color:"#5B4FCF"}}>{totalQ}q</div>
+          <div style={{fontSize:10,color:"#9898B8"}}>total</div>
+        </div>
+      </div>
+      {grupos.map((g,gi)=>(
+        <div key={gi} style={{marginBottom:12}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#5B4FCF",textTransform:"uppercase",letterSpacing:1,marginBottom:6,paddingLeft:2}}>{g.nome}</div>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {g.materias.map((m,mi)=>{
+              const pct = dados.totalQuestoes ? Math.round((m.questoes/dados.totalQuestoes)*100) : 0;
+              return (
+                <div key={mi} style={{background:"white",border:"1px solid #E8E8F0",borderRadius:10,padding:"10px 12px",display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{flex:1}}>
+                    <input value={m.nome} onChange={e=>updNome(gi,mi,e.target.value)}
+                      style={{width:"100%",padding:0,border:"none",fontSize:13,fontWeight:600,color:"#1A1A2E",background:"transparent",outline:"none",marginBottom:4}}
+                      placeholder="Nome da matéria"/>
+                    <div style={{height:3,background:"#E8E8F0",borderRadius:99,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${pct}%`,background:"#5B4FCF",borderRadius:99}}/>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                    <input type="number" value={m.questoes||""} onChange={e=>updQ(gi,mi,parseInt(e.target.value)||0)}
+                      style={{width:48,padding:"6px 8px",border:"1px solid #E8E8F0",borderRadius:8,fontSize:13,fontWeight:700,color:"#5B4FCF",background:"#F7F7FC",outline:"none",textAlign:"center"}} placeholder="0"/>
+                    <span style={{fontSize:10,color:"#9898B8"}}>q</span>
+                    <button onClick={()=>remM(gi,mi)} style={{background:"none",border:"none",color:"#F25A5A",cursor:"pointer",fontSize:14,padding:"2px"}}>✕</button>
+                  </div>
+                </div>
+              );
+            })}
+            <button onClick={()=>addM(gi)} style={{padding:"8px",background:"transparent",border:"1px dashed #E8E8F0",borderRadius:9,fontSize:11,color:"#9898B8",cursor:"pointer",textAlign:"center"}}>+ adicionar matéria</button>
+          </div>
+        </div>
+      ))}
+      <button onClick={()=>onConfirm(grupos)} style={{width:"100%",padding:"13px",background:"#5B4FCF",color:"white",border:"none",borderRadius:12,fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 16px rgba(91,79,207,0.25)",marginTop:4}}>
+        ✓ Confirmar matérias e questões →
+      </button>
+    </div>
+  );
+};
+
+// ── Confirmar Tópicos (uma por vez) ──────────────────────────────────────────
+const ObConfirmarTopicos = ({grupos, onConfirm}) => {
+  const todasMats = grupos.flatMap((g,gi)=>g.materias.map((m,mi)=>({...m,gi,mi,grupo:g.nome})));
+  const [atual, setAtual] = useState(0);
+  const [topicos, setTopicos] = useState(todasMats[0]?.topicos||[]);
+  const [confirmados, setConfirmados] = useState([]);
+  const mat = todasMats[atual];
+  if(!mat) return null;
+  const addT = () => setTopicos(t=>[...t,""]);
+  const updT = (i,v) => setTopicos(t=>t.map((x,j)=>j===i?v:x));
+  const remT = i => setTopicos(t=>t.filter((_,j)=>j!==i));
+  const avancar = () => {
+    const novos = [...confirmados, {...mat, topicos}];
+    setConfirmados(novos);
+    if(atual+1 < todasMats.length){
+      setAtual(atual+1);
+      setTopicos(todasMats[atual+1]?.topicos||[]);
+    } else {
+      const gruposAtt = grupos.map((g,gi)=>({...g,materias:g.materias.map((m,mi)=>{
+        const conf = novos.find(c=>c.gi===gi&&c.mi===mi);
+        return conf ? {...m,topicos:conf.topicos} : m;
+      })}));
+      onConfirm(gruposAtt);
+    }
+  };
+  return (
+    <div style={{animation:"fadeUp 0.4s ease"}}>
+      <div style={{marginBottom:12}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+          <span style={{fontSize:11,fontWeight:700,color:"#5B4FCF"}}>Matéria {atual+1} de {todasMats.length}</span>
+          <span style={{fontSize:10,color:"#9898B8"}}>{mat.grupo}</span>
+        </div>
+        <div style={{height:4,background:"#E8E8F0",borderRadius:99,overflow:"hidden"}}>
+          <div style={{height:"100%",width:`${(atual/todasMats.length)*100}%`,background:"linear-gradient(90deg,#5B4FCF,#7C6FE0)",borderRadius:99,transition:"width 0.4s ease"}}/>
+        </div>
+      </div>
+      <div style={{background:"white",border:"1.5px solid #E8E8F0",borderRadius:14,overflow:"hidden",marginBottom:12}}>
+        <div style={{background:"linear-gradient(135deg,#5B4FCF,#7C6FE0)",padding:"12px 16px"}}>
+          <div style={{fontSize:14,fontWeight:800,color:"white"}}>{mat.nome}</div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",marginTop:2}}>{mat.questoes}q · {topicos.length} tópicos</div>
+        </div>
+        <div style={{padding:"12px 14px",maxHeight:300,overflowY:"auto"}}>
+          {topicos.map((t,i)=>(
+            <div key={i} style={{display:"flex",gap:7,alignItems:"center",marginBottom:6}}>
+              <span style={{color:"#5B4FCF",fontSize:12,flexShrink:0}}>•</span>
+              <input value={t} onChange={e=>updT(i,e.target.value)}
+                style={{flex:1,padding:"7px 10px",border:"1px solid #E8E8F0",borderRadius:8,fontSize:12,color:"#1A1A2E",background:"#F7F7FC",outline:"none"}}
+                placeholder="Tópico"/>
+              <button onClick={()=>remT(i)} style={{background:"none",border:"none",color:"#F25A5A",cursor:"pointer",fontSize:13,flexShrink:0}}>✕</button>
+            </div>
+          ))}
+          <button onClick={addT} style={{padding:"6px 10px",background:"transparent",border:"1px dashed #E8E8F0",borderRadius:8,fontSize:11,color:"#9898B8",cursor:"pointer",marginTop:4,width:"100%"}}>+ adicionar tópico</button>
+        </div>
+      </div>
+      <button onClick={avancar} style={{width:"100%",padding:"13px",background:"#5B4FCF",color:"white",border:"none",borderRadius:12,fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 16px rgba(91,79,207,0.25)"}}>
+        {atual+1 < todasMats.length ? `✓ Confirmar e ir para ${todasMats[atual+1]?.nome} →` : "✓ Confirmar última matéria →"}
+      </button>
+    </div>
+  );
+};
+
+const ObRevisaoMaterias = ({dados, onConfirm, modoSoMaterias}) =>
+  modoSoMaterias
+    ? <ObConfirmarMaterias dados={dados} onConfirm={onConfirm}/>
+    : <ObConfirmarTopicos grupos={dados.grupos||[]} onConfirm={onConfirm}/>;) => {
   const [grupos, setGrupos] = useState(dados.grupos||[]);
   const [exp, setExp] = useState({});
   const toggle = k => setExp(e=>({...e,[k]:!e[k]}));
