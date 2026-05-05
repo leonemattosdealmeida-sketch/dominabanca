@@ -1887,77 +1887,7 @@ const ObConfirmarTopicos = ({grupos, onConfirm}) => {
 const ObRevisaoMaterias = ({dados, onConfirm, modoSoMaterias}) =>
   modoSoMaterias
     ? <ObConfirmarMaterias dados={dados} onConfirm={onConfirm}/>
-    : <ObConfirmarTopicos grupos={dados.grupos||[]} onConfirm={onConfirm}/>;) => {
-  const [grupos, setGrupos] = useState(dados.grupos||[]);
-  const [exp, setExp] = useState({});
-  const toggle = k => setExp(e=>({...e,[k]:!e[k]}));
-  const updM = (gi,mi,f,v) => setGrupos(gs=>gs.map((g,i)=>i!==gi?g:{...g,materias:g.materias.map((m,j)=>j!==mi?m:{...m,[f]:v})}));
-  const remM = (gi,mi) => setGrupos(gs=>gs.map((g,i)=>i!==gi?g:{...g,materias:g.materias.filter((_,j)=>j!==mi)}));
-  const addM = gi => setGrupos(gs=>gs.map((g,i)=>i!==gi?g:{...g,materias:[...g.materias,{nome:"",questoes:0,topicos:[]}]}));
-  const updT = (gi,mi,ti,v) => setGrupos(gs=>gs.map((g,i)=>i!==gi?g:{...g,materias:g.materias.map((m,j)=>j!==mi?m:{...m,topicos:(m.topicos||[]).map((t,k)=>k!==ti?t:v)})}));
-  const remT = (gi,mi,ti) => setGrupos(gs=>gs.map((g,i)=>i!==gi?g:{...g,materias:g.materias.map((m,j)=>j!==mi?m:{...m,topicos:(m.topicos||[]).filter((_,k)=>k!==ti)})}));
-  const addT = (gi,mi) => setGrupos(gs=>gs.map((g,i)=>i!==gi?g:{...g,materias:g.materias.map((m,j)=>j!==mi?m:{...m,topicos:[...(m.topicos||[]),""]})}));
-  const totalM = grupos.reduce((a,g)=>a+g.materias.length,0);
-  return (
-    <div style={{animation:"fadeUp 0.4s ease"}}>
-      <div style={{background:"#EFEFFD",border:"1px solid #DDDDF5",borderRadius:12,padding:"10px 14px",marginBottom:10,fontSize:12,color:"#5B4FCF",fontWeight:600}}>
-        {grupos.length} grupos · {totalM} matérias. Clique em cada matéria para editar os tópicos
-      </div>
-      {grupos.map((g,gi)=>(
-        <div key={gi} style={{border:"1px solid #E8E8F0",borderRadius:12,overflow:"hidden",marginBottom:8}}>
-          <div style={{background:"linear-gradient(135deg,#5B4FCF,#7C6FE0)",padding:"9px 12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{fontSize:12,fontWeight:800,color:"white"}}>{g.nome} <span style={{fontSize:10,fontWeight:400,opacity:.7}}>({g.materias.length} mat.)</span></span>
-            <button onClick={()=>addM(gi)} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:6,padding:"3px 9px",fontSize:10,fontWeight:700,color:"white",cursor:"pointer"}}>+ matéria</button>
-          </div>
-          <div style={{padding:"7px 10px",display:"flex",flexDirection:"column",gap:4}}>
-            {g.materias.map((m,mi)=>{
-              const k=`${gi}-${mi}`;
-              const pct=dados.totalQuestoes?Math.round((m.questoes/dados.totalQuestoes)*100):0;
-              return (
-                <div key={mi} style={{border:"1px solid #E8E8F0",borderRadius:9,overflow:"hidden"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:"#F7F7FC",cursor:"pointer"}} onClick={()=>toggle(k)}>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:12,fontWeight:600,color:"#1A1A2E"}}>{m.nome}</div>
-                      <div style={{display:"flex",gap:5,alignItems:"center",marginTop:2}}>
-                        <div style={{height:2,width:60,background:"#E8E8F0",borderRadius:99,overflow:"hidden"}}>
-                          <div style={{height:"100%",width:`${pct}%`,background:"#5B4FCF",borderRadius:99}}/>
-                        </div>
-                        <span style={{fontSize:10,color:"#9898B8"}}>{m.questoes}q · {pct}% · {(m.topicos||[]).length} tópicos</span>
-                      </div>
-                    </div>
-                    <div style={{display:"flex",gap:5,alignItems:"center"}}>
-                      <span style={{fontSize:11,color:"#9898B8"}}>{exp[k]?"▲":"▼"}</span>
-                      <button onClick={e=>{e.stopPropagation();remM(gi,mi)}} style={{background:"none",border:"none",color:"#F25A5A",cursor:"pointer",fontSize:13}}>✕</button>
-                    </div>
-                  </div>
-                  {exp[k]&&(
-                    <div style={{background:"white",padding:"8px 10px",borderTop:"1px solid #E8E8F0"}}>
-                      <div style={{display:"flex",gap:7,marginBottom:7}}>
-                        <input value={m.nome} onChange={e=>updM(gi,mi,"nome",e.target.value)} style={{flex:1,padding:"6px 9px",border:"1px solid #E8E8F0",borderRadius:7,fontSize:12,color:"#1A1A2E",background:"#F7F7FC",outline:"none"}} placeholder="Nome da matéria"/>
-                        <input type="number" value={m.questoes||""} onChange={e=>updM(gi,mi,"questoes",parseInt(e.target.value)||0)} style={{width:52,padding:"6px 7px",border:"1px solid #E8E8F0",borderRadius:7,fontSize:12,color:"#1A1A2E",background:"#F7F7FC",outline:"none",textAlign:"center"}} placeholder="q"/>
-                      </div>
-                      {(m.topicos||[]).map((t,ti)=>(
-                        <div key={ti} style={{display:"flex",gap:5,alignItems:"center",marginBottom:3}}>
-                          <span style={{color:"#9898B8",fontSize:10}}>•</span>
-                          <input value={t} onChange={e=>updT(gi,mi,ti,e.target.value)} style={{flex:1,padding:"4px 8px",border:"1px solid #E8E8F0",borderRadius:6,fontSize:11,color:"#4A4A6A",background:"#F7F7FC",outline:"none"}} placeholder="Tópico"/>
-                          <button onClick={()=>remT(gi,mi,ti)} style={{background:"none",border:"none",color:"#F25A5A",cursor:"pointer",fontSize:11}}>✕</button>
-                        </div>
-                      ))}
-                      <button onClick={()=>addT(gi,mi)} style={{padding:"4px 8px",background:"transparent",border:"1px dashed #E8E8F0",borderRadius:6,fontSize:10,color:"#9898B8",cursor:"pointer",marginTop:3}}>+ tópico</button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-      <button onClick={()=>onConfirm(grupos)} style={{width:"100%",padding:"13px",background:"#5B4FCF",color:"white",border:"none",borderRadius:12,fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 20px rgba(91,79,207,0.28)"}}>
-        {modoSoMaterias ? "✓ Confirmar matérias e questões →" : "✓ Confirmar tópicos →"}
-      </button>
-    </div>
-  );
-};
+    : <ObConfirmarTopicos grupos={dados.grupos||[]} onConfirm={onConfirm}/>;
 
 // ── Redação ───────────────────────────────────────────────────────────────────
 const ObRedacao = ({dadosRedacao, onConfirm, onSkip}) => {
