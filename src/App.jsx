@@ -189,7 +189,7 @@ const DemoQuestao = () => {
         <button onClick={()=>sel&&setShow(true)} style={{padding:"8px",background:sel?C.primary:"#E5E7EB",color:sel?"white":C.textLight,border:"none",borderRadius:8,fontSize:11,fontWeight:700,cursor:sel?"pointer":"not-allowed"}}>Confirmar →</button>
       ):(
         <div style={{padding:"8px 12px",background:sel==="A"?"#D1FAE5":"#FEE2E2",borderRadius:8,fontSize:11,color:sel==="A"?"#065F46":"#991B1B",lineHeight:1.6,animation:"bounceIn 0.3s ease"}}>
-          <strong>{sel==="A"?"✓ Correto!":"✗ Gabarito: A"}</strong> — O princípio da legalidade exige autorização legal expressa para que a Administração aja.
+          <strong>{sel==="A"?"✓ Correto!":"✗ Gabarito: A"}</strong>. O princípio da legalidade exige autorização legal expressa para que a Administração aja.
         </div>
       )}
     </div>
@@ -1522,7 +1522,7 @@ export default function App() {
               Vamos montar seu plano de estudos
             </h1>
             <p style={{fontSize:14,color:"#6B7280",lineHeight:1.7}}>
-              Esta etapa é fundamental para a sua preparação. Dedique alguns minutos com atenção — quanto mais preciso você for, mais eficiente será o seu cronograma.
+              Esta etapa é fundamental para a sua preparação. Dedique alguns minutos com atenção. Quanto mais preciso você for, mais eficiente será o seu cronograma.
             </p>
           </div>
 
@@ -1834,8 +1834,11 @@ const ObRevisaoMaterias = ({dados, onConfirm}) => {
 // ── P4: Discursiva ────────────────────────────────────────────────────────────
 const ObDiscursiva = ({banca, onConfirm, onSkip}) => {
   const [tipo, setTipo] = useState(null);
-  const [peso, setPeso] = useState("");
-  const [freq, setFreq] = useState(2);
+  const DIAS = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
+  const [diasSel, setDiasSel] = useState([]);
+
+  const toggleDia = d => setDiasSel(ds => ds.includes(d) ? ds.filter(x=>x!==d) : [...ds,d]);
+
   return (
     <div style={{animation:"fadeUp 0.4s ease"}}>
       <div style={{marginBottom:14}}>
@@ -1855,34 +1858,26 @@ const ObDiscursiva = ({banca, onConfirm, onSkip}) => {
           ))}
         </div>
       </div>
+
       {tipo&&(
-        <div style={{marginBottom:14,animation:"fadeUp 0.3s ease"}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E",marginBottom:8}}>Quantas vezes por semana quer treinar?</div>
-          <div style={{display:"flex",gap:8}}>
-            {[1,2,3].map(n=>(
-              <button key={n} onClick={()=>setFreq(n)}
-                style={{flex:1,padding:"10px",border:`1.5px solid ${freq===n?"#5B4FCF":"#E8E8F0"}`,borderRadius:10,background:freq===n?"#EFEFFD":"white",color:freq===n?"#5B4FCF":"#4A4A6A",fontSize:13,fontWeight:freq===n?700:500,cursor:"pointer"}}>
-                {n}x {n===2&&"⭐"}
+        <div style={{marginBottom:16,animation:"fadeUp 0.3s ease"}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E",marginBottom:8}}>Em quais dias da semana vai treinar?</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {DIAS.map(d=>(
+              <button key={d} onClick={()=>toggleDia(d)}
+                style={{padding:"8px 12px",border:`1.5px solid ${diasSel.includes(d)?"#5B4FCF":"#E8E8F0"}`,borderRadius:9,background:diasSel.includes(d)?"#EFEFFD":"white",color:diasSel.includes(d)?"#5B4FCF":"#4A4A6A",fontSize:12,fontWeight:diasSel.includes(d)?700:500,cursor:"pointer"}}>
+                {d}
               </button>
             ))}
           </div>
+          {diasSel.length===0&&<p style={{fontSize:11,color:"#9898B8",marginTop:6}}>Selecione pelo menos um dia</p>}
         </div>
       )}
-      {tipo&&(
-        <div style={{marginBottom:16,animation:"fadeUp 0.3s ease"}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E",marginBottom:4}}>Qual é o peso da discursiva na nota final? <span style={{fontSize:11,color:"#9898B8",fontWeight:400}}>(opcional)</span></div>
-          <div style={{fontSize:11,color:"#9898B8",marginBottom:10}}>Ex: se objetiva vale 60% e discursiva 40%, coloque 40</div>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <input type="number" value={peso} onChange={e=>setPeso(e.target.value)} placeholder="Ex: 30" min="0" max="100"
-              style={{width:80,padding:"9px 12px",border:"1.5px solid #E8E8F0",borderRadius:10,fontSize:14,color:"#1A1A2E",background:"#F7F7FC",outline:"none",textAlign:"center"}}/>
-            <span style={{fontSize:13,color:"#4A4A6A"}}>% da nota total</span>
-          </div>
-        </div>
-      )}
+
       <div style={{display:"flex",gap:10}}>
         <button onClick={onSkip} style={{flex:1,padding:"12px",background:"white",color:"#4A4A6A",border:"1.5px solid #E8E8F0",borderRadius:12,fontSize:12,fontWeight:600,cursor:"pointer"}}>Pular por agora</button>
-        <button onClick={()=>tipo&&onConfirm({tipo,freq,peso:parseInt(peso)||0})} disabled={!tipo}
-          style={{flex:2,padding:"12px",background:tipo?"#5B4FCF":"#E8E8F0",color:tipo?"white":"#9898B8",border:"none",borderRadius:12,fontSize:13,fontWeight:700,cursor:tipo?"pointer":"not-allowed"}}>
+        <button onClick={()=>tipo&&diasSel.length>0&&onConfirm({tipo,dias:diasSel})} disabled={!tipo||diasSel.length===0}
+          style={{flex:2,padding:"12px",background:tipo&&diasSel.length>0?"#5B4FCF":"#E8E8F0",color:tipo&&diasSel.length>0?"white":"#9898B8",border:"none",borderRadius:12,fontSize:13,fontWeight:700,cursor:tipo&&diasSel.length>0?"pointer":"not-allowed"}}>
           ✓ Confirmar discursiva →
         </button>
       </div>
@@ -1890,15 +1885,13 @@ const ObDiscursiva = ({banca, onConfirm, onSkip}) => {
   );
 };
 
-// ── P5: Horas + Resumo ────────────────────────────────────────────────────────
-const ObHorasResumo = ({dados, onConfirm, modoResumo}) => {
+// ── P5: Horas ────────────────────────────────────────────────────────────────
+const ObHoras = ({onConfirm}) => {
   const DIAS = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
   const [horas, setHoras] = useState({Seg:2,Ter:2,Qua:2,Qui:2,Sex:2,Sáb:3,Dom:3});
   const totalHoras = Object.values(horas).reduce((a,b)=>a+b,0);
-  const totalMats = dados.grupos?.reduce((a,g)=>a+g.materias.length,0)||0;
   return (
     <div style={{animation:"fadeUp 0.4s ease"}}>
-      {/* Horas por dia */}
       <div style={{background:"white",border:"1px solid #E8E8F0",borderRadius:14,padding:"16px",marginBottom:12}}>
         <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E",marginBottom:4}}>⏰ Horas de estudo por dia</div>
         <div style={{fontSize:11,color:"#9898B8",marginBottom:14}}>Seja realista: consistência vale mais que intensidade.</div>
@@ -1922,36 +1915,46 @@ const ObHorasResumo = ({dados, onConfirm, modoResumo}) => {
           <span style={{fontSize:16,fontWeight:700,color:"#5B4FCF"}}>{totalHoras}h/semana</span>
         </div>
       </div>
-
-      {/* Resumo final */}
-      <div style={{background:"white",border:"1.5px solid #E8E8F0",borderRadius:14,overflow:"hidden",marginBottom:12}}>
-        <div style={{background:"linear-gradient(135deg,#5B4FCF,#7C6FE0)",padding:"12px 16px"}}>
-          <div style={{fontSize:13,fontWeight:800,color:"white"}}>📋 Resumo do seu plano</div>
-        </div>
-        <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
-          {[
-            {icon:"🏛️",l:"Concurso",v:`${dados.orgao||"?"} | ${dados.cargo||"?"}`},
-            {icon:"📋",l:"Banca",v:dados.banca||"—"},
-            {icon:"📅",l:"Data da prova",v:dados.dataProva||"A confirmar"},
-            {icon:"📚",l:"Matérias",v:`${totalMats} disciplinas em ${dados.grupos?.length||0} grupos`},
-            {icon:"❓",l:"Total de questões",v:dados.totalQuestoes?`${dados.totalQuestoes} questões`:"—"},
-            ...(dados.discursiva?[{icon:"✍️",l:"Discursiva",v:`${dados.discursiva.tipo==="redacao"?"Redação":"Questões dissertativas"} · ${dados.discursiva.freq}x/semana${dados.discursiva.peso?` · ${dados.discursiva.peso}% da nota`:`"`}`}]:[]),
-            {icon:"⏰",l:"Estudo semanal",v:`${totalHoras}h/semana`},
-          ].map(r=>(
-            <div key={r.l} style={{display:"flex",gap:10,alignItems:"flex-start",paddingBottom:8,borderBottom:"1px solid #E8E8F0"}}>
-              <span style={{fontSize:16,flexShrink:0}}>{r.icon}</span>
-              <div>
-                <div style={{fontSize:10,color:"#9898B8",fontWeight:600,textTransform:"uppercase",letterSpacing:.5,marginBottom:1}}>{r.l}</div>
-                <div style={{fontSize:13,fontWeight:600,color:"#1A1A2E"}}>{r.v}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       <button onClick={()=>onConfirm(horas)}
+        style={{width:"100%",padding:"14px",background:"#5B4FCF",color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 20px rgba(91,79,207,0.28)"}}>
+        Confirmar horas →
+      </button>
+    </div>
+  );
+};
+
+// ── Resumo Final ──────────────────────────────────────────────────────────────
+const ObResumoFinal = ({dados, onConfirm}) => {
+  const totalMats = dados.grupos?.reduce((a,g)=>a+g.materias.length,0)||0;
+  const totalHoras = dados.horas ? Object.values(dados.horas).reduce((a,b)=>a+b,0) : 0;
+  return (
+    <div style={{animation:"fadeUp 0.4s ease"}}>
+      <div style={{background:"linear-gradient(135deg,#5B4FCF,#7C6FE0)",borderRadius:14,padding:"14px 16px",marginBottom:12}}>
+        <div style={{fontSize:14,fontWeight:800,color:"white",marginBottom:2}}>📋 Resumo do seu plano</div>
+        <div style={{fontSize:11,color:"rgba(255,255,255,0.7)"}}>Revise e confirme para criar seu cronograma</div>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:14}}>
+        {[
+          {icon:"🏛️",l:"Concurso",v:`${dados.orgao||"?"} | ${dados.cargo||"?"}`},
+          {icon:"📋",l:"Banca",v:dados.banca||"Não identificada"},
+          {icon:"📅",l:"Data da prova",v:dados.dataProva||"A confirmar"},
+          {icon:"📚",l:"Matérias",v:`${totalMats} disciplinas em ${dados.grupos?.length||0} grupos`},
+          {icon:"❓",l:"Total de questões",v:dados.totalQuestoes?`${dados.totalQuestoes} questões`:"Não informado"},
+          ...(dados.discursiva?[{icon:"✍️",l:"Discursiva",v:`${dados.discursiva.tipo==="redacao"?"Redação":"Questões dissertativas"} — ${dados.discursiva.dias?.join(", ")||""}`}]:[]),
+          {icon:"⏰",l:"Estudo semanal",v:`${totalHoras}h por semana`},
+        ].map(r=>(
+          <div key={r.l} style={{display:"flex",gap:10,alignItems:"flex-start",padding:"10px 12px",background:"white",border:"1px solid #E8E8F0",borderRadius:10}}>
+            <span style={{fontSize:18,flexShrink:0}}>{r.icon}</span>
+            <div>
+              <div style={{fontSize:10,color:"#9898B8",fontWeight:600,textTransform:"uppercase",letterSpacing:.5,marginBottom:1}}>{r.l}</div>
+              <div style={{fontSize:13,fontWeight:600,color:"#1A1A2E"}}>{r.v}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <button onClick={onConfirm}
         style={{width:"100%",padding:"15px",background:"#5B4FCF",color:"white",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:"0 6px 24px rgba(91,79,207,0.28)"}}>
-        {modoResumo ? "Confirmar e criar meu cronograma →" : "Confirmar horas →"}
+        Confirmar e criar meu cronograma →
       </button>
     </div>
   );
@@ -1972,6 +1975,7 @@ function Onboarding({ user, onComplete, onBack }) {
   const [dataProva, setDataProva] = useState("");
   const [grupos, setGrupos] = useState([]);
   const [discursiva, setDiscursiva] = useState(null);
+  const [horasConfirmadas, setHorasConfirmadas] = useState(null);
   const [erro, setErro] = useState("");
   const chatRef = useRef(null);
   const inputRef = useRef(null);
@@ -2076,8 +2080,8 @@ function Onboarding({ user, onComplete, onBack }) {
       const resp = await fetch("/api/index",{
         method:"POST", headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
-          model:"gpt-4o-mini", max_tokens:4000,
-          system:"Você é especialista em concursos públicos brasileiros. Retorne APENAS JSON válido sem texto adicional.",
+          model:"gpt-4o-mini", max_tokens:8000,
+          system:"Você é especialista em concursos públicos brasileiros. Retorne APENAS JSON válido sem texto adicional. É ESSENCIAL incluir TODOS os tópicos de CADA matéria sem truncar.",
           messages:[{role:"user",content:[
             {type:"document",source:{type:"base64",media_type:"application/pdf",data:base64}},
             {type:"text",text:PROMPT_EDITAL(orgao,cargo)}
@@ -2145,17 +2149,18 @@ function Onboarding({ user, onComplete, onBack }) {
   };
 
   const confirmarHoras = async horas=>{
+    setHorasConfirmadas(horas);
     userMsg("Confirmo as horas de estudo.");
     await bot("Ótimo! Agora confirme as matérias, tópicos e quantidade de questões de cada disciplina.",600);
     setPhase("materias");
   };
 
-  const confirmarResumo = horas=>{
+  const confirmarResumo = ()=>{
     const dadosFinais = {
       orgao, cargo, dataProva, banca:dadosEdital?.banca,
       totalQuestoes:dadosEdital?.totalQuestoes,
       temDiscursiva:dadosEdital?.temDiscursiva,
-      grupos, discursiva, horas,
+      grupos, discursiva, horas:horasConfirmadas,
     };
     onComplete(dadosFinais);
   };
@@ -2256,7 +2261,7 @@ function Onboarding({ user, onComplete, onBack }) {
             <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E",marginBottom:4}}>📚 Próxima etapa: Questões objetivas</div>
 
             {[
-              {icon:"⏰",bg:"#EDE9FE",text:"Informe quantas horas você tem disponível em cada dia da semana. Seja realista — consistência vale mais que intensidade."},
+              {icon:"⏰",bg:"#EDE9FE",text:"Informe quantas horas você tem disponível em cada dia da semana. Seja realista: consistência vale mais que intensidade."},
               {icon:"📋",bg:"#D1FAE5",text:"Confirme as matérias, os tópicos de cada uma e a quantidade de questões. Você pode editar tudo antes de confirmar."},
               {icon:"💡",bg:"#FEF3DC",text:"Tudo pode ser ajustado depois. Esta configuração inicial é só o ponto de partida do seu cronograma."},
             ].map((c,i)=>(
@@ -2278,7 +2283,7 @@ function Onboarding({ user, onComplete, onBack }) {
       {showHoras&&(
         <div style={{background:"white",borderTop:"1px solid #E8E8F0",padding:"12px 16px",flexShrink:0,maxHeight:"65vh",overflowY:"auto"}}>
           <div style={{maxWidth:640,margin:"0 auto"}}>
-            <ObHorasResumo dados={{orgao,cargo,dataProva,banca:dadosEdital?.banca,totalQuestoes:dadosEdital?.totalQuestoes,grupos,discursiva}} onConfirm={confirmarHoras}/>
+            <ObHoras onConfirm={confirmarHoras}/>
           </div>
         </div>
       )}
@@ -2296,7 +2301,7 @@ function Onboarding({ user, onComplete, onBack }) {
       {showResumo&&(
         <div style={{background:"white",borderTop:"1px solid #E8E8F0",padding:"12px 16px",flexShrink:0,maxHeight:"65vh",overflowY:"auto"}}>
           <div style={{maxWidth:640,margin:"0 auto"}}>
-            <ObHorasResumo dados={{orgao,cargo,dataProva,banca:dadosEdital?.banca,totalQuestoes:dadosEdital?.totalQuestoes,grupos,discursiva}} onConfirm={confirmarResumo} modoResumo={true}/>
+            <ObResumoFinal dados={{orgao,cargo,dataProva,banca:dadosEdital?.banca,totalQuestoes:dadosEdital?.totalQuestoes,grupos,discursiva,horas:horasConfirmadas}} onConfirm={confirmarResumo}/>
           </div>
         </div>
       )}
