@@ -1454,17 +1454,20 @@ export default function App() {
   useEffect(() => {
     // Verifica sessão ativa
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if(session?.user) {
-        setUserData(session.user);
-        // Verifica se já fez onboarding
-        const { data } = await supabase.from("onboarding").select("concluido").eq("user_id", session.user.id).single();
-        if(data?.concluido) {
-          setScreen("dashboard");
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if(session?.user) {
+          setUserData(session.user);
+          const { data } = await supabase.from("onboarding").select("concluido").eq("user_id", session.user.id).single();
+          if(data?.concluido) {
+            setScreen("dashboard");
+          } else {
+            setScreen("onboarding_intro");
+          }
         } else {
-          setScreen("onboarding_intro");
+          setScreen("landing");
         }
-      } else {
+      } catch(e) {
         setScreen("landing");
       }
     };
