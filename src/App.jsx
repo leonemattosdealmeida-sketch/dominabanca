@@ -1532,8 +1532,8 @@ export default function App() {
             <div style={{background:"white",border:"1.5px solid #E8E8F0",borderRadius:14,padding:"16px 18px",display:"flex",gap:14,alignItems:"flex-start"}}>
               <div style={{width:40,height:40,borderRadius:10,background:"#EDE9FE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>📎</div>
               <div>
-                <div style={{fontSize:13,fontWeight:700,color:"#1E1B4B",marginBottom:4}}>Edital aberto? Tenha o PDF em mãos</div>
-                <div style={{fontSize:12,color:"#6B7280",lineHeight:1.6}}>Se o edital do seu concurso já foi publicado, baixe o PDF antes de continuar. A IA vai ler o edital completo e extrair todas as matérias automaticamente.</div>
+                <div style={{fontSize:13,fontWeight:700,color:"#1E1B4B",marginBottom:4}}>Edital aberto? Baixe o PDF antes de continuar</div>
+                <div style={{fontSize:12,color:"#6B7280",lineHeight:1.6}}>A IA vai ler o edital completo e extrair todas as matérias automaticamente. Tenha o arquivo disponível para anexar na próxima etapa.</div>
               </div>
             </div>
 
@@ -1541,15 +1541,15 @@ export default function App() {
               <div style={{width:40,height:40,borderRadius:10,background:"#D1FAE5",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>📅</div>
               <div>
                 <div style={{fontSize:13,fontWeight:700,color:"#1E1B4B",marginBottom:4}}>Edital ainda não publicado?</div>
-                <div style={{fontSize:12,color:"#6B7280",lineHeight:1.6}}>Sem problema. Você pode usar o edital do último concurso do mesmo órgão como base. O cronograma será ajustado quando o novo edital sair.</div>
+                <div style={{fontSize:12,color:"#6B7280",lineHeight:1.6}}>Sem problema. Você pode usar o edital do último concurso. Quando o novo edital sair, é só atualizar.</div>
               </div>
             </div>
 
             <div style={{background:"#FEF3DC",border:"1.5px solid #FDE68A",borderRadius:14,padding:"16px 18px",display:"flex",gap:14,alignItems:"flex-start"}}>
-              <div style={{width:40,height:40,borderRadius:10,background:"#FDE68A",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>⚠️</div>
+              <div style={{width:40,height:40,borderRadius:10,background:"#FDE68A",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>💡</div>
               <div>
-                <div style={{fontSize:13,fontWeight:700,color:"#92400E",marginBottom:4}}>Atenção total nesta etapa</div>
-                <div style={{fontSize:12,color:"#92400E",lineHeight:1.6}}>As informações que você fornecer aqui vão definir todo o seu cronograma de estudos. Reserve um momento tranquilo para preenchê-las com cuidado.</div>
+                <div style={{fontSize:13,fontWeight:700,color:"#92400E",marginBottom:4}}>Preencha com calma — mas sem pressão</div>
+                <div style={{fontSize:12,color:"#92400E",lineHeight:1.6}}>Quanto mais preciso você for agora, melhor será seu cronograma. E se precisar ajustar alguma coisa depois, tudo pode ser editado a qualquer momento.</div>
               </div>
             </div>
 
