@@ -2311,7 +2311,14 @@ function Onboarding({ user, onComplete, onBack }) {
     setGrupos(gruposEditados);
     userMsg("Confirmo os tópicos.");
     if(dadosEdital?.temRedacao){
-      await bot(<span>Ótimo! Sua prova tem <b>redação</b>. Vamos configurar como você vai treinar.</span>,600);
+      await bot(<span>Ótimo! Sua prova tem <b>redação</b>. Buscando os critérios de avaliação do edital...</span>,600);
+      setTyping(true);
+      // Busca critérios de redação do edital
+      try{
+        const raw = await obAIJson([{role:"user",content:PROMPT_REDACAO(orgao,cargo,editalTextoRaw)}],2000);
+        if(raw) setDadosRedacaoEdital(raw);
+      }catch{}
+      setTyping(false);
       setPhase("discursiva");
     } else {
       await bot("Tudo confirmado! Agora informe suas horas de estudo.",600);
@@ -2480,7 +2487,7 @@ function Onboarding({ user, onComplete, onBack }) {
       {showDiscursiva&&(
         <div style={{background:"white",borderTop:"1px solid #E8E8F0",padding:"12px 16px",flexShrink:0,maxHeight:"60vh",overflowY:"auto"}}>
           <div style={{maxWidth:640,margin:"0 auto"}}>
-            <ObRedacao dadosRedacao={dadosEdital?.dadosRedacao} onConfirm={confirmarDiscursiva} onSkip={()=>{setDiscursiva(null);setPhase("resumo");bot("Ok! Vamos ao resumo final.",400);}}/>
+            <ObRedacao dadosRedacao={dadosRedacaoEdital} onConfirm={confirmarDiscursiva} onSkip={()=>{setDiscursiva(null);setPhase("resumo");bot("Ok! Vamos ao resumo final.",400);}}/>
           </div>
         </div>
       )}
