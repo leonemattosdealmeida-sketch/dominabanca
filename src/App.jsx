@@ -1703,12 +1703,12 @@ const OB_SYSTEM = `Você é assistente do DominaBanca. Responda em português. M
 const PROMPT_EDITAL = (orgao, cargo) => `Analise este edital do ${orgao} para o cargo ${cargo}. Extraia grupos e matérias. NÃO extraia tópicos ainda. Use nomes EXATOS do edital. Retorne APENAS JSON válido:
 {"dataProva":"dd/mm/aaaa ou null","totalQuestoes":120,"temRedacao":false,"banca":"null","grupos":[{"nome":"Nome do grupo","materias":[{"nome":"Matéria","questoes":20}]}]}`;
 
-const PROMPT_TOPICOS = (banca, cargo, orgao, materia) => `Liste o conteúdo programático completo da matéria "${materia}" cobrada em concursos públicos brasileiros da banca ${banca||"CESPE/CEBRASPE"} para o cargo ${cargo} do ${orgao}.
+const PROMPT_TOPICOS = (banca, cargo, orgao, materia, textoEdital) => `Extraia ou gere o conteúdo programático COMPLETO da matéria "${materia}" para o cargo ${cargo} do ${orgao}, banca ${banca||"CESPE/CEBRASPE"}.
 
-Retorne APENAS este JSON sem nenhum texto adicional:
-{"topicos":["Nome do primeiro tópico","Nome do segundo tópico","Nome do terceiro tópico"]}
+${textoEdital ? `CONTEÚDO DO EDITAL:\n${textoEdital}\n\nUse o conteúdo acima como base principal. Se encontrar a matéria "${materia}" no edital, liste TODOS os itens e subitens exatamente como estão. Complemente com tópicos relevantes que a banca costuma cobrar.` : `Liste todos os tópicos e subtópicos que a banca ${banca||"CESPE"} costuma cobrar desta matéria. Seja detalhado.`}
 
-Inclua pelo menos 8 tópicos específicos e relevantes para esta matéria e banca.`;
+Retorne APENAS este JSON:
+{"topicos":["Tópico 1 completo","Tópico 2 completo","Tópico 3 completo"]}`;
 
 const PROMPT_REDACAO = (orgao, cargo, editalTexto) => `Analise este edital do ${orgao} para o cargo ${cargo} e extraia todas as informações sobre a prova de redação. Retorne APENAS JSON:
 {"tipoTexto":"dissertativo-argumentativo ou outro","minLinhas":0,"maxLinhas":0,"criterios":["critério 1","critério 2"],"eliminatorio":["o que zera ou elimina 1","o que zera ou elimina 2"],"observacoes":"outras observações relevantes"}
@@ -1831,8 +1831,16 @@ const ObConfirmarMaterias = ({dados, onConfirm}) => {
 const ObConfirmarTopicos = ({grupos, onConfirm}) => {
   const todasMats = grupos.flatMap((g,gi)=>g.materias.map((m,mi)=>({...m,gi,mi,grupo:g.nome})));
   const [atual, setAtual] = useState(0);
-  const [topicos, setTopicos] = useState(todasMats[0]?.topicos||[]);
+  const [topicos, setTopicos] = useState([]);
   const [confirmados, setConfirmados] = useState([]);
+
+  // Carrega tópicos sempre que muda a matéria atual
+  useEffect(()=>{
+    if(todasMats[atual]?.topicos){
+      setTopicos([...todasMats[atual].topicos]);
+    }
+  },[atual]);
+
   const mat = todasMats[atual];
   if(!mat) return null;
   const addT = () => setTopicos(t=>[...t,""]);
@@ -2099,6 +2107,7 @@ function Onboarding({ user, onComplete, onBack }) {
   const [discursiva, setDiscursiva] = useState(null);
   const [horasConfirmadas, setHorasConfirmadas] = useState(null);
   const [dadosRedacaoEdital, setDadosRedacaoEdital] = useState(null);
+  const [editalTextoRaw, setEditalTextoRaw] = useState("");
   const [erro, setErro] = useState("");
   const chatRef = useRef(null);
   const inputRef = useRef(null);
@@ -2203,14 +2212,30 @@ function Onboarding({ user, onComplete, onBack }) {
       const resp = await fetch("/api/index",{
         method:"POST", headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
-          model:"gpt-4o-mini", max_tokens:16000,
-          system:"Você é especialista em concursos públicos brasileiros. Retorne APENAS JSON válido sem texto adicional. OBRIGATÓRIO: inclua TODOS os tópicos e subtópicos de CADA matéria sem omitir nenhum. Não resuma, não abrevia, não trunca. Liste tudo que aparecer no edital.",
+          model:"gpt-4o-mini", max_tokens:4000,
+          system:"Você é especialista em concursos públicos brasileiros. Retorne APENAS JSON válido sem texto adicional.",
           messages:[{role:"user",content:[
             {type:"document",source:{type:"base64",media_type:"application/pdf",data:base64}},
             {type:"text",text:PROMPT_EDITAL(orgao,cargo)}
           ]}]
         })
       });
+
+      // Também extrai texto bruto para usar nos tópicos depois
+      const respTexto = await fetch("/api/index",{
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          model:"gpt-4o-mini", max_tokens:8000,
+          system:"Extraia o conteúdo programático completo do edital. Retorne apenas o texto, sem formatação adicional.",
+          messages:[{role:"user",content:[
+            {type:"document",source:{type:"base64",media_type:"application/pdf",data:base64}},
+            {type:"text",text:"Extraia e retorne TODO o conteúdo programático deste edital, incluindo todos os tópicos e subtópicos de cada matéria, exatamente como estão no documento."}
+          ]}]
+        })
+      });
+      const dTexto = await respTexto.json();
+      const textoEdital = dTexto.content?.[0]?.text||"";
+      setEditalTextoRaw(textoEdital);
       const d = await resp.json();
       const raw = d.content?.[0]?.text||"";
       let dados = null;
@@ -2266,7 +2291,7 @@ function Onboarding({ user, onComplete, onBack }) {
       for(let mi=0; mi<g.materias.length; mi++){
         const m = g.materias[mi];
         try{
-          const raw = await obAIJson([{role:"user",content:PROMPT_TOPICOS(dadosEdital?.banca,cargo,orgao,m.nome)}],2000);
+          const raw = await obAIJson([{role:"user",content:PROMPT_TOPICOS(dadosEdital?.banca,cargo,orgao,m.nome,editalTextoRaw)}],2000);
           const topicos = (raw?.topicos||[]).filter(t=>t&&t.trim().length>0);
           materiasComTopicos.push({...m, topicos: topicos.length>0 ? topicos : [`Conteúdo de ${m.nome} — adicione os tópicos manualmente`]});
         }catch(e){
