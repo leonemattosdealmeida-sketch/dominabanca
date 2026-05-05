@@ -1575,7 +1575,7 @@ export default function App() {
         data_prova: plan.dataProva,
         banca: plan.banca,
         total_questoes: plan.totalQuestoes,
-        tem_discursiva: plan.temDiscursiva,
+        tem_redacao: plan.temRedacao,
         grupos: plan.grupos,
         discursiva: plan.discursiva,
         horas: plan.horas,
@@ -1700,8 +1700,15 @@ const safeJson = t => { try{ return JSON.parse(t.replace(/```json|```/g,"").trim
 
 const OB_SYSTEM = `Você é assistente do DominaBanca. Responda em português. Máximo 2 linhas. Nunca faça outras perguntas além do solicitado. Ao validar órgão: NUNCA mencione cargo. Ao validar cargo: NUNCA mencione órgão.`;
 
-const PROMPT_EDITAL = (orgao, cargo) => `Analise este edital do ${orgao} para o cargo ${cargo}. Extraia TUDO de uma vez: grupos, matérias, questões E tópicos completos de cada matéria. Use nomes EXATOS do edital. Retorne APENAS JSON válido:
-{"dataProva":"dd/mm/aaaa ou null","totalQuestoes":120,"temDiscursiva":false,"pesoDiscursiva":0,"banca":"null","grupos":[{"nome":"Nome do grupo","materias":[{"nome":"Matéria","questoes":20,"topicos":["Tópico 1","Tópico 2","Tópico 3"]}]}]}`;
+const PROMPT_EDITAL = (orgao, cargo) => `Analise este edital do ${orgao} para o cargo ${cargo}. Extraia grupos e matérias. NÃO extraia tópicos ainda. Use nomes EXATOS do edital. Retorne APENAS JSON válido:
+{"dataProva":"dd/mm/aaaa ou null","totalQuestoes":120,"temRedacao":false,"banca":"null","grupos":[{"nome":"Nome do grupo","materias":[{"nome":"Matéria","questoes":20}]}]}`;
+
+const PROMPT_TOPICOS = (banca, cargo, orgao, materia) => `Gere o conteúdo programático COMPLETO de "${materia}" para concursos da banca ${banca||"CESPE"}, cargo ${cargo} do ${orgao}. Liste TODOS os tópicos e subtópicos cobrados. Retorne APENAS JSON:
+{"topicos":["Tópico completo 1","Tópico completo 2","Tópico completo 3"]}`;
+
+const PROMPT_REDACAO = (orgao, cargo, editalTexto) => `Analise este edital do ${orgao} para o cargo ${cargo} e extraia todas as informações sobre a prova de redação. Retorne APENAS JSON:
+{"tipoTexto":"dissertativo-argumentativo ou outro","minLinhas":0,"maxLinhas":0,"criterios":["critério 1","critério 2"],"eliminatorio":["o que zera ou elimina 1","o que zera ou elimina 2"],"observacoes":"outras observações relevantes"}
+${editalTexto||""}`;
 
 async function obAI(messages, maxTokens=300) {
   const r = await fetch("/api/index",{
@@ -1759,7 +1766,7 @@ const ObConfirmCard = ({label,value,onEdit,onConfirm}) => (
 );
 
 // ── P3: Revisão de matérias ───────────────────────────────────────────────────
-const ObRevisaoMaterias = ({dados, onConfirm}) => {
+const ObRevisaoMaterias = ({dados, onConfirm, modoSoMaterias}) => {
   const [grupos, setGrupos] = useState(dados.grupos||[]);
   const [exp, setExp] = useState({});
   const toggle = k => setExp(e=>({...e,[k]:!e[k]}));
@@ -1825,60 +1832,120 @@ const ObRevisaoMaterias = ({dados, onConfirm}) => {
         </div>
       ))}
       <button onClick={()=>onConfirm(grupos)} style={{width:"100%",padding:"13px",background:"#5B4FCF",color:"white",border:"none",borderRadius:12,fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 20px rgba(91,79,207,0.28)"}}>
-        ✓ Confirmar matérias e tópicos →
+        {modoSoMaterias ? "✓ Confirmar matérias e questões →" : "✓ Confirmar tópicos →"}
       </button>
     </div>
   );
 };
 
-// ── P4: Discursiva ────────────────────────────────────────────────────────────
-const ObDiscursiva = ({banca, onConfirm, onSkip}) => {
-  const [tipo, setTipo] = useState(null);
+// ── Redação ───────────────────────────────────────────────────────────────────
+const ObRedacao = ({dadosRedacao, onConfirm, onSkip}) => {
   const DIAS = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
   const [diasSel, setDiasSel] = useState([]);
+  const [dados, setDados] = useState(dadosRedacao || {
+    tipoTexto:"dissertativo-argumentativo",
+    minLinhas:0, maxLinhas:0,
+    criterios:[], eliminatorio:[], observacoes:""
+  });
+  const [editando, setEditando] = useState(false);
 
   const toggleDia = d => setDiasSel(ds => ds.includes(d) ? ds.filter(x=>x!==d) : [...ds,d]);
 
+  const updCriterio = (i,v) => setDados(d=>({...d,criterios:d.criterios.map((c,j)=>j===i?v:c)}));
+  const remCriterio = i => setDados(d=>({...d,criterios:d.criterios.filter((_,j)=>j!==i)}));
+  const addCriterio = () => setDados(d=>({...d,criterios:[...d.criterios,""]}));
+
+  const updElim = (i,v) => setDados(d=>({...d,eliminatorio:d.eliminatorio.map((c,j)=>j===i?v:c)}));
+  const remElim = i => setDados(d=>({...d,eliminatorio:d.eliminatorio.filter((_,j)=>j!==i)}));
+  const addElim = () => setDados(d=>({...d,eliminatorio:[...d.eliminatorio,""]}));
+
   return (
     <div style={{animation:"fadeUp 0.4s ease"}}>
-      <div style={{marginBottom:14}}>
-        <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E",marginBottom:5}}>Qual é o tipo da prova discursiva?</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          {[
-            {v:"redacao",icon:"✍️",t:"Redação",d:"Texto dissertativo-argumentativo (estilo ENEM/CESPE)"},
-            {v:"dissertativa",icon:"📝",t:"Questões dissertativas",d:"Respostas técnicas por tema (estilo FGV/ESAF)"},
-          ].map(op=>(
-            <div key={op.v} onClick={()=>setTipo(op.v)}
-              style={{padding:"14px",border:`1.5px solid ${tipo===op.v?"#5B4FCF":"#E8E8F0"}`,borderRadius:12,background:tipo===op.v?"#EFEFFD":"white",cursor:"pointer",position:"relative"}}>
-              {tipo===op.v&&<div style={{position:"absolute",top:8,right:8,width:18,height:18,borderRadius:"50%",background:"#5B4FCF",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,color:"white",fontWeight:700}}>✓</div>}
-              <div style={{fontSize:20,marginBottom:6}}>{op.icon}</div>
-              <div style={{fontSize:12,fontWeight:700,color:tipo===op.v?"#5B4FCF":"#1A1A2E",marginBottom:3}}>{op.t}</div>
-              <div style={{fontSize:11,color:"#9898B8",lineHeight:1.5}}>{op.d}</div>
-            </div>
-          ))}
+      <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E",marginBottom:12}}>✍️ Redação — dados extraídos do edital</div>
+
+      {/* Info da redação */}
+      <div style={{background:"#EFEFFD",border:"1px solid #DDDDF5",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <span style={{fontSize:12,fontWeight:700,color:"#5B4FCF"}}>Dados da prova</span>
+          <button onClick={()=>setEditando(!editando)} style={{background:"none",border:"none",fontSize:11,color:"#5B4FCF",fontWeight:700,cursor:"pointer"}}>
+            {editando?"✓ Fechar":"✏️ Editar"}
+          </button>
         </div>
+        {editando ? (
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div>
+              <div style={{fontSize:11,color:"#9898B8",marginBottom:3}}>Tipo de texto</div>
+              <input value={dados.tipoTexto} onChange={e=>setDados(d=>({...d,tipoTexto:e.target.value}))}
+                style={{width:"100%",padding:"7px 10px",border:"1px solid #E8E8F0",borderRadius:8,fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:11,color:"#9898B8",marginBottom:3}}>Mín. linhas</div>
+                <input type="number" value={dados.minLinhas||""} onChange={e=>setDados(d=>({...d,minLinhas:parseInt(e.target.value)||0}))}
+                  style={{width:"100%",padding:"7px 10px",border:"1px solid #E8E8F0",borderRadius:8,fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:11,color:"#9898B8",marginBottom:3}}>Máx. linhas</div>
+                <input type="number" value={dados.maxLinhas||""} onChange={e=>setDados(d=>({...d,maxLinhas:parseInt(e.target.value)||0}))}
+                  style={{width:"100%",padding:"7px 10px",border:"1px solid #E8E8F0",borderRadius:8,fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{display:"flex",gap:16"}}>
+            <div><span style={{fontSize:11,color:"#9898B8"}}>Tipo: </span><span style={{fontSize:12,fontWeight:600,color:"#1A1A2E"}}>{dados.tipoTexto||"—"}</span></div>
+            {dados.maxLinhas>0&&<div><span style={{fontSize:11,color:"#9898B8"}}>Linhas: </span><span style={{fontSize:12,fontWeight:600,color:"#1A1A2E"}}>{dados.minLinhas} a {dados.maxLinhas}</span></div>}
+          </div>
+        )}
       </div>
 
-      {tipo&&(
-        <div style={{marginBottom:16,animation:"fadeUp 0.3s ease"}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E",marginBottom:8}}>Em quais dias da semana vai treinar?</div>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            {DIAS.map(d=>(
-              <button key={d} onClick={()=>toggleDia(d)}
-                style={{padding:"8px 12px",border:`1.5px solid ${diasSel.includes(d)?"#5B4FCF":"#E8E8F0"}`,borderRadius:9,background:diasSel.includes(d)?"#EFEFFD":"white",color:diasSel.includes(d)?"#5B4FCF":"#4A4A6A",fontSize:12,fontWeight:diasSel.includes(d)?700:500,cursor:"pointer"}}>
-                {d}
-              </button>
-            ))}
+      {/* Critérios */}
+      <div style={{background:"white",border:"1px solid #E8E8F0",borderRadius:12,padding:"12px 14px",marginBottom:10}}>
+        <div style={{fontSize:12,fontWeight:700,color:"#1A1A2E",marginBottom:8}}>Critérios de avaliação</div>
+        {dados.criterios.map((c,i)=>(
+          <div key={i} style={{display:"flex",gap:6,alignItems:"center",marginBottom:5}}>
+            <span style={{color:"#00C48C",fontSize:11}}>✓</span>
+            <input value={c} onChange={e=>updCriterio(i,e.target.value)}
+              style={{flex:1,padding:"5px 9px",border:"1px solid #E8E8F0",borderRadius:7,fontSize:11,outline:"none"}}/>
+            <button onClick={()=>remCriterio(i)} style={{background:"none",border:"none",color:"#F25A5A",cursor:"pointer",fontSize:12}}>✕</button>
           </div>
-          {diasSel.length===0&&<p style={{fontSize:11,color:"#9898B8",marginTop:6}}>Selecione pelo menos um dia</p>}
+        ))}
+        <button onClick={addCriterio} style={{padding:"5px 10px",background:"transparent",border:"1px dashed #E8E8F0",borderRadius:7,fontSize:11,color:"#9898B8",cursor:"pointer",marginTop:3}}>+ critério</button>
+      </div>
+
+      {/* Eliminatórios */}
+      <div style={{background:"#FEE8E8",border:"1px solid #FECACA",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+        <div style={{fontSize:12,fontWeight:700,color:"#F25A5A",marginBottom:8}}>O que zera ou elimina</div>
+        {dados.eliminatorio.map((c,i)=>(
+          <div key={i} style={{display:"flex",gap:6,alignItems:"center",marginBottom:5}}>
+            <span style={{color:"#F25A5A",fontSize:11}}>✕</span>
+            <input value={c} onChange={e=>updElim(i,e.target.value)}
+              style={{flex:1,padding:"5px 9px",border:"1px solid #FECACA",borderRadius:7,fontSize:11,outline:"none"}}/>
+            <button onClick={()=>remElim(i)} style={{background:"none",border:"none",color:"#F25A5A",cursor:"pointer",fontSize:12}}>✕</button>
+          </div>
+        ))}
+        <button onClick={addElim} style={{padding:"5px 10px",background:"transparent",border:"1px dashed #FECACA",borderRadius:7,fontSize:11,color:"#F25A5A",cursor:"pointer",marginTop:3}}>+ item</button>
+      </div>
+
+      {/* Dias da semana */}
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:12,fontWeight:700,color:"#1A1A2E",marginBottom:8}}>Dias de treino de redação</div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+          {DIAS.map(d=>(
+            <button key={d} onClick={()=>toggleDia(d)}
+              style={{padding:"8px 12px",border:`1.5px solid ${diasSel.includes(d)?"#5B4FCF":"#E8E8F0"}`,borderRadius:9,background:diasSel.includes(d)?"#EFEFFD":"white",color:diasSel.includes(d)?"#5B4FCF":"#4A4A6A",fontSize:12,fontWeight:diasSel.includes(d)?700:500,cursor:"pointer"}}>
+              {d}
+            </button>
+          ))}
         </div>
-      )}
+        {diasSel.length===0&&<p style={{fontSize:11,color:"#9898B8",marginTop:6}}>Selecione pelo menos um dia</p>}
+      </div>
 
       <div style={{display:"flex",gap:10}}>
         <button onClick={onSkip} style={{flex:1,padding:"12px",background:"white",color:"#4A4A6A",border:"1.5px solid #E8E8F0",borderRadius:12,fontSize:12,fontWeight:600,cursor:"pointer"}}>Pular por agora</button>
-        <button onClick={()=>tipo&&diasSel.length>0&&onConfirm({tipo,dias:diasSel})} disabled={!tipo||diasSel.length===0}
-          style={{flex:2,padding:"12px",background:tipo&&diasSel.length>0?"#5B4FCF":"#E8E8F0",color:tipo&&diasSel.length>0?"white":"#9898B8",border:"none",borderRadius:12,fontSize:13,fontWeight:700,cursor:tipo&&diasSel.length>0?"pointer":"not-allowed"}}>
-          ✓ Confirmar discursiva →
+        <button onClick={()=>diasSel.length>0&&onConfirm({...dados,dias:diasSel})} disabled={diasSel.length===0}
+          style={{flex:2,padding:"12px",background:diasSel.length>0?"#5B4FCF":"#E8E8F0",color:diasSel.length>0?"white":"#9898B8",border:"none",borderRadius:12,fontSize:13,fontWeight:700,cursor:diasSel.length>0?"pointer":"not-allowed"}}>
+          ✓ Confirmar redação →
         </button>
       </div>
     </div>
@@ -1940,7 +2007,7 @@ const ObResumoFinal = ({dados, onConfirm}) => {
           {icon:"📅",l:"Data da prova",v:dados.dataProva||"A confirmar"},
           {icon:"📚",l:"Matérias",v:`${totalMats} disciplinas em ${dados.grupos?.length||0} grupos`},
           {icon:"❓",l:"Total de questões",v:dados.totalQuestoes?`${dados.totalQuestoes} questões`:"Não informado"},
-          ...(dados.discursiva?[{icon:"✍️",l:"Discursiva",v:`${dados.discursiva.tipo==="redacao"?"Redação":"Questões dissertativas"} — ${dados.discursiva.dias?.join(", ")||""}`}]:[]),
+          ...(dados.discursiva?[{icon:"✍️",l:"Redação",v:`${dados.discursiva.dias?.join(", ")||""} · ${dados.discursiva.tipoTexto||""}`}]:[]),
           {icon:"⏰",l:"Estudo semanal",v:`${totalHoras}h por semana`},
         ].map(r=>(
           <div key={r.l} style={{display:"flex",gap:10,alignItems:"flex-start",padding:"10px 12px",background:"white",border:"1px solid #E8E8F0",borderRadius:10}}>
@@ -1976,6 +2043,7 @@ function Onboarding({ user, onComplete, onBack }) {
   const [grupos, setGrupos] = useState([]);
   const [discursiva, setDiscursiva] = useState(null);
   const [horasConfirmadas, setHorasConfirmadas] = useState(null);
+  const [dadosRedacaoEdital, setDadosRedacaoEdital] = useState(null);
   const [erro, setErro] = useState("");
   const chatRef = useRef(null);
   const inputRef = useRef(null);
@@ -2107,7 +2175,7 @@ function Onboarding({ user, onComplete, onBack }) {
 
       await bot(<span>
         Leitura completa! Encontrei <strong>{dados.grupos.length} grupos</strong> com <strong>{nM} matérias</strong>.
-        {dados.temDiscursiva?" Sua prova tem prova discursiva.":""}
+        {dados.temRedacao?" Sua prova tem redação.":""}
         <br/>Banca: <strong>{dados.banca||"identificada"}</strong> · Questões: <strong>{dados.totalQuestoes||"—"}</strong>
       </span>,400);
 
@@ -2130,14 +2198,43 @@ function Onboarding({ user, onComplete, onBack }) {
   };
 
   const confirmarMaterias = async gruposEditados=>{
+    userMsg("Confirmo as matérias e questões.");
     setGrupos(gruposEditados);
-    userMsg("Confirmo as matérias e tópicos.");
-    if(dadosEdital?.temDiscursiva){
-      await bot(<span>Ótimo! Sua prova tem <b>prova discursiva</b>. Vamos configurar como você vai treinar.</span>,600);
+    setPhase("buscando_topicos");
+    setTyping(true);
+
+    // Busca tópicos sequencialmente por grupo
+    const gruposComTopicos = [];
+    for(let gi=0; gi<gruposEditados.length; gi++){
+      const g = gruposEditados[gi];
+      const materiasComTopicos = [];
+      for(let mi=0; mi<g.materias.length; mi++){
+        const m = g.materias[mi];
+        try{
+          const raw = await obAIJson([{role:"user",content:PROMPT_TOPICOS(dadosEdital?.banca,cargo,orgao,m.nome)}],2000);
+          materiasComTopicos.push({...m, topicos: raw?.topicos||[m.nome]});
+        }catch{
+          materiasComTopicos.push({...m, topicos:[m.nome]});
+        }
+      }
+      gruposComTopicos.push({...g, materias:materiasComTopicos});
+    }
+
+    setGrupos(gruposComTopicos);
+    setTyping(false);
+    await bot(<span>Conteúdo programático completo! Revise os tópicos de cada matéria e edite se necessário.</span>,400);
+    setPhase("topicos");
+  };
+
+  const confirmarTopicos = async gruposEditados=>{
+    setGrupos(gruposEditados);
+    userMsg("Confirmo os tópicos.");
+    if(dadosEdital?.temRedacao){
+      await bot(<span>Ótimo! Sua prova tem <b>redação</b>. Vamos configurar como você vai treinar.</span>,600);
       setPhase("discursiva");
     } else {
-      await bot("Tudo confirmado! Seu plano de estudos está pronto.",600);
-      setPhase("resumo");
+      await bot("Tudo confirmado! Agora informe suas horas de estudo.",600);
+      setPhase("horas");
     }
   };
 
@@ -2168,11 +2265,12 @@ function Onboarding({ user, onComplete, onBack }) {
   const showInput = ["orgao","cargo","data"].includes(phase)&&!typing;
   const showPDF = phase==="pdf";
   const showAviso = phase==="aviso_p3";
-  const showHoras = phase==="horas"&&!typing;
   const showMaterias = phase==="materias"&&!typing;
+  const showTopicos = phase==="topicos"&&!typing;
+  const showHoras = phase==="horas"&&!typing;
   const showDiscursiva = phase==="discursiva"&&!typing;
   const showResumo = phase==="resumo"&&!typing;
-  const prog = {init:0,orgao:10,cargo:25,pdf:35,lendo:45,aguardando_data:48,data:50,aviso_p3:55,horas:65,materias:78,discursiva:88,resumo:95,done:100}[phase]||0;
+  const prog = {init:0,orgao:10,cargo:25,pdf:35,lendo:45,aguardando_data:48,data:50,aviso_p3:55,materias:60,buscando_topicos:68,topicos:72,horas:82,discursiva:90,resumo:96,done:100}[phase]||0;
 
   return (
     <div style={{fontFamily:"'Sora',sans-serif",height:"100vh",display:"flex",flexDirection:"column",background:"#F7F7FC"}}>
@@ -2206,7 +2304,16 @@ function Onboarding({ user, onComplete, onBack }) {
           return null;
         })}
         {typing&&<ObDots/>}
-        {showMaterias&&<ObRevisaoMaterias dados={{...dadosEdital,grupos}} onConfirm={confirmarMaterias}/>}
+        {(phase==="buscando_topicos"&&typing)&&(
+          <div style={{background:"#EFEFFD",border:"1px solid #DDDDF5",borderRadius:12,padding:"14px 16px",animation:"fadeUp 0.3s ease"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{width:18,height:18,border:"3px solid #DDDDF5",borderTop:"3px solid #5B4FCF",borderRadius:"50%",animation:"spin 0.8s linear infinite",flexShrink:0}}/>
+              <span style={{fontSize:13,color:"#5B4FCF",fontWeight:600}}>Buscando conteúdo programático de cada matéria...</span>
+            </div>
+          </div>
+        )}
+        {showMaterias&&<ObRevisaoMaterias dados={{...dadosEdital,grupos}} onConfirm={confirmarMaterias} modoSoMaterias={true}/>}
+        {showTopicos&&<ObRevisaoMaterias dados={{...dadosEdital,grupos}} onConfirm={confirmarTopicos} modoSoMaterias={false}/>}
         {erro&&<div style={{background:"#FEE8E8",border:"1px solid #F25A5A",borderRadius:10,padding:"10px 14px",fontSize:12,color:"#F25A5A",marginBottom:8}}>{erro}</div>}
         <div style={{height:8,flexShrink:0}}/>
       </div>
@@ -2292,7 +2399,7 @@ function Onboarding({ user, onComplete, onBack }) {
       {showDiscursiva&&(
         <div style={{background:"white",borderTop:"1px solid #E8E8F0",padding:"12px 16px",flexShrink:0,maxHeight:"60vh",overflowY:"auto"}}>
           <div style={{maxWidth:640,margin:"0 auto"}}>
-            <ObDiscursiva banca={dadosEdital?.banca} onConfirm={confirmarDiscursiva} onSkip={()=>{setDiscursiva(null);setPhase("resumo");bot("Ok! Vamos ao resumo final.",400);}}/>
+            <ObRedacao dadosRedacao={dadosEdital?.dadosRedacao} onConfirm={confirmarDiscursiva} onSkip={()=>{setDiscursiva(null);setPhase("resumo");bot("Ok! Vamos ao resumo final.",400);}}/>
           </div>
         </div>
       )}
