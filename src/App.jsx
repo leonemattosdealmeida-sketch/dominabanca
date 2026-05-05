@@ -1548,7 +1548,7 @@ export default function App() {
             <div style={{background:"#FEF3DC",border:"1.5px solid #FDE68A",borderRadius:14,padding:"16px 18px",display:"flex",gap:14,alignItems:"flex-start"}}>
               <div style={{width:40,height:40,borderRadius:10,background:"#FDE68A",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>💡</div>
               <div>
-                <div style={{fontSize:13,fontWeight:700,color:"#92400E",marginBottom:4}}>Preencha com calma — mas sem pressão</div>
+                <div style={{fontSize:13,fontWeight:700,color:"#92400E",marginBottom:4}}>Preencha com calma, sem pressão</div>
                 <div style={{fontSize:12,color:"#92400E",lineHeight:1.6}}>Quanto mais preciso você for agora, melhor será seu cronograma. E se precisar ajustar alguma coisa depois, tudo pode ser editado a qualquer momento.</div>
               </div>
             </div>
@@ -2080,8 +2080,8 @@ function Onboarding({ user, onComplete, onBack }) {
       const resp = await fetch("/api/index",{
         method:"POST", headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
-          model:"gpt-4o-mini", max_tokens:8000,
-          system:"Você é especialista em concursos públicos brasileiros. Retorne APENAS JSON válido sem texto adicional. É ESSENCIAL incluir TODOS os tópicos de CADA matéria sem truncar.",
+          model:"gpt-4o-mini", max_tokens:16000,
+          system:"Você é especialista em concursos públicos brasileiros. Retorne APENAS JSON válido sem texto adicional. OBRIGATÓRIO: inclua TODOS os tópicos e subtópicos de CADA matéria sem omitir nenhum. Não resuma, não abrevia, não trunca. Liste tudo que aparecer no edital.",
           messages:[{role:"user",content:[
             {type:"document",source:{type:"base64",media_type:"application/pdf",data:base64}},
             {type:"text",text:PROMPT_EDITAL(orgao,cargo)}
