@@ -1703,8 +1703,12 @@ const OB_SYSTEM = `Você é assistente do DominaBanca. Responda em português. M
 const PROMPT_EDITAL = (orgao, cargo) => `Analise este edital do ${orgao} para o cargo ${cargo}. Extraia grupos e matérias. NÃO extraia tópicos ainda. Use nomes EXATOS do edital. Retorne APENAS JSON válido:
 {"dataProva":"dd/mm/aaaa ou null","totalQuestoes":120,"temRedacao":false,"banca":"null","grupos":[{"nome":"Nome do grupo","materias":[{"nome":"Matéria","questoes":20}]}]}`;
 
-const PROMPT_TOPICOS = (banca, cargo, orgao, materia) => `Gere o conteúdo programático COMPLETO de "${materia}" para concursos da banca ${banca||"CESPE"}, cargo ${cargo} do ${orgao}. Liste TODOS os tópicos e subtópicos cobrados. Retorne APENAS JSON:
-{"topicos":["Tópico completo 1","Tópico completo 2","Tópico completo 3"]}`;
+const PROMPT_TOPICOS = (banca, cargo, orgao, materia) => `Liste o conteúdo programático completo da matéria "${materia}" cobrada em concursos públicos brasileiros da banca ${banca||"CESPE/CEBRASPE"} para o cargo ${cargo} do ${orgao}.
+
+Retorne APENAS este JSON sem nenhum texto adicional:
+{"topicos":["Nome do primeiro tópico","Nome do segundo tópico","Nome do terceiro tópico"]}
+
+Inclua pelo menos 8 tópicos específicos e relevantes para esta matéria e banca.`;
 
 const PROMPT_REDACAO = (orgao, cargo, editalTexto) => `Analise este edital do ${orgao} para o cargo ${cargo} e extraia todas as informações sobre a prova de redação. Retorne APENAS JSON:
 {"tipoTexto":"dissertativo-argumentativo ou outro","minLinhas":0,"maxLinhas":0,"criterios":["critério 1","critério 2"],"eliminatorio":["o que zera ou elimina 1","o que zera ou elimina 2"],"observacoes":"outras observações relevantes"}
@@ -2263,9 +2267,10 @@ function Onboarding({ user, onComplete, onBack }) {
         const m = g.materias[mi];
         try{
           const raw = await obAIJson([{role:"user",content:PROMPT_TOPICOS(dadosEdital?.banca,cargo,orgao,m.nome)}],2000);
-          materiasComTopicos.push({...m, topicos: raw?.topicos||[m.nome]});
-        }catch{
-          materiasComTopicos.push({...m, topicos:[m.nome]});
+          const topicos = (raw?.topicos||[]).filter(t=>t&&t.trim().length>0);
+          materiasComTopicos.push({...m, topicos: topicos.length>0 ? topicos : [`Conteúdo de ${m.nome} — adicione os tópicos manualmente`]});
+        }catch(e){
+          materiasComTopicos.push({...m, topicos:[`Conteúdo de ${m.nome} — adicione os tópicos manualmente`]});
         }
       }
       gruposComTopicos.push({...g, materias:materiasComTopicos});
