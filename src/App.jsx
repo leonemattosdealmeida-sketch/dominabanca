@@ -2108,6 +2108,45 @@ function Onboarding({ user, onComplete, onBack }) {
       await bot(<span>
         Leitura completa! Encontrei <strong>{dados.grupos.length} grupos</strong> com <strong>{nM} matérias</strong>.
         {dados.temDiscursiva?" Sua prova tem prova discursiva.":""}
+        <br/>Agora vou buscar o conteúdo programático detalhado de cada matéria...
+      </span>,400);
+
+      // Segunda chamada: complementa tópicos de cada matéria
+      setTyping(true);
+      const gruposComTopicos = await Promise.all(dados.grupos.map(async g => {
+        const materiasComTopicos = await Promise.all(g.materias.map(async m => {
+          const prompt = `Gere o conteúdo programático COMPLETO e DETALHADO da matéria "${m.nome}" para concursos da banca ${dados.banca||"CESPE/CEBRASPE"}, cargo ${cargo} do ${orgao}.
+Os tópicos do edital são: ${(m.topicos||[]).join(", ")||"não especificados"}.
+EXPANDA cada tópico com todos os subtópicos cobrados por esta banca. Seja extremamente detalhado.
+Retorne APENAS JSON: {"topicos":["Tópico 1 detalhado","Tópico 2 detalhado","Tópico 3 detalhado"]}`;
+          
+          const r = await fetch("/api/index",{
+            method:"POST", headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({
+              model:"gpt-4o-mini", max_tokens:2000,
+              system:"Você é especialista em concursos públicos brasileiros. Retorne APENAS JSON válido. Liste TODOS os tópicos e subtópicos sem omitir nenhum.",
+              messages:[{role:"user",content:prompt}]
+            })
+          });
+          const rd = await r.json();
+          const rt = rd.content?.[0]?.text||"";
+          let topicos = m.topicos||[];
+          try{
+            const parsed = JSON.parse(rt.replace(/```json|```/g,"").trim());
+            if(parsed?.topicos?.length) topicos = parsed.topicos;
+          }catch{}
+          return {...m, topicos};
+        }));
+        return {...g, materias: materiasComTopicos};
+      }));
+
+      setTyping(false);
+      const dadosCompletos = {...dados, grupos: gruposComTopicos};
+      setDadosEdital(dadosCompletos);
+      setGrupos(gruposComTopicos);
+
+      await bot(<span>
+        Conteúdo programático completo! <strong>{nM} matérias</strong> com todos os tópicos.
         <br/>Banca: <strong>{dados.banca||"identificada"}</strong> · Questões: <strong>{dados.totalQuestoes||"—"}</strong>
       </span>,400);
 
