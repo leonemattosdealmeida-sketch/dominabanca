@@ -1462,7 +1462,7 @@ export default function App() {
         if(data?.concluido) {
           setScreen("dashboard");
         } else {
-          setScreen("onboarding");
+          setScreen("onboarding_intro");
         }
       } else {
         setScreen("landing");
@@ -1478,7 +1478,7 @@ export default function App() {
         if(data?.concluido) {
           setScreen("dashboard");
         } else {
-          setScreen("onboarding");
+          setScreen("onboarding_intro");
         }
       } else if(event === "SIGNED_OUT") {
         setUserData(null);
@@ -1498,8 +1498,71 @@ export default function App() {
     </div>
   );
 
-  if(screen === "cadastro") return <Cadastro onBack={()=>setScreen("landing")} onLogin={()=>setScreen("login")} onSuccess={u=>{setUserData(u);setScreen("onboarding");}}/>;
-  if(screen === "login") return <Login onBack={()=>setScreen("landing")} onCadastro={()=>setScreen("cadastro")} onSuccess={u=>{setUserData(u);setScreen("onboarding");}}/>;
+  if(screen === "cadastro") return <Cadastro onBack={()=>setScreen("landing")} onLogin={()=>setScreen("login")} onSuccess={u=>{setUserData(u);setScreen("onboarding_intro");}}/>;
+  if(screen === "login") return <Login onBack={()=>setScreen("landing")} onCadastro={()=>setScreen("cadastro")} onSuccess={u=>{setUserData(u);setScreen("onboarding_intro");}}/>;
+  if(screen === "onboarding_intro") return (
+    <div style={{fontFamily:"'Sora',sans-serif",minHeight:"100vh",background:"#F8F7FF",display:"flex",flexDirection:"column"}}>
+      <nav style={{background:"white",borderBottom:"1px solid #E8E8F0",height:62,display:"flex",alignItems:"center",padding:"0 24px",justifyContent:"space-between",boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{width:30,height:30,borderRadius:9,background:"#6C3CE1",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Georgia,serif",fontSize:11,fontWeight:700,color:"white"}}>DB</div>
+          <span style={{fontFamily:"Georgia,serif",fontWeight:700,fontSize:14,color:"#1E1B4B"}}>DominaBanca</span>
+        </div>
+      </nav>
+
+      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"32px 16px"}}>
+        <div style={{width:"100%",maxWidth:500,animation:"fadeUp 0.5s ease"}}>
+
+          {/* Ícone */}
+          <div style={{textAlign:"center",marginBottom:32}}>
+            <div style={{width:80,height:80,borderRadius:"50%",background:"#EDE9FE",border:"3px solid #6C3CE1",display:"flex",alignItems:"center",justifyContent:"center",fontSize:36,margin:"0 auto 20px"}}>📋</div>
+            <h1 style={{fontFamily:"Georgia,serif",fontSize:26,fontWeight:700,color:"#1E1B4B",marginBottom:10}}>
+              Vamos montar seu plano de estudos
+            </h1>
+            <p style={{fontSize:14,color:"#6B7280",lineHeight:1.7}}>
+              Esta etapa é fundamental para a sua preparação. Dedique alguns minutos com atenção — quanto mais preciso você for, mais eficiente será o seu cronograma.
+            </p>
+          </div>
+
+          {/* Cards de aviso */}
+          <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:32}}>
+
+            <div style={{background:"white",border:"1.5px solid #E8E8F0",borderRadius:14,padding:"16px 18px",display:"flex",gap:14,alignItems:"flex-start"}}>
+              <div style={{width:40,height:40,borderRadius:10,background:"#EDE9FE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>📎</div>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:"#1E1B4B",marginBottom:4}}>Edital aberto? Tenha o PDF em mãos</div>
+                <div style={{fontSize:12,color:"#6B7280",lineHeight:1.6}}>Se o edital do seu concurso já foi publicado, baixe o PDF antes de continuar. A IA vai ler o edital completo e extrair todas as matérias automaticamente.</div>
+              </div>
+            </div>
+
+            <div style={{background:"white",border:"1.5px solid #E8E8F0",borderRadius:14,padding:"16px 18px",display:"flex",gap:14,alignItems:"flex-start"}}>
+              <div style={{width:40,height:40,borderRadius:10,background:"#D1FAE5",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>📅</div>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:"#1E1B4B",marginBottom:4}}>Edital ainda não publicado?</div>
+                <div style={{fontSize:12,color:"#6B7280",lineHeight:1.6}}>Sem problema. Você pode usar o edital do último concurso do mesmo órgão como base. O cronograma será ajustado quando o novo edital sair.</div>
+              </div>
+            </div>
+
+            <div style={{background:"#FEF3DC",border:"1.5px solid #FDE68A",borderRadius:14,padding:"16px 18px",display:"flex",gap:14,alignItems:"flex-start"}}>
+              <div style={{width:40,height:40,borderRadius:10,background:"#FDE68A",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>⚠️</div>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:"#92400E",marginBottom:4}}>Atenção total nesta etapa</div>
+                <div style={{fontSize:12,color:"#92400E",lineHeight:1.6}}>As informações que você fornecer aqui vão definir todo o seu cronograma de estudos. Reserve um momento tranquilo para preenchê-las com cuidado.</div>
+              </div>
+            </div>
+
+          </div>
+
+          <button onClick={()=>setScreen("onboarding")}
+            style={{width:"100%",padding:"16px",background:"#6C3CE1",color:"white",border:"none",borderRadius:14,fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:"0 6px 24px rgba(108,60,225,0.28)",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            Estou pronto, vamos começar →
+          </button>
+
+          <p style={{textAlign:"center",fontSize:12,color:"#9898B8",marginTop:16}}>Esta etapa leva aproximadamente 5 minutos</p>
+        </div>
+      </div>
+    </div>
+  );
+
   if(screen === "onboarding") return <Onboarding user={userData} onComplete={async plan=>{
     if(userData?.id) {
       await supabase.from("onboarding").upsert({
