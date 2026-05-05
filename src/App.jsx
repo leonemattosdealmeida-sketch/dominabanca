@@ -2465,7 +2465,7 @@ function Onboarding({ user, onComplete, onBack }) {
               </div>
             ))}
 
-            <button onClick={()=>setPhase("horas")}
+            <button onClick={()=>setPhase("materias")}
               style={{width:"100%",padding:"14px",background:"#5B4FCF",color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",marginTop:4}}>
               Entendido, vamos lá →
             </button>
