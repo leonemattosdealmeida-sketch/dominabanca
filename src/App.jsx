@@ -1,5 +1,10 @@
 import { useState, useEffect, useRef } from "react";
+import { createClient } from "@supabase/supabase-js";
 
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 
 const C = {
   primary: "#6C3CE1",
@@ -1071,29 +1076,67 @@ const Sucesso = ({ nome, onContinue }) => (
 // ══════════════════════════════════════════════════════════════════════════════
 // ROOT
 // ══════════════════════════════════════════════════════════════════════════════
-function Cadastro({ onBack, onSuccess }) {
-  const [step, setStep] = useState(1);
+function Cadastro({ onBack, onSuccess, onLogin }) {
   const [loading, setLoading] = useState(false);
+  const [loadingGoogle, setLoadingGoogle] = useState(false);
   const [done, setDone] = useState(false);
-  const [form, setForm] = useState({
-    email:"", senha:"", nome:"", nascimento:"", sexo:"", estado:"", cidade:""
-  });
+  const [form, setForm] = useState({ nome:"", email:"", telefone:"", senha:"" });
+  const [errors, setErrors] = useState({});
+  const [authError, setAuthError] = useState("");
+  const [showPass, setShowPass] = useState(false);
 
-  const handleChange = (name, value) => setForm(f => ({...f, [name]:value}));
-
-  const handleSubmit = async () => {
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 1800));
-    setLoading(false);
-    setDone(true);
+  const handleChange = (name, value) => {
+    setForm(f => ({...f, [name]:value}));
+    if(errors[name]) setErrors(e => ({...e, [name]:""}));
   };
 
-  const TOTAL_STEPS = 3;
+  const validate = () => {
+    const e = {};
+    if(!form.nome.trim()) e.nome = "Nome obrigatório";
+    if(!form.email) e.email = "Email obrigatório";
+    else if(!/\S+@\S+\.\S+/.test(form.email)) e.email = "Email inválido";
+    if(!form.telefone.trim()) e.telefone = "Telefone obrigatório";
+    if(!form.senha) e.senha = "Senha obrigatória";
+    else if(form.senha.length < 6) e.senha = "Mínimo 6 caracteres";
+    return e;
+  };
+
+  const handleSubmit = async () => {
+    const e = validate();
+    if(Object.keys(e).length > 0){ setErrors(e); return; }
+    setLoading(true); setAuthError("");
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.senha,
+        options: { data: { nome: form.nome } }
+      });
+      if(error){ setAuthError(error.message); setLoading(false); return; }
+      if(data.user) {
+        await supabase.from("profiles").upsert({
+          id: data.user.id,
+          nome: form.nome,
+          telefone: form.telefone,
+        });
+      }
+      setLoading(false);
+      setDone(true);
+    } catch(e) {
+      setAuthError("Erro ao criar conta. Tente novamente.");
+      setLoading(false);
+    }
+  };
+
+  const handleGoogle = async () => {
+    setLoadingGoogle(true);
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin }
+    });
+  };
 
   return (
     <div style={{ fontFamily:"'Sora',sans-serif", minHeight:"100vh", background:C.bg, display:"flex", flexDirection:"column" }}>
-
-      {/* Nav */}
       <nav style={{ background:C.white, borderBottom:`1px solid ${C.border}`, height:64, display:"flex", alignItems:"center", padding:"0 28px", boxShadow:"0 1px 6px rgba(0,0,0,0.04)", justifyContent:"space-between" }}>
         <button onClick={onBack} style={{ background:"none", border:"none", cursor:"pointer", padding:0 }}>
           <CadastroLogo/>
@@ -1104,33 +1147,76 @@ function Cadastro({ onBack, onSuccess }) {
         </button>
       </nav>
 
-      {/* Content */}
       <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:"40px 16px" }}>
-        <div style={{ width:"100%", maxWidth:460 }}>
-
-          {/* Card */}
+        <div style={{ width:"100%", maxWidth:440 }}>
           <div style={{ background:C.white, borderRadius:24, padding:"36px 32px", boxShadow:C.shadowLg, border:`1px solid ${C.border}` }}>
-
-            {!done && <ProgressBar step={step} total={TOTAL_STEPS}/>}
-
             {done ? (
-              <Sucesso nome={form.nome} onContinue={()=>onSuccess&&onSuccess(form)}/>
-            ) : step === 1 ? (
-              <Etapa1 data={form} onChange={handleChange} onNext={()=>setStep(2)} onLogin={()=>alert("Ir para o login")}/>
-            ) : step === 2 ? (
-              <Etapa2 data={form} onChange={handleChange} onNext={()=>setStep(3)} onBack={()=>setStep(1)}/>
+              <Sucesso nome={form.nome} onContinue={()=>onSuccess&&onSuccess({...form})}/>
             ) : (
-              <Etapa3 data={form} onChange={handleChange} onSubmit={handleSubmit} onBack={()=>setStep(2)} loading={loading}/>
+              <>
+                <div style={{ textAlign:"center", marginBottom:28 }}>
+                  <h1 style={{ fontFamily:"'Lora',serif", fontSize:24, fontWeight:700, color:C.text, marginBottom:8 }}>Crie sua conta</h1>
+                  <p style={{ fontSize:13, color:C.textMed }}>Comece sua preparação hoje.</p>
+                </div>
+
+                {/* Google */}
+                <button onClick={handleGoogle} disabled={loadingGoogle}
+                  style={{ width:"100%", padding:"13px", background:C.white, border:`1.5px solid ${C.border}`, borderRadius:12, fontSize:14, fontWeight:600, color:C.text, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:10, marginBottom:20, boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }}>
+                  <img src="https://www.google.com/favicon.ico" width={18} height={18} alt="Google"/>
+                  {loadingGoogle ? "Redirecionando..." : "Continuar com Google"}
+                </button>
+
+                <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
+                  <div style={{ flex:1, height:1, background:C.border }}/>
+                  <span style={{ fontSize:12, color:C.textLight }}>ou</span>
+                  <div style={{ flex:1, height:1, background:C.border }}/>
+                </div>
+
+                <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+                  {[
+                    {name:"nome", label:"Nome completo", placeholder:"Seu nome completo", type:"text"},
+                    {name:"email", label:"Email", placeholder:"seu@email.com", type:"email"},
+                    {name:"telefone", label:"Telefone", placeholder:"(11) 99999-9999", type:"tel"},
+                  ].map(f => (
+                    <div key={f.name} style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                      <label style={{ fontSize:13, fontWeight:700, color:C.textMed }}>{f.label}</label>
+                      <input type={f.type} value={form[f.name]} onChange={e=>handleChange(f.name, e.target.value)}
+                        placeholder={f.placeholder} className="inp"
+                        style={{ padding:"12px 14px", border:`1.5px solid ${errors[f.name]?C.danger:C.border}`, borderRadius:10, fontSize:13, color:C.text, background:"white", outline:"none", width:"100%", boxSizing:"border-box" }}/>
+                      {errors[f.name]&&<span style={{ fontSize:11, color:C.danger, fontWeight:600 }}>{errors[f.name]}</span>}
+                    </div>
+                  ))}
+
+                  <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                    <label style={{ fontSize:13, fontWeight:700, color:C.textMed }}>Senha</label>
+                    <div style={{ position:"relative" }}>
+                      <input type={showPass?"text":"password"} value={form.senha} onChange={e=>handleChange("senha",e.target.value)}
+                        placeholder="Mínimo 6 caracteres" className="inp"
+                        style={{ padding:"12px 44px 12px 14px", border:`1.5px solid ${errors.senha?C.danger:C.border}`, borderRadius:10, fontSize:13, color:C.text, background:"white", outline:"none", width:"100%", boxSizing:"border-box" }}/>
+                      <button onClick={()=>setShowPass(!showPass)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", color:C.textLight, fontSize:15 }}>
+                        {showPass?"🙈":"👁️"}
+                      </button>
+                    </div>
+                    {errors.senha&&<span style={{ fontSize:11, color:C.danger, fontWeight:600 }}>{errors.senha}</span>}
+                  </div>
+
+                  {authError&&<div style={{ background:"#FEE8E8", border:`1px solid ${C.danger}`, borderRadius:9, padding:"9px 13px", fontSize:12, color:C.danger }}>{authError}</div>}
+
+                  <button className="btn-main" onClick={handleSubmit} disabled={loading}
+                    style={{ padding:"14px", background:C.primary, color:"white", border:"none", borderRadius:12, fontSize:14, fontWeight:700, cursor:"pointer", boxShadow:C.shadowMd, display:"flex", alignItems:"center", justifyContent:"center", gap:8, marginTop:4 }}>
+                    {loading&&<div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,0.3)", borderTop:"2px solid white", borderRadius:"50%", animation:"spin 0.8s linear infinite" }}/>}
+                    {loading?"Criando conta...":"Criar conta →"}
+                  </button>
+
+                  <p style={{ textAlign:"center", fontSize:13, color:C.textMed, marginTop:4 }}>
+                    Já tem conta?{" "}
+                    <button onClick={onLogin} style={{ background:"none", border:"none", color:C.primary, fontWeight:700, cursor:"pointer", fontSize:13 }}>Entrar</button>
+                  </p>
+                </div>
+              </>
             )}
           </div>
-
-          {/* Marca */}
-          {!done && (
-            <div style={{ display:"flex", justifyContent:"center", marginTop:28, animation:"fadeIn 0.5s ease" }}>
-              <CadastroLogo/>
-            </div>
-          )}
-
+          {!done&&<div style={{ display:"flex", justifyContent:"center", marginTop:24 }}><CadastroLogo/></div>}
         </div>
       </div>
     </div>
@@ -1178,13 +1264,35 @@ function Login({ onBack, onCadastro, onSuccess }) {
     return e;
   };
 
+  const [authError, setAuthError] = useState("");
+
+  const [loadingGoogle, setLoadingGoogle] = useState(false);
+
+  const handleGoogle = async () => {
+    setLoadingGoogle(true);
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin }
+    });
+  };
+
   const handleLogin = async () => {
     const e = validateLogin();
     if(Object.keys(e).length > 0){ setErrors(e); return; }
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1500));
-    setLoading(false);
-    onSuccess && onSuccess(form);
+    setAuthError("");
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: form.email,
+        password: form.senha,
+      });
+      if(error){ setAuthError("Email ou senha incorretos."); setLoading(false); return; }
+      setLoading(false);
+      onSuccess && onSuccess(data.user);
+    } catch(e) {
+      setAuthError("Erro ao entrar. Tente novamente.");
+      setLoading(false);
+    }
   };
 
   const handleRecuperar = async () => {
@@ -1193,9 +1301,14 @@ function Login({ onBack, onCadastro, onSuccess }) {
       return;
     }
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1200));
-    setLoading(false);
-    setTela("confirmado");
+    try {
+      await supabase.auth.resetPasswordForEmail(form.emailRecuperar);
+      setLoading(false);
+      setTela("confirmado");
+    } catch(e) {
+      setLoading(false);
+      setTela("confirmado");
+    }
   };
 
   if(tela === "login") return (
@@ -1209,6 +1322,17 @@ function Login({ onBack, onCadastro, onSuccess }) {
               <p style={{ fontSize:14, color:C.textMed, lineHeight:1.6 }}>Entre na sua conta para continuar estudando.</p>
             </div>
             <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
+              {/* Google */}
+              <button onClick={handleGoogle} disabled={loadingGoogle}
+                style={{ width:"100%", padding:"13px", background:C.white, border:`1.5px solid ${C.border}`, borderRadius:12, fontSize:14, fontWeight:600, color:C.text, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:10, boxShadow:"0 1px 4px rgba(0,0,0,0.06)" }}>
+                <img src="https://www.google.com/favicon.ico" width={18} height={18} alt="Google"/>
+                {loadingGoogle ? "Redirecionando..." : "Continuar com Google"}
+              </button>
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <div style={{ flex:1, height:1, background:C.border }}/>
+                <span style={{ fontSize:12, color:C.textLight }}>ou entre com email</span>
+                <div style={{ flex:1, height:1, background:C.border }}/>
+              </div>
               <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
                 <label style={{ fontSize:13, fontWeight:700, color:C.textMed }}>Email</label>
                 <input type="email" value={form.email} onChange={e=>handleChange("email",e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()}
@@ -1238,6 +1362,7 @@ function Login({ onBack, onCadastro, onSuccess }) {
                 {loading&&<div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,0.3)", borderTop:"2px solid white", borderRadius:"50%", animation:"spin 0.8s linear infinite" }}/>}
                 {loading?"Entrando...":"Entrar →"}
               </button>
+              {authError&&<div style={{background:"#FEE8E8",border:`1px solid ${C.danger}`,borderRadius:10,padding:"10px 14px",fontSize:13,color:C.danger,textAlign:"center"}}>{authError}</div>}
             </div>
             <div style={{ display:"flex", alignItems:"center", gap:12, margin:"24px 0" }}>
               <div style={{ flex:1, height:1, background:C.border }}/>
