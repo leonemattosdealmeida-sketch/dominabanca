@@ -1892,7 +1892,7 @@ const ObRedacao = ({dadosRedacao, onConfirm, onSkip}) => {
             </div>
           </div>
         ) : (
-          <div style={{display:"flex",gap:16"}}>
+          <div style={{display:"flex",gap:16}}>
             <div><span style={{fontSize:11,color:"#9898B8"}}>Tipo: </span><span style={{fontSize:12,fontWeight:600,color:"#1A1A2E"}}>{dados.tipoTexto||"—"}</span></div>
             {dados.maxLinhas>0&&<div><span style={{fontSize:11,color:"#9898B8"}}>Linhas: </span><span style={{fontSize:12,fontWeight:600,color:"#1A1A2E"}}>{dados.minLinhas} a {dados.maxLinhas}</span></div>}
           </div>
