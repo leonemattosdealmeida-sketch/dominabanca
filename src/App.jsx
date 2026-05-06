@@ -32,13 +32,12 @@ const css = `
   @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
   @keyframes spin{to{transform:rotate(360deg)}}
-  @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
   @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
   @keyframes bounceIn{0%{transform:scale(0.85);opacity:0}60%{transform:scale(1.04)}100%{transform:scale(1);opacity:1}}
   @keyframes slideRight{from{transform:scaleX(0)}to{transform:scaleX(1)}}
   @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-  @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+  @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
   *{box-sizing:border-box;margin:0;padding:0;}
   html{scroll-behavior:smooth;}
   body{background:#F8F7FF;}
@@ -2339,7 +2338,7 @@ function Onboarding({ user, onComplete, onBack }) {
               </div>
             </div>
             <div style={{height:6,background:"#E8E8F0",borderRadius:99,overflow:"hidden"}}>
-              <div style={{height:"100%",width:"100%",background:"linear-gradient(90deg,#5B4FCF,#7C6FE0,#5B4FCF)",backgroundSize:"400% 100%",borderRadius:99,animation:"shimmer 2s linear infinite"}}/>
+              <div style={{height:"100%",width:"100%",background:"linear-gradient(90deg,#DDDDF5 0%,#5B4FCF 40%,#7C6FE0 60%,#DDDDF5 100%)",backgroundSize:"200% 100%",borderRadius:99,animation:"shimmer 1.5s linear infinite"}}/>
             </div>
           </div>
         )}
@@ -2408,7 +2407,7 @@ function Onboarding({ user, onComplete, onBack }) {
                     <p style={{fontSize:11,color:"#9898B8",marginBottom:12}}>Isso pode levar alguns segundos</p>
                   </div>
                   <div style={{width:"100%",height:6,background:"#E8E8F0",borderRadius:99,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:"100%",background:"linear-gradient(90deg,#5B4FCF,#7C6FE0,#5B4FCF)",backgroundSize:"200%",borderRadius:99,animation:"shimmer 1.5s linear infinite"}}/>
+                    <div style={{height:"100%",width:"100%",background:"linear-gradient(90deg,#DDDDF5 0%,#5B4FCF 40%,#7C6FE0 60%,#DDDDF5 100%)",backgroundSize:"200% 100%",borderRadius:99,animation:"shimmer 1.5s linear infinite"}}/>
                   </div>
                 </div>
               ):(
