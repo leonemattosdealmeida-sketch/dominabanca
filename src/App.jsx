@@ -1902,7 +1902,41 @@ const ObRevisaoMaterias = ({dados, onConfirm, modoSoMaterias}) =>
     : <ObConfirmarTopicos grupos={dados.grupos||[]} onConfirm={onConfirm}/>;
 
 // ── Redação ───────────────────────────────────────────────────────────────────
-const ObRedacao = ({dadosRedacao, onConfirm, onSkip}) => {
+const ObRedacao = ({onConfirm, onSkip}) => {
+  const DIAS = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
+  const [diasSel, setDiasSel] = useState([]);
+  const toggleDia = d => setDiasSel(ds => ds.includes(d) ? ds.filter(x=>x!==d) : [...ds,d]);
+  return (
+    <div style={{animation:"fadeUp 0.4s ease"}}>
+      <div style={{background:"#EFEFFD",border:"1px solid #DDDDF5",borderRadius:12,padding:"12px 14px",marginBottom:14,display:"flex",gap:12,alignItems:"center"}}>
+        <span style={{fontSize:24}}>✍️</span>
+        <div>
+          <div style={{fontSize:13,fontWeight:700,color:"#5B4FCF"}}>Sua prova tem redação</div>
+          <div style={{fontSize:11,color:"#9898B8",marginTop:2}}>Selecione os dias da semana que vai treinar</div>
+        </div>
+      </div>
+      <div style={{marginBottom:16}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E",marginBottom:10}}>Dias de treino de redação</div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {DIAS.map(d=>(
+            <button key={d} onClick={()=>toggleDia(d)}
+              style={{padding:"10px 14px",border:`1.5px solid ${diasSel.includes(d)?"#5B4FCF":"#E8E8F0"}`,borderRadius:10,background:diasSel.includes(d)?"#EFEFFD":"white",color:diasSel.includes(d)?"#5B4FCF":"#4A4A6A",fontSize:13,fontWeight:diasSel.includes(d)?700:500,cursor:"pointer"}}>
+              {d}
+            </button>
+          ))}
+        </div>
+        {diasSel.length===0&&<p style={{fontSize:11,color:"#9898B8",marginTop:8}}>Selecione pelo menos um dia</p>}
+      </div>
+      <div style={{display:"flex",gap:10}}>
+        <button onClick={onSkip} style={{flex:1,padding:"12px",background:"white",color:"#4A4A6A",border:"1.5px solid #E8E8F0",borderRadius:12,fontSize:12,fontWeight:600,cursor:"pointer"}}>Pular por agora</button>
+        <button onClick={()=>diasSel.length>0&&onConfirm({dias:diasSel})} disabled={diasSel.length===0}
+          style={{flex:2,padding:"12px",background:diasSel.length>0?"#5B4FCF":"#E8E8F0",color:diasSel.length>0?"white":"#9898B8",border:"none",borderRadius:12,fontSize:13,fontWeight:700,cursor:diasSel.length>0?"pointer":"not-allowed"}}>
+          ✓ Confirmar dias de redação →
+        </button>
+      </div>
+    </div>
+  );
+};) => {
   const DIAS = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
   const [diasSel, setDiasSel] = useState([]);
   const [dados, setDados] = useState(dadosRedacao || {
@@ -2310,8 +2344,13 @@ function Onboarding({ user, onComplete, onBack }) {
   const confirmarTopicos = async gruposEditados=>{
     setGrupos(gruposEditados);
     userMsg("Confirmo os tópicos.");
-    await bot("Tópicos confirmados! Agora informe suas horas de estudo por dia.",600);
-    setPhase("horas");
+    if(dadosEdital?.temRedacao){
+      await bot(<span>Ótimo! Sua prova tem <b>redação</b>. Vamos configurar como você vai treinar.</span>,600);
+      setPhase("discursiva");
+    } else {
+      await bot("Tudo confirmado! Agora informe suas horas de estudo.",600);
+      setPhase("horas");
+    }
   };
 
   const confirmarDiscursiva = async disc=>{
@@ -2324,19 +2363,8 @@ function Onboarding({ user, onComplete, onBack }) {
   const confirmarHoras = async horas=>{
     setHorasConfirmadas(horas);
     userMsg("Confirmo as horas de estudo.");
-    if(dadosEdital?.temRedacao){
-      await bot(<span>Ótimo! Sua prova tem <b>redação</b>. Buscando os critérios de avaliação do edital...</span>,600);
-      setTyping(true);
-      try{
-        const raw = await obAIJson([{role:"user",content:PROMPT_REDACAO(orgao,cargo,editalTextoRaw)}],2000);
-        if(raw) setDadosRedacaoEdital(raw);
-      }catch{}
-      setTyping(false);
-      setPhase("discursiva");
-    } else {
-      await bot("Perfeito! Vamos ao resumo final.",600);
-      setPhase("resumo");
-    }
+    await bot("Ótimo! Agora confirme as matérias, tópicos e quantidade de questões de cada disciplina.",600);
+    setPhase("materias");
   };
 
   const confirmarResumo = ()=>{
@@ -2465,7 +2493,7 @@ function Onboarding({ user, onComplete, onBack }) {
               </div>
             ))}
 
-            <button onClick={()=>setPhase("materias")}
+            <button onClick={()=>setPhase("horas")}
               style={{width:"100%",padding:"14px",background:"#5B4FCF",color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",marginTop:4}}>
               Entendido, vamos lá →
             </button>
@@ -2486,7 +2514,7 @@ function Onboarding({ user, onComplete, onBack }) {
       {showDiscursiva&&(
         <div style={{background:"white",borderTop:"1px solid #E8E8F0",padding:"12px 16px",flexShrink:0,maxHeight:"60vh",overflowY:"auto"}}>
           <div style={{maxWidth:640,margin:"0 auto"}}>
-            <ObRedacao dadosRedacao={dadosRedacaoEdital} onConfirm={confirmarDiscursiva} onSkip={()=>{setDiscursiva(null);setPhase("resumo");bot("Ok! Vamos ao resumo final.",400);}}/>
+            <ObRedacao onConfirm={confirmarDiscursiva} onSkip={()=>{setDiscursiva(null);setPhase("resumo");bot("Ok! Vamos ao resumo final.",400);}}/>
           </div>
         </div>
       )}
