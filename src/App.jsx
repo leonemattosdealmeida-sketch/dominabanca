@@ -551,7 +551,7 @@ const ObResumoFinal=({dados,onConfirm})=>{
 function Onboarding({user,onComplete,onBack}){
   const nome=user?.user_metadata?.nome?.split(" ")[0]||user?.email?.split("@")[0]||"aluno";
   const [msgs,setMsgs]=useState([]);const [typing,setTyping]=useState(false);const [phase,setPhase]=useState("init");const [input,setInput]=useState("");
-  const [orgao,setOrgao]=useState("");const [cargo,setCargo]=useState("");const [pdfLoading,setPdfLoading]=useState(false);
+  const [orgao,setOrgao]=useState("");const [cargo,setCargo]=useState("");const [pdfLoading,setPdfLoading]=useState(false);const [pdfProgress,setPdfProgress]=useState(0);
   const [dadosEdital,setDadosEdital]=useState(null);const [dataProva,setDataProva]=useState("");const [grupos,setGrupos]=useState([]);
   const [discursiva,setDiscursiva]=useState(null);const [horasConfirmadas,setHorasConfirmadas]=useState(null);const [editalTextoRaw,setEditalTextoRaw]=useState("");const [erro,setErro]=useState("");
   const chatRef=useRef(null);const inputRef=useRef(null);const fileRef=useRef(null);
@@ -567,9 +567,9 @@ function Onboarding({user,onComplete,onBack}){
 
   const send=async()=>{const val=input.trim();if(!val||typing)return;setInput("");setErro("");if(phase==="orgao")await handleOrgao(val);else if(phase==="cargo")await handleCargo(val);else if(phase==="data")await handleData(val);};
 
-  const handleOrgao=async val=>{userMsg(val);setPhase("aguardando");setTyping(true);try{const raw=await obAI([{role:"user",content:`Valide este órgão público concursal: "${val}". UMA linha. NÃO mencione cargo. NÃO faça perguntas.`}]);setTyping(false);addMsg("bot",<span>{raw}</span>);const prob=["não parece","não encontrei","misturou","pode confirmar"].some(x=>raw.toLowerCase().includes(x));if(prob){setPhase("orgao");setTimeout(()=>inputRef.current?.focus(),100);}else{setOrgao(val.toUpperCase());addMsg("confirm",{label:"órgão",value:val.toUpperCase(),onEdit:()=>{setOrgao("");setMsgs(m=>m.filter(x=>x.role!=="confirm"));setPhase("orgao");setTimeout(()=>inputRef.current?.focus(),100);},onConfirm:confirmOrgao});}}catch(e){setTyping(false);setErro("Erro: "+e.message);setPhase("orgao");}};
+  const handleOrgao=async val=>{userMsg(val);setPhase("aguardando");setTyping(true);try{const raw=await obAI([{role:"user",content:`Confirme e descreva brevemente o órgão público brasileiro: "${val}". Responda em 1 linha: nome completo e função principal. Ex: "Banco Central do Brasil, responsável pela política monetária." NÃO mencione cargo. NÃO faça perguntas.`}]);setTyping(false);const msgOrgao=raw||"Órgão identificado!";addMsg("bot",<span>{msgOrgao}</span>);const prob=["não parece","não encontrei","misturou","pode confirmar"].some(x=>raw.toLowerCase().includes(x));if(prob){setPhase("orgao");setTimeout(()=>inputRef.current?.focus(),100);}else{setOrgao(val.toUpperCase());addMsg("confirm",{label:"órgão",value:val.toUpperCase(),onEdit:()=>{setOrgao("");setMsgs(m=>m.filter(x=>x.role!=="confirm"));setPhase("orgao");setTimeout(()=>inputRef.current?.focus(),100);},onConfirm:confirmOrgao});}}catch(e){setTyping(false);setErro("Erro: "+e.message);setPhase("orgao");}};
 
-  const handleCargo=async val=>{userMsg(val);setPhase("aguardando");setTyping(true);try{const raw=await obAI([{role:"user",content:`Valide este cargo concursal: "${val}" para o órgão ${orgao}. UMA linha. NÃO mencione órgão. NÃO faça perguntas.`}]);setTyping(false);addMsg("bot",<span>{raw}</span>);const prob=["não parece","não encontrei","misturou","pode confirmar"].some(x=>raw.toLowerCase().includes(x));if(prob){setPhase("cargo");setTimeout(()=>inputRef.current?.focus(),100);}else{setCargo(val);addMsg("confirm",{label:"cargo",value:val,onEdit:()=>{setCargo("");setMsgs(m=>m.filter(x=>x.role!=="confirm"));setPhase("cargo");setTimeout(()=>inputRef.current?.focus(),100);},onConfirm:confirmCargo});}}catch(e){setTyping(false);setErro("Erro: "+e.message);setPhase("cargo");}};
+  const handleCargo=async val=>{userMsg(val);setPhase("aguardando");setTyping(true);try{const raw=await obAI([{role:"user",content:`Confirme e descreva brevemente o cargo concursal: "${val}". Responda em 1 linha com o que o profissional faz. Ex: "Analista Administrativo, responsável por atividades de suporte e gestão." NÃO mencione órgão. NÃO faça perguntas.`}]);setTyping(false);const msgCargo=raw||"Cargo identificado!";addMsg("bot",<span>{msgCargo}</span>);const prob=["não parece","não encontrei","misturou","pode confirmar"].some(x=>raw.toLowerCase().includes(x));if(prob){setPhase("cargo");setTimeout(()=>inputRef.current?.focus(),100);}else{setCargo(val);addMsg("confirm",{label:"cargo",value:val,onEdit:()=>{setCargo("");setMsgs(m=>m.filter(x=>x.role!=="confirm"));setPhase("cargo");setTimeout(()=>inputRef.current?.focus(),100);},onConfirm:confirmCargo});}}catch(e){setTyping(false);setErro("Erro: "+e.message);setPhase("cargo");}};
 
   const handleData=async val=>{userMsg(val);setDataProva(val);setMsgs(m=>m.filter(x=>x.role!=="confirm"));addMsg("confirm",{label:"data da prova",value:val,onEdit:()=>{setDataProva("");setPhase("data");setTimeout(()=>inputRef.current?.focus(),100);},onConfirm:()=>confirmData(val)});};
 
@@ -579,7 +579,7 @@ function Onboarding({user,onComplete,onBack}){
 
   const processarPDF=async file=>{
     if(!file||file.type!=="application/pdf")return;
-    setPdfLoading(true);setErro("");
+    setPdfLoading(true);setPdfProgress(0);setErro("");let _progTimer=setInterval(()=>{setPdfProgress(p=>p<88?p+Math.random()*4:p);},800);
     try{
       const base64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(",")[1]);r.onerror=rej;r.readAsDataURL(file);});
       userMsg(`Edital enviado: ${file.name}`);setPhase("lendo");
@@ -591,14 +591,14 @@ function Onboarding({user,onComplete,onBack}){
       const dTexto=await respTexto.json();setEditalTextoRaw(dTexto.content?.[0]?.text||"");
       const d=await resp.json();const raw=d.content?.[0]?.text||"";let dados=null;
       try{dados=JSON.parse(raw.replace(/```json|```/g,"").trim());}catch{}
-      setTyping(false);setPdfLoading(false);
+      setTyping(false);setPdfLoading(false);clearInterval(_progTimer);setPdfProgress(100);
       if(!dados?.grupos?.length){addMsg("bot",<span>Não consegui extrair as informações. Tente novamente com outro PDF.</span>);setPhase("pdf");return;}
       setDadosEdital(dados);setGrupos(dados.grupos);
       const nM=dados.grupos.reduce((a,g)=>a+g.materias.length,0);
       await bot(<span>Leitura completa! Encontrei <strong>{dados.grupos.length} grupos</strong> com <strong>{nM} matérias</strong>.{dados.temRedacao?" Sua prova tem redação.":""}<br/>Banca: <strong>{dados.banca||"identificada"}</strong> · Questões: <strong>{dados.totalQuestoes||"—"}</strong></span>,400);
       if(dados.dataProva&&dados.dataProva!=="null"){setDataProva(dados.dataProva);await bot(<span>Identifiquei a data da prova: <strong>{dados.dataProva}</strong>. Está correta?</span>,500);addMsg("confirm",{label:"data da prova",value:dados.dataProva,onEdit:()=>{setDataProva("");setMsgs(m=>m.filter(x=>x.role!=="confirm"));setPhase("data");setTimeout(()=>inputRef.current?.focus(),100);},onConfirm:()=>confirmData(dados.dataProva)});setPhase("aguardando_data");}
       else{await bot("Não encontrei a data da prova no edital. Qual é a data? (formato dd/mm/aaaa)",500);setPhase("data");setTimeout(()=>inputRef.current?.focus(),100);}
-    }catch(e){setTyping(false);setPdfLoading(false);setErro("Erro ao ler o PDF: "+e.message);setPhase("pdf");}
+    }catch(e){setTyping(false);setPdfLoading(false);clearInterval(_progTimer);setPdfProgress(100);setErro("Erro ao ler o PDF: "+e.message);setPhase("pdf");}
   };
 
   const confirmarMaterias=async gruposEditados=>{
@@ -611,7 +611,7 @@ function Onboarding({user,onComplete,onBack}){
 
   const confirmarTopicos=async gruposEditados=>{setGrupos(gruposEditados);userMsg("Confirmo os tópicos.");await bot("Tópicos confirmados! Agora informe suas horas de estudo por dia.",600);setPhase("horas");};
   const confirmarDiscursiva=async disc=>{setDiscursiva(disc);userMsg(`Confirmo redação: ${disc.dias?.join(", ")||""}`);await bot("Perfeito! Seu plano de estudos está completo.",600);setPhase("resumo");};
-  const confirmarHoras=async horas=>{setHorasConfirmadas(horas);userMsg("Confirmo as horas de estudo.");if(dadosEdital?.temRedacao){await bot(<span>Ótimo! Sua prova tem <b>redação</b>. Selecione os dias de treino.</span>,600);setPhase("discursiva");}else{await bot("Perfeito! Vamos ao resumo final.",600);setPhase("resumo");}};
+  const confirmarHoras=async horas=>{setHorasConfirmadas(horas);userMsg("Confirmo as horas de estudo.");await bot(<span>Ótimo! Agora configure os dias de treino de <b>redação</b>. Se não tiver, pode pular.</span>,600);setPhase("discursiva");};
   const confirmarResumo=()=>{onComplete({orgao,cargo,dataProva,banca:dadosEdital?.banca,totalQuestoes:dadosEdital?.totalQuestoes,temRedacao:dadosEdital?.temRedacao,grupos,discursiva,horas:horasConfirmadas});};
 
   const showInput=["orgao","cargo","data"].includes(phase)&&!typing;
@@ -694,9 +694,14 @@ function Onboarding({user,onComplete,onBack}){
                   <div style={{width:28,height:28,border:"3px solid #EFEFFD",borderTop:"3px solid #5B4FCF",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
                   <p style={{fontSize:13,color:"#5B4FCF",fontWeight:600}}>Lendo o edital completo...</p>
                   <p style={{fontSize:11,color:"#9898B8",marginBottom:8}}>Isso pode levar alguns segundos</p>
-                  {/* FIX 3: Shimmer bar no loading do PDF */}
-                  <div style={{width:"100%",height:5,background:"#E8E8F0",borderRadius:99,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:"100%",background:"linear-gradient(90deg,#EFEFFD,#5B4FCF,#7C6FE0,#EFEFFD)",backgroundSize:"300% 100%",borderRadius:99,animation:"shimmer 1.5s linear infinite"}}/>
+                  <div style={{width:"100%",marginTop:4}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                      <span style={{fontSize:10,color:"#5B4FCF",fontWeight:600}}>Processando edital...</span>
+                      <span style={{fontSize:10,color:"#9898B8"}}>{Math.round(pdfProgress)}%</span>
+                    </div>
+                    <div style={{width:"100%",height:6,background:"#E8E8F0",borderRadius:99,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${pdfProgress}%`,background:"linear-gradient(90deg,#5B4FCF,#7C6FE0)",borderRadius:99,transition:"width 0.4s ease"}}/>
+                    </div>
                   </div>
                 </div>
               ):(
