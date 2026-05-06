@@ -1782,15 +1782,22 @@ const ObConfirmarMaterias = ({dados, onConfirm}) => {
   const updNome = (gi,mi,v) => setGrupos(gs=>gs.map((g,i)=>i!==gi?g:{...g,materias:g.materias.map((m,j)=>j!==mi?m:{...m,nome:v})}));
   return (
     <div style={{animation:"fadeUp 0.4s ease"}}>
-      <div style={{background:"#EFEFFD",border:"1px solid #DDDDF5",borderRadius:12,padding:"12px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div>
-          <div style={{fontSize:13,fontWeight:700,color:"#5B4FCF"}}>{totalM} matérias</div>
-          <div style={{fontSize:11,color:"#9898B8",marginTop:1}}>Edite o nome e a quantidade de questões</div>
+      <div style={{background:"#EFEFFD",border:"1px solid #DDDDF5",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:"#5B4FCF"}}>{totalM} matérias identificadas</div>
+            <div style={{fontSize:11,color:"#9898B8",marginTop:1}}>Confirme o nome e a quantidade de questões de cada matéria</div>
+          </div>
+          <div style={{textAlign:"right",flexShrink:0}}>
+            <div style={{fontSize:16,fontWeight:700,color:"#5B4FCF"}}>{totalQ}</div>
+            <div style={{fontSize:10,color:"#9898B8"}}>questões no total</div>
+          </div>
         </div>
-        <div style={{textAlign:"right"}}>
-          <div style={{fontSize:16,fontWeight:700,color:"#5B4FCF"}}>{totalQ}q</div>
-          <div style={{fontSize:10,color:"#9898B8"}}>total</div>
-        </div>
+        {dados.totalQuestoes&&totalQ!==dados.totalQuestoes&&(
+          <div style={{background:"#FEF3DC",border:"1px solid #FDE68A",borderRadius:8,padding:"6px 10px",fontSize:11,color:"#92400E"}}>
+            ⚠️ O edital indica {dados.totalQuestoes} questões no total. Verifique as quantidades acima.
+          </div>
+        )}
       </div>
       {grupos.map((g,gi)=>(
         <div key={gi} style={{marginBottom:12}}>
@@ -1876,14 +1883,15 @@ const ObConfirmarTopicos = ({grupos, onConfirm}) => {
           <div style={{fontSize:14,fontWeight:800,color:"white"}}>{mat.nome}</div>
           <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",marginTop:2}}>{mat.questoes}q · {topicos.length} tópicos</div>
         </div>
-        <div style={{padding:"12px 14px",maxHeight:300,overflowY:"auto"}}>
+        <div style={{padding:"12px 14px",maxHeight:320,overflowY:"auto"}}>
           {topicos.map((t,i)=>(
-            <div key={i} style={{display:"flex",gap:7,alignItems:"center",marginBottom:6}}>
-              <span style={{color:"#5B4FCF",fontSize:12,flexShrink:0}}>•</span>
-              <input value={t} onChange={e=>updT(i,e.target.value)}
-                style={{flex:1,padding:"7px 10px",border:"1px solid #E8E8F0",borderRadius:8,fontSize:12,color:"#1A1A2E",background:"#F7F7FC",outline:"none"}}
+            <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:8}}>
+              <span style={{color:"#5B4FCF",fontSize:11,fontWeight:700,flexShrink:0,minWidth:18,marginTop:9}}>{i+1}.</span>
+              <textarea value={t} onChange={e=>updT(i,e.target.value)}
+                rows={Math.max(1,Math.ceil(t.length/45))}
+                style={{flex:1,padding:"7px 10px",border:"1px solid #E8E8F0",borderRadius:8,fontSize:12,color:"#1A1A2E",background:"#F7F7FC",outline:"none",resize:"none",lineHeight:1.5,fontFamily:"inherit"}}
                 placeholder="Tópico"/>
-              <button onClick={()=>remT(i)} style={{background:"none",border:"none",color:"#F25A5A",cursor:"pointer",fontSize:13,flexShrink:0}}>✕</button>
+              <button onClick={()=>remT(i)} style={{background:"none",border:"none",color:"#F25A5A",cursor:"pointer",fontSize:13,flexShrink:0,marginTop:8}}>✕</button>
             </div>
           ))}
           <button onClick={addT} style={{padding:"6px 10px",background:"transparent",border:"1px dashed #E8E8F0",borderRadius:8,fontSize:11,color:"#9898B8",cursor:"pointer",marginTop:4,width:"100%"}}>+ adicionar tópico</button>
@@ -2331,7 +2339,7 @@ function Onboarding({ user, onComplete, onBack }) {
               </div>
             </div>
             <div style={{height:6,background:"#E8E8F0",borderRadius:99,overflow:"hidden"}}>
-              <div style={{height:"100%",width:"100%",background:"linear-gradient(90deg,#5B4FCF,#7C6FE0,#5B4FCF)",backgroundSize:"200% 100%",borderRadius:99,animation:"shimmer 1.5s linear infinite"}}/>
+              <div style={{height:"100%",width:"100%",background:"linear-gradient(90deg,#5B4FCF,#7C6FE0,#5B4FCF)",backgroundSize:"400% 100%",borderRadius:99,animation:"shimmer 2s linear infinite"}}/>
             </div>
           </div>
         )}
