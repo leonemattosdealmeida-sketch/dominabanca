@@ -1807,11 +1807,10 @@ const ObConfirmarMaterias = ({dados, onConfirm}) => {
                       <div style={{height:"100%",width:`${pct}%`,background:"#5B4FCF",borderRadius:99}}/>
                     </div>
                   </div>
-                  <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,flexShrink:0}}>
+                    <span style={{fontSize:9,color:"#9898B8",fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>Questões</span>
                     <input type="number" value={m.questoes||""} onChange={e=>updQ(gi,mi,parseInt(e.target.value)||0)}
-                      style={{width:48,padding:"6px 8px",border:"1px solid #E8E8F0",borderRadius:8,fontSize:13,fontWeight:700,color:"#5B4FCF",background:"#F7F7FC",outline:"none",textAlign:"center"}} placeholder="0"/>
-                    <span style={{fontSize:10,color:"#9898B8"}}>q</span>
-                    <button onClick={()=>remM(gi,mi)} style={{background:"none",border:"none",color:"#F25A5A",cursor:"pointer",fontSize:14,padding:"2px"}}>✕</button>
+                      style={{width:56,padding:"6px 8px",border:"1px solid #E8E8F0",borderRadius:8,fontSize:13,fontWeight:700,color:"#5B4FCF",background:"#F7F7FC",outline:"none",textAlign:"center"}} placeholder="0"/>
                   </div>
                 </div>
               );
@@ -2233,18 +2232,13 @@ function Onboarding({ user, onComplete, onBack }) {
   const confirmarTopicos = async gruposEditados=>{
     setGrupos(gruposEditados);
     userMsg("Confirmo os tópicos.");
-    if(dadosEdital?.temRedacao){
-      await bot(<span>Ótimo! Sua prova tem <b>redação</b>. Vamos configurar como você vai treinar.</span>,600);
-      setPhase("discursiva");
-    } else {
-      await bot("Tudo confirmado! Agora informe suas horas de estudo.",600);
-      setPhase("horas");
-    }
+    await bot("Tópicos confirmados! Agora informe suas horas de estudo por dia.",600);
+    setPhase("horas");
   };
 
   const confirmarDiscursiva = async disc=>{
     setDiscursiva(disc);
-    userMsg(`Confirmo: ${disc.tipo==="redacao"?"Redação":"Questões dissertativas"} · ${disc.freq}x/semana${disc.peso?` · ${disc.peso}%`:""}`);
+    userMsg(`Confirmo redação: ${disc.dias?.join(", ")||""}`);
     await bot("Perfeito! Seu plano de estudos está completo.",600);
     setPhase("resumo");
   };
@@ -2252,8 +2246,13 @@ function Onboarding({ user, onComplete, onBack }) {
   const confirmarHoras = async horas=>{
     setHorasConfirmadas(horas);
     userMsg("Confirmo as horas de estudo.");
-    await bot("Ótimo! Agora confirme as matérias, tópicos e quantidade de questões de cada disciplina.",600);
-    setPhase("materias");
+    if(dadosEdital?.temRedacao){
+      await bot(<span>Ótimo! Sua prova tem <b>redação</b>. Selecione os dias de treino.</span>,600);
+      setPhase("discursiva");
+    } else {
+      await bot("Perfeito! Vamos ao resumo final.",600);
+      setPhase("resumo");
+    }
   };
 
   const confirmarResumo = ()=>{
@@ -2382,7 +2381,7 @@ function Onboarding({ user, onComplete, onBack }) {
               </div>
             ))}
 
-            <button onClick={()=>setPhase("horas")}
+            <button onClick={()=>setPhase("materias")}
               style={{width:"100%",padding:"14px",background:"#5B4FCF",color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",marginTop:4}}>
               Entendido, vamos lá →
             </button>
