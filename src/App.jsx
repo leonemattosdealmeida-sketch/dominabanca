@@ -32,6 +32,7 @@ const css = `
   @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
   @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
   @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
   @keyframes bounceIn{0%{transform:scale(0.85);opacity:0}60%{transform:scale(1.04)}100%{transform:scale(1);opacity:1}}
@@ -2022,6 +2023,8 @@ function Onboarding({ user, onComplete, onBack }) {
   const [orgao, setOrgao] = useState("");
   const [cargo, setCargo] = useState("");
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState("");
+  const [loadingProgress, setLoadingProgress] = useState({atual:0,total:0});
   const [pdfName, setPdfName] = useState(null);
   const [dadosEdital, setDadosEdital] = useState(null);
   const [dataProva, setDataProva] = useState("");
@@ -2205,19 +2208,26 @@ function Onboarding({ user, onComplete, onBack }) {
     setPhase("buscando_topicos");
     setTyping(true);
 
-    // Busca tópicos sequencialmente por grupo
+    const totalMats = gruposEditados.reduce((a,g)=>a+g.materias.length,0);
+    let matCount = 0;
+    setLoadingProgress({atual:0,total:totalMats});
+    setLoadingMsg("Preparando busca do conteúdo programático...");
+
     const gruposComTopicos = [];
     for(let gi=0; gi<gruposEditados.length; gi++){
       const g = gruposEditados[gi];
       const materiasComTopicos = [];
       for(let mi=0; mi<g.materias.length; mi++){
         const m = g.materias[mi];
+        matCount++;
+        setLoadingProgress({atual:matCount,total:totalMats});
+        setLoadingMsg(`Buscando conteúdo de ${m.nome}...`);
         try{
           const raw = await obAIJson([{role:"user",content:PROMPT_TOPICOS(dadosEdital?.banca,cargo,orgao,m.nome,editalTextoRaw)}],2000);
           const topicos = (raw?.topicos||[]).filter(t=>t&&t.trim().length>0);
-          materiasComTopicos.push({...m, topicos: topicos.length>0 ? topicos : [`Conteúdo de ${m.nome} — adicione os tópicos manualmente`]});
+          materiasComTopicos.push({...m, topicos: topicos.length>0 ? topicos : [`Conteúdo de ${m.nome}`]});
         }catch(e){
-          materiasComTopicos.push({...m, topicos:[`Conteúdo de ${m.nome} — adicione os tópicos manualmente`]});
+          materiasComTopicos.push({...m, topicos:[`Conteúdo de ${m.nome}`]});
         }
       }
       gruposComTopicos.push({...g, materias:materiasComTopicos});
@@ -2225,6 +2235,8 @@ function Onboarding({ user, onComplete, onBack }) {
 
     setGrupos(gruposComTopicos);
     setTyping(false);
+    setLoadingProgress({atual:0,total:0});
+    setLoadingMsg("");
     await bot(<span>Conteúdo programático completo! Revise os tópicos de cada matéria e edite se necessário.</span>,400);
     setPhase("topicos");
   };
@@ -2307,12 +2319,28 @@ function Onboarding({ user, onComplete, onBack }) {
           return null;
         })}
         {typing&&<ObDots/>}
-        {(phase==="buscando_topicos"&&typing)&&(
-          <div style={{background:"#EFEFFD",border:"1px solid #DDDDF5",borderRadius:12,padding:"14px 16px",animation:"fadeUp 0.3s ease"}}>
-            <div style={{display:"flex",alignItems:"center",gap:10}}>
-              <div style={{width:18,height:18,border:"3px solid #DDDDF5",borderTop:"3px solid #5B4FCF",borderRadius:"50%",animation:"spin 0.8s linear infinite",flexShrink:0}}/>
-              <span style={{fontSize:13,color:"#5B4FCF",fontWeight:600}}>Buscando conteúdo programático de cada matéria...</span>
+        {(phase==="buscando_topicos")&&(
+          <div style={{background:"white",border:"1px solid #E8E8F0",borderRadius:14,padding:"20px",animation:"fadeUp 0.3s ease",marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+              <div style={{width:36,height:36,borderRadius:"50%",background:"#EFEFFD",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <div style={{width:18,height:18,border:"3px solid #DDDDF5",borderTop:"3px solid #5B4FCF",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+              </div>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E",marginBottom:2}}>Buscando conteúdo programático</div>
+                <div style={{fontSize:11,color:"#9898B8"}}>{loadingMsg||"Aguarde um momento..."}</div>
+              </div>
             </div>
+            {loadingProgress.total>0&&(
+              <>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                  <span style={{fontSize:11,color:"#5B4FCF",fontWeight:600}}>{loadingProgress.atual} de {loadingProgress.total} matérias</span>
+                  <span style={{fontSize:11,color:"#9898B8"}}>{Math.round((loadingProgress.atual/loadingProgress.total)*100)}%</span>
+                </div>
+                <div style={{height:6,background:"#E8E8F0",borderRadius:99,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${(loadingProgress.atual/loadingProgress.total)*100}%`,background:"linear-gradient(90deg,#5B4FCF,#7C6FE0)",borderRadius:99,transition:"width 0.5s ease"}}/>
+                </div>
+              </>
+            )}
           </div>
         )}
         {showMaterias&&<ObRevisaoMaterias dados={{...dadosEdital,grupos}} onConfirm={confirmarMaterias} modoSoMaterias={true}/>}
@@ -2347,10 +2375,17 @@ function Onboarding({ user, onComplete, onBack }) {
               onDrop={e=>{e.preventDefault();processarPDF(e.dataTransfer.files[0]);}}
               style={{border:`2px dashed ${pdfLoading?"#E8E8F0":"#5B4FCF"}`,borderRadius:14,padding:"28px 20px",textAlign:"center",cursor:pdfLoading?"default":"pointer",background:"#F7F7FC",transition:"all 0.2s"}}>
               {pdfLoading?(
-                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
-                  <div style={{width:28,height:28,border:"3px solid #EFEFFD",borderTop:"3px solid #5B4FCF",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
-                  <p style={{fontSize:13,color:"#5B4FCF",fontWeight:600}}>Lendo o edital completo...</p>
-                  <p style={{fontSize:11,color:"#9898B8"}}>Isso pode levar alguns segundos</p>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
+                  <div style={{width:48,height:48,borderRadius:"50%",background:"#EFEFFD",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    <div style={{width:24,height:24,border:"3px solid #DDDDF5",borderTop:"3px solid #5B4FCF",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+                  </div>
+                  <div style={{textAlign:"center"}}>
+                    <p style={{fontSize:14,color:"#5B4FCF",fontWeight:700,marginBottom:4}}>Lendo o edital completo...</p>
+                    <p style={{fontSize:11,color:"#9898B8",marginBottom:12}}>Isso pode levar alguns segundos</p>
+                  </div>
+                  <div style={{width:"100%",height:6,background:"#E8E8F0",borderRadius:99,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:"100%",background:"linear-gradient(90deg,#5B4FCF,#7C6FE0,#5B4FCF)",backgroundSize:"200%",borderRadius:99,animation:"shimmer 1.5s linear infinite"}}/>
+                  </div>
                 </div>
               ):(
                 <div>
