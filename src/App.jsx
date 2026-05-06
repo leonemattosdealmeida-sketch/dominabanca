@@ -433,10 +433,8 @@ function Landing({ onCadastro, onLogin }) {
             <div style={{width:6,height:6,borderRadius:"50%",background:C.primary,animation:"pulse 2s infinite"}}/>
             Plataforma de questões para concursos públicos
           </div>
-          <h1 style={{fontFamily:"'Lora',serif",fontSize:"clamp(30px,4vw,52px)",fontWeight:700,lineHeight:1.18,color:C.text,marginBottom:22}}>
-            Transforme seu edital
-            <br/>em um plano estruturado
-            <br/><span style={{color:C.primary}}>de estudo.</span>
+          <h1 style={{fontFamily:"'Lora',serif",fontSize:"clamp(30px,4vw,52px)",fontWeight:700,lineHeight:1.18,color:C.text,marginBottom:22,maxWidth:520}}>
+  Transforme seu edital em um plano estruturado <span style={{color:C.primary}}>de estudo.</span>
           </h1>
           <p style={{fontSize:17,color:C.textMed,lineHeight:1.8,marginBottom:40,maxWidth:460}}>
             Questões, cronograma e simulados personalizados para o seu estudo diário.
