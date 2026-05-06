@@ -2134,33 +2134,33 @@ function Onboarding({ user, onComplete, onBack }) {
       await bot("Lendo o edital completo, aguarde alguns segundos...",400);
       setTyping(true);
 
-      const resp = await fetch("/api/index",{
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          model:"gpt-4o-mini", max_tokens:4000,
-          system:"Você é especialista em concursos públicos brasileiros. Retorne APENAS JSON válido sem texto adicional.",
-          messages:[{role:"user",content:[
-            {type:"document",source:{type:"base64",media_type:"application/pdf",data:base64}},
-            {type:"text",text:PROMPT_EDITAL(orgao,cargo)}
-          ]}]
+      // Faz as duas chamadas em paralelo para economizar tempo
+      const [resp, respTexto] = await Promise.all([
+        fetch("/api/index",{
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            model:"gpt-4o-mini", max_tokens:4000,
+            system:"Você é especialista em concursos públicos brasileiros. Retorne APENAS JSON válido sem texto adicional.",
+            messages:[{role:"user",content:[
+              {type:"document",source:{type:"base64",media_type:"application/pdf",data:base64}},
+              {type:"text",text:PROMPT_EDITAL(orgao,cargo)}
+            ]}]
+          })
+        }),
+        fetch("/api/index",{
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            model:"gpt-4o-mini", max_tokens:8000,
+            system:"Extraia o conteúdo programático completo do edital. Retorne apenas o texto.",
+            messages:[{role:"user",content:[
+              {type:"document",source:{type:"base64",media_type:"application/pdf",data:base64}},
+              {type:"text",text:"Extraia TODO o conteúdo programático: todos os tópicos e subtópicos de cada matéria, exatamente como estão no documento."}
+            ]}]
+          })
         })
-      });
-
-      // Também extrai texto bruto para usar nos tópicos depois
-      const respTexto = await fetch("/api/index",{
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          model:"gpt-4o-mini", max_tokens:8000,
-          system:"Extraia o conteúdo programático completo do edital. Retorne apenas o texto, sem formatação adicional.",
-          messages:[{role:"user",content:[
-            {type:"document",source:{type:"base64",media_type:"application/pdf",data:base64}},
-            {type:"text",text:"Extraia e retorne TODO o conteúdo programático deste edital, incluindo todos os tópicos e subtópicos de cada matéria, exatamente como estão no documento."}
-          ]}]
-        })
-      });
+      ]);
       const dTexto = await respTexto.json();
-      const textoEdital = dTexto.content?.[0]?.text||"";
-      setEditalTextoRaw(textoEdital);
+      setEditalTextoRaw(dTexto.content?.[0]?.text||"");
       const d = await resp.json();
       const raw = d.content?.[0]?.text||"";
       let dados = null;
@@ -2319,6 +2319,22 @@ function Onboarding({ user, onComplete, onBack }) {
           return null;
         })}
         {typing&&<ObDots/>}
+        {phase==="lendo"&&(
+          <div style={{background:"white",border:"1px solid #E8E8F0",borderRadius:14,padding:"16px",animation:"fadeUp 0.3s ease",marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+              <div style={{width:36,height:36,borderRadius:"50%",background:"#EFEFFD",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <div style={{width:18,height:18,border:"3px solid #DDDDF5",borderTop:"3px solid #5B4FCF",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+              </div>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E"}}>Lendo o edital completo</div>
+                <div style={{fontSize:11,color:"#9898B8",marginTop:1}}>Aguarde, estamos extraindo todas as informações...</div>
+              </div>
+            </div>
+            <div style={{height:6,background:"#E8E8F0",borderRadius:99,overflow:"hidden"}}>
+              <div style={{height:"100%",width:"100%",background:"linear-gradient(90deg,#5B4FCF,#7C6FE0,#5B4FCF)",backgroundSize:"200% 100%",borderRadius:99,animation:"shimmer 1.5s linear infinite"}}/>
+            </div>
+          </div>
+        )}
         {(phase==="buscando_topicos")&&(
           <div style={{background:"white",border:"1px solid #E8E8F0",borderRadius:14,padding:"20px",animation:"fadeUp 0.3s ease",marginBottom:8}}>
             <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
