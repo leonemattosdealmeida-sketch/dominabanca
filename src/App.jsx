@@ -431,7 +431,12 @@ export default function App(){
 const OB={primary:"#5B4FCF",primaryLight:"#7C6FE0",primaryXLight:"#EFEFFD",accent:"#00C48C",accentLight:"#E0FBF3",warning:"#F5A623",danger:"#F25A5A",bg:"#F7F7FC",white:"#FFFFFF",text:"#1A1A2E",textMed:"#4A4A6A",textLight:"#9898B8",border:"#E8E8F0"};
 const OB_SYSTEM=`Você é assistente do DominaBanca. Responda em português. Máximo 2 linhas. Nunca faça outras perguntas além do solicitado. Ao validar órgão: NUNCA mencione cargo. Ao validar cargo: NUNCA mencione órgão.`;
 const PROMPT_EDITAL=(orgao,cargo)=>`Analise este edital do ${orgao} para o cargo ${cargo}. Extraia grupos e matérias. NÃO extraia tópicos ainda. Use nomes EXATOS do edital. Retorne APENAS JSON válido:\n{"dataProva":"dd/mm/aaaa ou null","totalQuestoes":120,"temRedacao":false,"banca":"null","grupos":[{"nome":"Nome do grupo","materias":[{"nome":"Matéria","questoes":20}]}]}`;
-const PROMPT_TOPICOS=(banca,cargo,orgao,materia,textoEdital)=>`Extraia ou gere o conteúdo programático COMPLETO da matéria "${materia}" para o cargo ${cargo} do ${orgao}, banca ${banca||"CESPE/CEBRASPE"}.\n\n${textoEdital?`CONTEÚDO DO EDITAL:\n${textoEdital}\n\nUse o conteúdo acima como base principal. Se encontrar a matéria "${materia}" no edital, liste TODOS os itens e subitens exatamente como estão. Complemente com tópicos relevantes que a banca costuma cobrar.`:`Liste todos os tópicos e subtópicos que a banca ${banca||"CESPE"} costuma cobrar desta matéria. Seja detalhado.`}\n\nRetorne APENAS este JSON:\n{"topicos":["Tópico 1 completo","Tópico 2 completo","Tópico 3 completo"]}`;
+const PROMPT_TOPICOS=(banca,cargo,orgao,materia,textoEdital)=>{
+  const ctx=textoEdital
+    ?"CONTEÚDO DO EDITAL:\n"+textoEdital+"\n\nUse o conteúdo acima como base principal. Se encontrar a matéria '"+materia+"' no edital, liste TODOS os itens e subitens exatamente como estão. Complemente com tópicos relevantes que a banca costuma cobrar."
+    :"Liste todos os tópicos e subtópicos que a banca "+(banca||"CESPE")+" costuma cobrar desta matéria. Seja detalhado.";
+  return "Extraia ou gere o conteúdo programático COMPLETO da matéria \""+materia+"\" para o cargo "+cargo+" do "+orgao+", banca "+(banca||"CESPE/CEBRASPE")+".\n\n"+ctx+"\n\nRetorne APENAS este JSON:\n{\"topicos\":[\"Tópico 1 completo\",\"Tópico 2 completo\",\"Tópico 3 completo\"]}";
+};
 
 async function obAI(messages,maxTokens=300){const r=await fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"gpt-4o-mini",max_tokens:maxTokens,system:OB_SYSTEM,messages})});const d=await r.json();return d.content?.[0]?.text||"";}
 async function obAIJson(messages,maxTokens=4000){const r=await fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"gpt-4o-mini",max_tokens:maxTokens,system:"Você é especialista em concursos públicos brasileiros. Retorne APENAS JSON válido sem texto adicional.",messages})});const d=await r.json();const t=d.content?.[0]?.text||"";try{return JSON.parse(t.replace(/```json|```/g,"").trim());}catch{return null;}}
@@ -615,7 +620,7 @@ function Onboarding({user,onComplete,onBack}){
   const confirmarResumo=()=>{onComplete({orgao,cargo,dataProva,banca:dadosEdital?.banca,totalQuestoes:dadosEdital?.totalQuestoes,temRedacao:dadosEdital?.temRedacao,grupos,discursiva,horas:horasConfirmadas});};
 
   const showInput=["orgao","cargo","data"].includes(phase)&&!typing;
-  const showPDF=phase==="pdf";const showAviso=phase==="aviso_p3";const showMaterias=phase==="materias"&&!typing;
+  const showPDF=phase==="pdf"||phase==="lendo";const showAviso=phase==="aviso_p3";const showMaterias=phase==="materias"&&!typing;
   const showTopicos=phase==="topicos"&&!typing;const showHoras=phase==="horas"&&!typing;
   const showDiscursiva=phase==="discursiva"&&!typing;const showResumo=phase==="resumo"&&!typing;
   const prog={init:0,orgao:10,cargo:25,pdf:35,lendo:45,aguardando_data:48,data:50,aviso_p3:55,materias:60,buscando_topicos:68,topicos:72,horas:82,discursiva:90,resumo:96,done:100}[phase]||0;
