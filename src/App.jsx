@@ -37,7 +37,7 @@ const css = `
   @keyframes bounceIn{0%{transform:scale(0.85);opacity:0}60%{transform:scale(1.04)}100%{transform:scale(1);opacity:1}}
   @keyframes slideRight{from{transform:scaleX(0)}to{transform:scaleX(1)}}
   @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-  @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+  @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
   *{box-sizing:border-box;margin:0;padding:0;}
   html{scroll-behavior:smooth;}
   body{background:#F8F7FF;}
@@ -1781,22 +1781,15 @@ const ObConfirmarMaterias = ({dados, onConfirm}) => {
   const updNome = (gi,mi,v) => setGrupos(gs=>gs.map((g,i)=>i!==gi?g:{...g,materias:g.materias.map((m,j)=>j!==mi?m:{...m,nome:v})}));
   return (
     <div style={{animation:"fadeUp 0.4s ease"}}>
-      <div style={{background:"#EFEFFD",border:"1px solid #DDDDF5",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-          <div>
-            <div style={{fontSize:13,fontWeight:700,color:"#5B4FCF"}}>{totalM} matérias identificadas</div>
-            <div style={{fontSize:11,color:"#9898B8",marginTop:1}}>Confirme o nome e a quantidade de questões de cada matéria</div>
-          </div>
-          <div style={{textAlign:"right",flexShrink:0}}>
-            <div style={{fontSize:16,fontWeight:700,color:"#5B4FCF"}}>{totalQ}</div>
-            <div style={{fontSize:10,color:"#9898B8"}}>questões no total</div>
-          </div>
+      <div style={{background:"#EFEFFD",border:"1px solid #DDDDF5",borderRadius:12,padding:"12px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:13,fontWeight:700,color:"#5B4FCF"}}>{totalM} matérias</div>
+          <div style={{fontSize:11,color:"#9898B8",marginTop:1}}>Edite o nome e a quantidade de questões</div>
         </div>
-        {dados.totalQuestoes&&totalQ!==dados.totalQuestoes&&(
-          <div style={{background:"#FEF3DC",border:"1px solid #FDE68A",borderRadius:8,padding:"6px 10px",fontSize:11,color:"#92400E"}}>
-            ⚠️ O edital indica {dados.totalQuestoes} questões no total. Verifique as quantidades acima.
-          </div>
-        )}
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:16,fontWeight:700,color:"#5B4FCF"}}>{totalQ}q</div>
+          <div style={{fontSize:10,color:"#9898B8"}}>total</div>
+        </div>
       </div>
       {grupos.map((g,gi)=>(
         <div key={gi} style={{marginBottom:12}}>
@@ -1882,15 +1875,14 @@ const ObConfirmarTopicos = ({grupos, onConfirm}) => {
           <div style={{fontSize:14,fontWeight:800,color:"white"}}>{mat.nome}</div>
           <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",marginTop:2}}>{mat.questoes}q · {topicos.length} tópicos</div>
         </div>
-        <div style={{padding:"12px 14px",maxHeight:320,overflowY:"auto"}}>
+        <div style={{padding:"12px 14px",maxHeight:300,overflowY:"auto"}}>
           {topicos.map((t,i)=>(
-            <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:8}}>
-              <span style={{color:"#5B4FCF",fontSize:11,fontWeight:700,flexShrink:0,minWidth:18,marginTop:9}}>{i+1}.</span>
-              <textarea value={t} onChange={e=>updT(i,e.target.value)}
-                rows={Math.max(1,Math.ceil(t.length/45))}
-                style={{flex:1,padding:"7px 10px",border:"1px solid #E8E8F0",borderRadius:8,fontSize:12,color:"#1A1A2E",background:"#F7F7FC",outline:"none",resize:"none",lineHeight:1.5,fontFamily:"inherit"}}
+            <div key={i} style={{display:"flex",gap:7,alignItems:"center",marginBottom:6}}>
+              <span style={{color:"#5B4FCF",fontSize:12,flexShrink:0}}>•</span>
+              <input value={t} onChange={e=>updT(i,e.target.value)}
+                style={{flex:1,padding:"7px 10px",border:"1px solid #E8E8F0",borderRadius:8,fontSize:12,color:"#1A1A2E",background:"#F7F7FC",outline:"none"}}
                 placeholder="Tópico"/>
-              <button onClick={()=>remT(i)} style={{background:"none",border:"none",color:"#F25A5A",cursor:"pointer",fontSize:13,flexShrink:0,marginTop:8}}>✕</button>
+              <button onClick={()=>remT(i)} style={{background:"none",border:"none",color:"#F25A5A",cursor:"pointer",fontSize:13,flexShrink:0}}>✕</button>
             </div>
           ))}
           <button onClick={addT} style={{padding:"6px 10px",background:"transparent",border:"1px dashed #E8E8F0",borderRadius:8,fontSize:11,color:"#9898B8",cursor:"pointer",marginTop:4,width:"100%"}}>+ adicionar tópico</button>
@@ -2030,8 +2022,6 @@ function Onboarding({ user, onComplete, onBack }) {
   const [orgao, setOrgao] = useState("");
   const [cargo, setCargo] = useState("");
   const [pdfLoading, setPdfLoading] = useState(false);
-  const [loadingMsg, setLoadingMsg] = useState("");
-  const [loadingProgress, setLoadingProgress] = useState({atual:0,total:0});
   const [pdfName, setPdfName] = useState(null);
   const [dadosEdital, setDadosEdital] = useState(null);
   const [dataProva, setDataProva] = useState("");
@@ -2141,33 +2131,33 @@ function Onboarding({ user, onComplete, onBack }) {
       await bot("Lendo o edital completo, aguarde alguns segundos...",400);
       setTyping(true);
 
-      // Faz as duas chamadas em paralelo para economizar tempo
-      const [resp, respTexto] = await Promise.all([
-        fetch("/api/index",{
-          method:"POST", headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({
-            model:"gpt-4o-mini", max_tokens:4000,
-            system:"Você é especialista em concursos públicos brasileiros. Retorne APENAS JSON válido sem texto adicional.",
-            messages:[{role:"user",content:[
-              {type:"document",source:{type:"base64",media_type:"application/pdf",data:base64}},
-              {type:"text",text:PROMPT_EDITAL(orgao,cargo)}
-            ]}]
-          })
-        }),
-        fetch("/api/index",{
-          method:"POST", headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({
-            model:"gpt-4o-mini", max_tokens:8000,
-            system:"Extraia o conteúdo programático completo do edital. Retorne apenas o texto.",
-            messages:[{role:"user",content:[
-              {type:"document",source:{type:"base64",media_type:"application/pdf",data:base64}},
-              {type:"text",text:"Extraia TODO o conteúdo programático: todos os tópicos e subtópicos de cada matéria, exatamente como estão no documento."}
-            ]}]
-          })
+      const resp = await fetch("/api/index",{
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          model:"gpt-4o-mini", max_tokens:4000,
+          system:"Você é especialista em concursos públicos brasileiros. Retorne APENAS JSON válido sem texto adicional.",
+          messages:[{role:"user",content:[
+            {type:"document",source:{type:"base64",media_type:"application/pdf",data:base64}},
+            {type:"text",text:PROMPT_EDITAL(orgao,cargo)}
+          ]}]
         })
-      ]);
+      });
+
+      // Também extrai texto bruto para usar nos tópicos depois
+      const respTexto = await fetch("/api/index",{
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          model:"gpt-4o-mini", max_tokens:8000,
+          system:"Extraia o conteúdo programático completo do edital. Retorne apenas o texto, sem formatação adicional.",
+          messages:[{role:"user",content:[
+            {type:"document",source:{type:"base64",media_type:"application/pdf",data:base64}},
+            {type:"text",text:"Extraia e retorne TODO o conteúdo programático deste edital, incluindo todos os tópicos e subtópicos de cada matéria, exatamente como estão no documento."}
+          ]}]
+        })
+      });
       const dTexto = await respTexto.json();
-      setEditalTextoRaw(dTexto.content?.[0]?.text||"");
+      const textoEdital = dTexto.content?.[0]?.text||"";
+      setEditalTextoRaw(textoEdital);
       const d = await resp.json();
       const raw = d.content?.[0]?.text||"";
       let dados = null;
@@ -2215,26 +2205,19 @@ function Onboarding({ user, onComplete, onBack }) {
     setPhase("buscando_topicos");
     setTyping(true);
 
-    const totalMats = gruposEditados.reduce((a,g)=>a+g.materias.length,0);
-    let matCount = 0;
-    setLoadingProgress({atual:0,total:totalMats});
-    setLoadingMsg("Preparando busca do conteúdo programático...");
-
+    // Busca tópicos sequencialmente por grupo
     const gruposComTopicos = [];
     for(let gi=0; gi<gruposEditados.length; gi++){
       const g = gruposEditados[gi];
       const materiasComTopicos = [];
       for(let mi=0; mi<g.materias.length; mi++){
         const m = g.materias[mi];
-        matCount++;
-        setLoadingProgress({atual:matCount,total:totalMats});
-        setLoadingMsg(`Buscando conteúdo de ${m.nome}...`);
         try{
           const raw = await obAIJson([{role:"user",content:PROMPT_TOPICOS(dadosEdital?.banca,cargo,orgao,m.nome,editalTextoRaw)}],2000);
           const topicos = (raw?.topicos||[]).filter(t=>t&&t.trim().length>0);
-          materiasComTopicos.push({...m, topicos: topicos.length>0 ? topicos : [`Conteúdo de ${m.nome}`]});
+          materiasComTopicos.push({...m, topicos: topicos.length>0 ? topicos : [`Conteúdo de ${m.nome} — adicione os tópicos manualmente`]});
         }catch(e){
-          materiasComTopicos.push({...m, topicos:[`Conteúdo de ${m.nome}`]});
+          materiasComTopicos.push({...m, topicos:[`Conteúdo de ${m.nome} — adicione os tópicos manualmente`]});
         }
       }
       gruposComTopicos.push({...g, materias:materiasComTopicos});
@@ -2242,8 +2225,6 @@ function Onboarding({ user, onComplete, onBack }) {
 
     setGrupos(gruposComTopicos);
     setTyping(false);
-    setLoadingProgress({atual:0,total:0});
-    setLoadingMsg("");
     await bot(<span>Conteúdo programático completo! Revise os tópicos de cada matéria e edite se necessário.</span>,400);
     setPhase("topicos");
   };
@@ -2326,44 +2307,12 @@ function Onboarding({ user, onComplete, onBack }) {
           return null;
         })}
         {typing&&<ObDots/>}
-        {phase==="lendo"&&(
-          <div style={{background:"white",border:"1px solid #E8E8F0",borderRadius:14,padding:"16px",animation:"fadeUp 0.3s ease",marginBottom:8}}>
-            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
-              <div style={{width:36,height:36,borderRadius:"50%",background:"#EFEFFD",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                <div style={{width:18,height:18,border:"3px solid #DDDDF5",borderTop:"3px solid #5B4FCF",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
-              </div>
-              <div>
-                <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E"}}>Lendo o edital completo</div>
-                <div style={{fontSize:11,color:"#9898B8",marginTop:1}}>Aguarde, estamos extraindo todas as informações...</div>
-              </div>
+        {(phase==="buscando_topicos"&&typing)&&(
+          <div style={{background:"#EFEFFD",border:"1px solid #DDDDF5",borderRadius:12,padding:"14px 16px",animation:"fadeUp 0.3s ease"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{width:18,height:18,border:"3px solid #DDDDF5",borderTop:"3px solid #5B4FCF",borderRadius:"50%",animation:"spin 0.8s linear infinite",flexShrink:0}}/>
+              <span style={{fontSize:13,color:"#5B4FCF",fontWeight:600}}>Buscando conteúdo programático de cada matéria...</span>
             </div>
-            <div style={{height:6,background:"#E8E8F0",borderRadius:99,overflow:"hidden"}}>
-              <div style={{height:"100%",width:"100%",background:"linear-gradient(90deg,#DDDDF5 0%,#5B4FCF 40%,#7C6FE0 60%,#DDDDF5 100%)",backgroundSize:"200% 100%",borderRadius:99,animation:"shimmer 1.5s linear infinite"}}/>
-            </div>
-          </div>
-        )}
-        {(phase==="buscando_topicos")&&(
-          <div style={{background:"white",border:"1px solid #E8E8F0",borderRadius:14,padding:"20px",animation:"fadeUp 0.3s ease",marginBottom:8}}>
-            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
-              <div style={{width:36,height:36,borderRadius:"50%",background:"#EFEFFD",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                <div style={{width:18,height:18,border:"3px solid #DDDDF5",borderTop:"3px solid #5B4FCF",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
-              </div>
-              <div>
-                <div style={{fontSize:13,fontWeight:700,color:"#1A1A2E",marginBottom:2}}>Buscando conteúdo programático</div>
-                <div style={{fontSize:11,color:"#9898B8"}}>{loadingMsg||"Aguarde um momento..."}</div>
-              </div>
-            </div>
-            {loadingProgress.total>0&&(
-              <>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                  <span style={{fontSize:11,color:"#5B4FCF",fontWeight:600}}>{loadingProgress.atual} de {loadingProgress.total} matérias</span>
-                  <span style={{fontSize:11,color:"#9898B8"}}>{Math.round((loadingProgress.atual/loadingProgress.total)*100)}%</span>
-                </div>
-                <div style={{height:6,background:"#E8E8F0",borderRadius:99,overflow:"hidden"}}>
-                  <div style={{height:"100%",width:`${(loadingProgress.atual/loadingProgress.total)*100}%`,background:"linear-gradient(90deg,#5B4FCF,#7C6FE0)",borderRadius:99,transition:"width 0.5s ease"}}/>
-                </div>
-              </>
-            )}
           </div>
         )}
         {showMaterias&&<ObRevisaoMaterias dados={{...dadosEdital,grupos}} onConfirm={confirmarMaterias} modoSoMaterias={true}/>}
@@ -2398,17 +2347,10 @@ function Onboarding({ user, onComplete, onBack }) {
               onDrop={e=>{e.preventDefault();processarPDF(e.dataTransfer.files[0]);}}
               style={{border:`2px dashed ${pdfLoading?"#E8E8F0":"#5B4FCF"}`,borderRadius:14,padding:"28px 20px",textAlign:"center",cursor:pdfLoading?"default":"pointer",background:"#F7F7FC",transition:"all 0.2s"}}>
               {pdfLoading?(
-                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
-                  <div style={{width:48,height:48,borderRadius:"50%",background:"#EFEFFD",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                    <div style={{width:24,height:24,border:"3px solid #DDDDF5",borderTop:"3px solid #5B4FCF",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
-                  </div>
-                  <div style={{textAlign:"center"}}>
-                    <p style={{fontSize:14,color:"#5B4FCF",fontWeight:700,marginBottom:4}}>Lendo o edital completo...</p>
-                    <p style={{fontSize:11,color:"#9898B8",marginBottom:12}}>Isso pode levar alguns segundos</p>
-                  </div>
-                  <div style={{width:"100%",height:6,background:"#E8E8F0",borderRadius:99,overflow:"hidden"}}>
-                    <div style={{height:"100%",width:"100%",background:"linear-gradient(90deg,#DDDDF5 0%,#5B4FCF 40%,#7C6FE0 60%,#DDDDF5 100%)",backgroundSize:"200% 100%",borderRadius:99,animation:"shimmer 1.5s linear infinite"}}/>
-                  </div>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10}}>
+                  <div style={{width:28,height:28,border:"3px solid #EFEFFD",borderTop:"3px solid #5B4FCF",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+                  <p style={{fontSize:13,color:"#5B4FCF",fontWeight:600}}>Lendo o edital completo...</p>
+                  <p style={{fontSize:11,color:"#9898B8"}}>Isso pode levar alguns segundos</p>
                 </div>
               ):(
                 <div>
