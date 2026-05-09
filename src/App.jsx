@@ -58,6 +58,7 @@ const css = `
     .logo-img{width:44px!important;height:44px!important;}
     .logo-name{font-size:16px!important;}
     .logo-sub{font-size:8px!important;}
+    .stats-grid{grid-template-columns:1fr!important;}
     .hero-section{grid-template-columns:1fr!important;padding:40px 16px 32px!important;}
     .redacao-grid{grid-template-columns:1fr!important;}
     .plans-grid{grid-template-columns:1fr!important;}
@@ -389,6 +390,248 @@ function Login({onBack,onCadastro,onSuccess}){
   return(<LoginWrapper><NavLogin onBack={onBack} voltarPara={onBack} voltarLabel="Voltar ao início"/><div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"40px 16px"}}><div style={{width:"100%",maxWidth:420,animation:"fadeUp 0.5s ease"}}><div style={{background:"white",borderRadius:24,padding:"40px 36px",boxShadow:C.shadowLg,border:`1px solid ${C.border}`,textAlign:"center"}}><div style={{width:64,height:64,borderRadius:"50%",background:C.accentLight,border:`3px solid ${C.accent}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,margin:"0 auto 20px"}}>✉️</div><h2 style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:700,color:C.text,marginBottom:10}}>Email enviado!</h2><p style={{fontSize:14,color:C.textMed,lineHeight:1.75,marginBottom:8}}>Enviamos um link de recuperação para:</p><p style={{fontSize:15,fontWeight:700,color:C.primary,marginBottom:28}}>{form.emailRecuperar}</p><p style={{fontSize:13,color:C.textLight,lineHeight:1.7,marginBottom:32}}>Verifique sua caixa de entrada e a pasta de spam. O link expira em 30 minutos.</p><button onClick={()=>setTela("login")} style={{width:"100%",padding:"14px",background:C.primary,color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",boxShadow:C.shadowMd}}>Voltar ao login</button></div><div style={{display:"flex",justifyContent:"center",marginTop:28}}><CadastroLogo/></div></div></div></LoginWrapper>);
 }
 
+/* ─── DASHBOARD ─────────────────────────────────────────────────── */
+function Dashboard({user,onLogout}){
+  const [tab,setTab]=useState("cronograma");
+  const [plan,setPlan]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const [cicloIdx,setCicloIdx]=useState(0);
+
+  React.useEffect(()=>{
+    (async()=>{
+      try{
+        const{data}=await supabase.from("onboarding").select("*").eq("user_id",user.id).single();
+        setPlan(data);
+      }catch(e){}
+      setLoading(false);
+    })();
+  },[]);
+
+  const TABS=[
+    {id:"cronograma",icon:"📅",label:"Cronograma"},
+    {id:"questoes",icon:"🎯",label:"Questões"},
+    {id:"redacao",icon:"✍️",label:"Redação"},
+    {id:"evolucao",icon:"📊",label:"Evolução"},
+  ];
+
+  /* ── helpers cronograma ── */
+  const getMaterias=()=>{
+    if(!plan?.grupos) return [];
+    const flat=[];
+    (plan.grupos||[]).forEach(g=>{
+      (g.materias||[]).forEach(m=>flat.push({grupo:g.nome,nome:m.nome,questoes:Number(m.questoes)||0}));
+    });
+    return flat.sort((a,b)=>b.questoes-a.questoes);
+  };
+
+  const getDiasAteProva=()=>{
+    if(!plan?.data_prova) return null;
+    const diff=Math.ceil((new Date(plan.data_prova)-new Date())/(1000*60*60*24));
+    return diff>0?diff:0;
+  };
+
+  const getMetaDiaria=()=>{
+    const h=Number(plan?.horas)||14;
+    const por_dia=h/7;
+    return Math.min(80,Math.max(30,Math.round(por_dia*18)));
+  };
+
+  const getPrevisoSemanas=()=>{
+    const total=Number(plan?.total_questoes)||400;
+    const meta=getMetaDiaria();
+    return Math.ceil(total/meta/7);
+  };
+
+  const mats=getMaterias();
+  const dias=getDiasAteProva();
+  const meta=plan?getMetaDiaria():50;
+  const totalQ=Number(plan?.total_questoes)||400;
+
+  /* distribuição do ciclo: proporcional ao peso */
+  const totalPeso=mats.reduce((s,m)=>s+m.questoes,0)||1;
+  const cicloMats=mats.map(m=>({
+    ...m,
+    qtdHoje:Math.max(5,Math.round(meta*(m.questoes/totalPeso))),
+  }));
+
+  /* hoje = primeiro ciclo, matérias do dia baseadas em índice */
+  const today=new Date();
+  const weekday=today.toLocaleDateString("pt-BR",{weekday:"long"});
+  const dateStr=today.toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
+
+  /* top 3 matérias mais pesadas para hoje */
+  const hojeMats=cicloMats.slice(0,3);
+
+  /* ── render ── */
+  if(loading)return(
+    <div style={{height:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:C.bg}}>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
+        <div style={{width:40,height:40,border:"4px solid #EDE9FE",borderTop:`4px solid ${C.primary}`,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+        <p style={{fontSize:13,color:C.primary,fontWeight:600}}>Carregando seu plano...</p>
+      </div>
+    </div>
+  );
+
+  return(
+    <div style={{fontFamily:"'Sora',sans-serif",background:C.bg,minHeight:"100vh",display:"flex",flexDirection:"column"}}>
+      {/* NAV */}
+      <nav style={{background:C.white,borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,zIndex:100,boxShadow:"0 1px 8px rgba(0,0,0,0.04)"}}>
+        <div style={{maxWidth:1100,margin:"0 auto",padding:"0 20px",height:62,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <LogoMark/>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <span style={{fontSize:12,color:C.textMed,fontWeight:600}}>{plan?.cargo||"Aluno"}</span>
+            <button onClick={onLogout} style={{fontSize:12,color:C.textLight,background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,padding:"6px 12px",cursor:"pointer",fontWeight:600}}>Sair</button>
+          </div>
+        </div>
+      </nav>
+
+      {/* TABS */}
+      <div style={{background:C.white,borderBottom:`1px solid ${C.border}`,position:"sticky",top:62,zIndex:99}}>
+        <div style={{maxWidth:1100,margin:"0 auto",padding:"0 20px",display:"flex",gap:2,overflowX:"auto"}}>
+          {TABS.map(t=>(
+            <button key={t.id} onClick={()=>setTab(t.id)} style={{
+              padding:"14px 20px",background:"transparent",border:"none",borderBottom:`3px solid ${tab===t.id?C.primary:"transparent"}`,
+              color:tab===t.id?C.primary:C.textMed,fontWeight:tab===t.id?700:500,fontSize:13,cursor:"pointer",
+              display:"flex",alignItems:"center",gap:6,whiteSpace:"nowrap",transition:"all 0.15s",flexShrink:0
+            }}>{t.icon} {t.label}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* CONTENT */}
+      <div style={{flex:1,maxWidth:1100,width:"100%",margin:"0 auto",padding:"28px 20px"}}>
+
+        {/* ── CRONOGRAMA ── */}
+        {tab==="cronograma"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:20}}>
+
+            {/* TOPO: status + meta */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}} className="stats-grid">
+              {[
+                {label:"Dias até a prova",value:dias!=null?dias:"—",sub:dias!=null&&dias>0?"fique firme!":"configure a prova",color:C.primary,icon:"🎯"},
+                {label:"Meta diária",value:`${meta} questões`,sub:`${Number(plan?.horas)||14}h/semana`,color:"#10B981",icon:"📈"},
+                {label:"Previsão de término",value:`${getPrevisoSemanas()} semanas`,sub:`${totalQ} questões no edital`,color:"#F59E0B",icon:"🏁"},
+              ].map(s=>(
+                <div key={s.label} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"20px 22px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+                  <div style={{fontSize:20,marginBottom:8}}>{s.icon}</div>
+                  <div style={{fontSize:22,fontWeight:800,color:s.color,fontFamily:"'Lora',serif"}}>{s.value}</div>
+                  <div style={{fontSize:11,color:C.textLight,marginTop:4,fontWeight:500}}>{s.label}</div>
+                  <div style={{fontSize:10,color:C.textLight,marginTop:2}}>{s.sub}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* HOJE */}
+            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"24px 26px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
+              <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:12}}>
+                <div>
+                  <div style={{fontSize:11,color:C.textLight,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>Plano de hoje</div>
+                  <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,color:C.text,textTransform:"capitalize"}}>{weekday}</div>
+                  <div style={{fontSize:12,color:C.textMed,marginTop:2}}>{dateStr}</div>
+                </div>
+                <div style={{background:C.primaryXLight,border:`1px solid ${C.borderPurple}`,borderRadius:12,padding:"10px 16px",textAlign:"center"}}>
+                  <div style={{fontSize:20,fontWeight:800,color:C.primary}}>{meta}</div>
+                  <div style={{fontSize:10,color:C.primary,fontWeight:700}}>questões hoje</div>
+                </div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {hojeMats.length>0?hojeMats.map((m,i)=>(
+                  <div key={m.nome} style={{display:"flex",alignItems:"center",gap:14,padding:"14px 16px",background:i===0?C.primaryXLight:C.bg,border:`1.5px solid ${i===0?C.borderPurple:C.border}`,borderRadius:12}}>
+                    <div style={{width:32,height:32,borderRadius:10,background:i===0?C.primary:"#E5E7EB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:i===0?"white":C.textMed,flexShrink:0}}>{i+1}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:700,color:C.text}}>{m.nome}</div>
+                      <div style={{fontSize:11,color:C.textLight,marginTop:2}}>{m.grupo}</div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:15,fontWeight:800,color:i===0?C.primary:C.textMed}}>{m.qtdHoje}</div>
+                      <div style={{fontSize:10,color:C.textLight}}>questões</div>
+                    </div>
+                    <button style={{padding:"8px 14px",background:i===0?C.primary:C.white,color:i===0?"white":C.primary,border:`1.5px solid ${C.primary}`,borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0}}>
+                      {i===0?"Começar →":"Ver"}
+                    </button>
+                  </div>
+                )):(
+                  <div style={{textAlign:"center",padding:"32px",color:C.textLight}}>
+                    <div style={{fontSize:32,marginBottom:8}}>📋</div>
+                    <div style={{fontSize:13}}>Nenhuma matéria no plano ainda.<br/>Complete o diagnóstico para gerar seu cronograma.</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* CICLO — todas as matérias */}
+            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"24px 26px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+                <div>
+                  <div style={{fontSize:11,color:C.textLight,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>Ciclo 1 — Todas as matérias</div>
+                  <div style={{fontSize:14,color:C.textMed}}>{mats.length} matérias ordenadas por peso no edital</div>
+                </div>
+                <div style={{background:C.primaryXLight,border:`1px solid ${C.borderPurple}`,borderRadius:10,padding:"8px 14px",fontSize:12,fontWeight:700,color:C.primary}}>
+                  Ciclo 1/{getPrevisoSemanas()}
+                </div>
+              </div>
+              {mats.length>0?(
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {cicloMats.map((m,i)=>{
+                    const pct=totalPeso>0?Math.round((m.questoes/totalPeso)*100):0;
+                    return(
+                      <div key={m.nome} style={{display:"flex",alignItems:"center",gap:12}}>
+                        <div style={{width:22,fontSize:11,fontWeight:700,color:C.textLight,textAlign:"right",flexShrink:0}}>#{i+1}</div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+                            <span style={{fontSize:12,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.nome}</span>
+                            <span style={{fontSize:11,color:C.textMed,flexShrink:0,marginLeft:8}}>{m.questoes}q</span>
+                          </div>
+                          <div style={{height:6,background:"#F3F4F6",borderRadius:100,overflow:"hidden"}}>
+                            <div style={{height:"100%",width:`${pct}%`,background:i<3?C.primary:C.primaryLight,borderRadius:100,transition:"width 0.6s ease"}}/>
+                          </div>
+                        </div>
+                        <div style={{fontSize:11,fontWeight:700,color:C.textMed,width:36,textAlign:"right",flexShrink:0}}>{pct}%</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ):(
+                <div style={{textAlign:"center",padding:"24px",color:C.textLight,fontSize:13}}>
+                  Sem matérias cadastradas. Refaça o onboarding com o edital.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── QUESTÕES placeholder ── */}
+        {tab==="questoes"&&(
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:400,gap:16}}>
+            <div style={{fontSize:48}}>🎯</div>
+            <h3 style={{fontFamily:"'Lora',serif",fontSize:22,color:C.text}}>Questões em breve</h3>
+            <p style={{fontSize:14,color:C.textMed,textAlign:"center",maxWidth:360}}>Questões diárias no estilo exato da sua banca, com comentário técnico e caderno de erros.</p>
+          </div>
+        )}
+
+        {/* ── REDAÇÃO placeholder ── */}
+        {tab==="redacao"&&(
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:400,gap:16}}>
+            <div style={{fontSize:48}}>✍️</div>
+            <h3 style={{fontFamily:"'Lora',serif",fontSize:22,color:C.text}}>Redação em breve</h3>
+            <p style={{fontSize:14,color:C.textMed,textAlign:"center",maxWidth:360}}>Envie sua redação manuscrita, receba correção com nota por critério e sugestões de evolução.</p>
+          </div>
+        )}
+
+        {/* ── EVOLUÇÃO placeholder ── */}
+        {tab==="evolucao"&&(
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:400,gap:16}}>
+            <div style={{fontSize:48}}>📊</div>
+            <h3 style={{fontFamily:"'Lora',serif",fontSize:22,color:C.text}}>Evolução em breve</h3>
+            <p style={{fontSize:14,color:C.textMed,textAlign:"center",maxWidth:360}}>Acompanhe seu progresso semana a semana, pontos fortes, fracos e caderno de erros.</p>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
 export default function App(){
   const [screen,setScreen]=useState("landing");const [userData,setUserData]=useState(null);
   useEffect(()=>{const s=document.createElement("style");s.id="db-global";s.textContent=css;document.head.appendChild(s);},[]);
@@ -432,7 +675,7 @@ export default function App(){
     </div>
   );
   if(screen==="onboarding")return<Onboarding user={userData} onComplete={async plan=>{if(userData?.id){await supabase.from("onboarding").upsert({user_id:userData.id,orgao:plan.orgao,cargo:plan.cargo,data_prova:plan.dataProva,banca:plan.banca,total_questoes:plan.totalQuestoes,tem_redacao:plan.temRedacao,grupos:plan.grupos,discursiva:plan.discursiva,horas:plan.horas,concluido:true});}setScreen("dashboard");}} onBack={()=>setScreen("landing")}/>;
-  if(screen==="dashboard")return(<div style={{height:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#F8F7FF",flexDirection:"column",gap:16}}><div style={{fontSize:32}}>🎉</div><h2 style={{fontFamily:"'Lora',serif",fontSize:24,color:"#1E1B4B"}}>Dashboard em construção!</h2><p style={{fontSize:14,color:"#6B7280"}}>Onboarding concluído com sucesso.</p><button onClick={async()=>{await supabase.auth.signOut();setScreen("landing");}} style={{padding:"10px 24px",background:"#6C3CE1",color:"white",border:"none",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer"}}>Sair</button></div>);
+  if(screen==="dashboard")return<Dashboard user={userData} onLogout={async()=>{await supabase.auth.signOut();setScreen("landing");}}/>;
   return<Landing onCadastro={()=>setScreen("cadastro")} onLogin={()=>setScreen("login")}/>;
 }
 
