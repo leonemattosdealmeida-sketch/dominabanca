@@ -80,11 +80,11 @@ const Logo = ({ size = 38 }) => (
 );
 
 const LogoMark = () => (
-  <div style={{display:"flex",alignItems:"center",gap:10}}>
-    <Logo size={38}/>
+  <div style={{display:"flex",alignItems:"center",gap:12}}>
+    <Logo size={52}/>
     <div>
-      <div style={{fontFamily:"'Lora',serif",fontWeight:700,fontSize:18,color:C.text,lineHeight:1}}>DominaBanca</div>
-      <div style={{fontSize:9,color:C.textLight,letterSpacing:1.5,textTransform:"uppercase",marginTop:1}}>Preparação Inteligente</div>
+      <div style={{fontFamily:"'Lora',serif",fontWeight:700,fontSize:20,color:C.text,lineHeight:1}}>DominaBanca</div>
+      <div style={{fontSize:10,color:C.textLight,letterSpacing:1.5,textTransform:"uppercase",marginTop:2}}>Preparação Inteligente</div>
     </div>
   </div>
 );
@@ -145,7 +145,7 @@ const DemoPlayer = () => {
             <div style={{flex:1,background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:"3px 8px",fontSize:10,color:C.textLight,textAlign:"center"}}>dominabanca.com.br</div>
           </div>
           <div style={{background:C.white,borderBottom:`1px solid ${C.border}`,padding:"8px 12px",display:"flex",alignItems:"center",gap:8}}>
-            <Logo size={26}/><span style={{fontWeight:800,fontSize:12,color:C.text}}>DominaBanca</span>
+            <Logo size={32}/><span style={{fontWeight:800,fontSize:13,color:C.text}}>DominaBanca</span>
             <div style={{marginLeft:"auto",display:"flex",gap:4,alignItems:"center"}}><div style={{width:5,height:5,borderRadius:"50%",background:C.accent}}/><span style={{fontSize:9,color:C.accent}}>online</span></div>
           </div>
           <div style={{background:C.primaryXLight,borderBottom:`1px solid ${C.borderPurple}`,padding:"8px 12px",display:"flex",alignItems:"center",gap:8}}>
@@ -339,7 +339,7 @@ function Landing({ onCadastro, onLogin }) {
         <div style={{maxWidth:1100,margin:"0 auto"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:40,marginBottom:48}} className="footer-inner">
             <div style={{maxWidth:280}}>
-              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><Logo size={34}/><div><div style={{fontFamily:"'Lora',serif",fontWeight:700,fontSize:16,color:"white"}}>DominaBanca</div><div style={{fontSize:9,color:"rgba(255,255,255,0.35)",letterSpacing:1.5,textTransform:"uppercase",marginTop:1}}>Preparação Inteligente</div></div></div>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><Logo size={46}/><div><div style={{fontFamily:"'Lora',serif",fontWeight:700,fontSize:18,color:"white"}}>DominaBanca</div><div style={{fontSize:9,color:"rgba(255,255,255,0.35)",letterSpacing:1.5,textTransform:"uppercase",marginTop:1}}>Preparação Inteligente</div></div></div>
               <p style={{fontSize:13,color:"rgba(255,255,255,0.45)",lineHeight:1.7}}>Cronograma inteligente, questões no estilo da banca e simulados agendados para a sua preparação.</p>
             </div>
             <div style={{display:"flex",gap:56,flexWrap:"wrap"}}>
@@ -358,7 +358,7 @@ function Landing({ onCadastro, onLogin }) {
 
 const ESTADOS=["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
 
-const CadastroLogo=()=>(<div style={{display:"flex",alignItems:"center",gap:10}}><img src={LOGO_SRC} alt="DominaBanca" style={{width:40,height:40,objectFit:"contain",flexShrink:0}}/><div><div style={{fontFamily:"'Lora',serif",fontWeight:700,fontSize:16,color:C.text,lineHeight:1}}>DominaBanca</div><div style={{fontSize:9,color:C.textLight,letterSpacing:1.5,textTransform:"uppercase",marginTop:2}}>Preparação Inteligente</div></div></div>);
+const CadastroLogo=()=>(<div style={{display:"flex",alignItems:"center",gap:12}}><img src={LOGO_SRC} alt="DominaBanca" style={{width:52,height:52,objectFit:"contain",flexShrink:0}}/><div><div style={{fontFamily:"'Lora',serif",fontWeight:700,fontSize:18,color:C.text,lineHeight:1}}>DominaBanca</div><div style={{fontSize:10,color:C.textLight,letterSpacing:1.5,textTransform:"uppercase",marginTop:2}}>Preparação Inteligente</div></div></div>);
 
 function Cadastro({onBack,onSuccess,onLogin}){
   const [loading,setLoading]=useState(false);const [loadingGoogle,setLoadingGoogle]=useState(false);const [done,setDone]=useState(false);
@@ -412,7 +412,7 @@ export default function App(){
   if(screen==="onboarding_intro")return(
     <div style={{fontFamily:"'Sora',sans-serif",minHeight:"100vh",background:"#F8F7FF",display:"flex",flexDirection:"column"}}>
       <nav style={{background:"white",borderBottom:"1px solid #E8E8F0",height:62,display:"flex",alignItems:"center",padding:"0 24px",justifyContent:"space-between",boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8}}><img src={LOGO_SRC} alt="DominaBanca" style={{width:32,height:32,objectFit:"contain"}}/><span style={{fontFamily:"Georgia,serif",fontWeight:700,fontSize:14,color:"#1E1B4B"}}>DominaBanca</span></div>
+        <div style={{display:"flex",alignItems:"center",gap:12}}><img src={LOGO_SRC} alt="DominaBanca" style={{width:46,height:46,objectFit:"contain"}}/><span style={{fontFamily:"Georgia,serif",fontWeight:700,fontSize:16,color:"#1E1B4B"}}>DominaBanca</span></div>
       </nav>
       <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"32px 16px"}}>
         <div style={{width:"100%",maxWidth:500,animation:"fadeUp 0.5s ease"}}>
