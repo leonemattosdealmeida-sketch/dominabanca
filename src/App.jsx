@@ -723,10 +723,10 @@ function Dashboard({user,onLogout}){
 }
 
 export default function App(){
-  const [screen,setScreen]=useState("loading");const [userData,setUserData]=useState(null);
+  const [screen,setScreen]=useState("landing");const [userData,setUserData]=useState(null);
   useEffect(()=>{const s=document.createElement("style");s.id="db-global";s.textContent=css;document.head.appendChild(s);},[]);
 
-  /* helper: dado um user, decide qual tela mostrar */
+  /* helper: rota o usuário logado para dashboard ou onboarding */
   const routeUser=async(user)=>{
     try{
       const{data}=await supabase.from("onboarding").select("concluido").eq("user_id",user.id).single();
@@ -737,25 +737,9 @@ export default function App(){
   };
 
   useEffect(()=>{
-    /* 1. verifica sessão existente no carregamento */
-    const checkSession=async()=>{
-      try{
-        const{data:{session}}=await supabase.auth.getSession();
-        if(session?.user){setUserData(session.user);await routeUser(session.user);}
-        else{setScreen("landing");}
-      }catch(e){setScreen("landing");}
-    };
-    checkSession();
-
-    /* 2. onAuthStateChange: só lida com OAuth (Google) e logout */
+    /* Apenas detecta logout para limpar o estado — sem redirecionamento automático */
     const{data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
-      if(event==="SIGNED_IN"&&session?.user){
-        /* evita re-checar se já estamos logados (TOKEN_REFRESHED dispara SIGNED_IN no Supabase v2) */
-        setUserData(prev=>{
-          if(prev?.id===session.user.id) return prev; // mesmo usuário, não faz nada
-          return session.user;
-        });
-      }else if(event==="SIGNED_OUT"){
+      if(event==="SIGNED_OUT"){
         setUserData(null);
         setScreen("landing");
       }
@@ -763,7 +747,6 @@ export default function App(){
     return()=>subscription.unsubscribe();
   },[]);
 
-  if(screen==="loading")return(<div style={{height:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#F8F7FF"}}><div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}><div style={{width:40,height:40,border:"4px solid #EDE9FE",borderTop:"4px solid #6C3CE1",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/><p style={{fontSize:13,color:"#6C3CE1",fontWeight:600}}>Carregando...</p></div></div>);
   if(screen==="cadastro")return<Cadastro onBack={()=>setScreen("landing")} onLogin={()=>setScreen("login")} onSuccess={u=>{setUserData(u);setScreen("onboarding_intro");}}/>;
   if(screen==="login")return<Login onBack={()=>setScreen("landing")} onCadastro={()=>setScreen("cadastro")} onSuccess={async u=>{setUserData(u);await routeUser(u);}}/>;
   if(screen==="onboarding_intro")return(
@@ -787,7 +770,14 @@ export default function App(){
   );
   if(screen==="onboarding")return<Onboarding user={userData} onComplete={async plan=>{if(userData?.id){await supabase.from("onboarding").upsert({user_id:userData.id,orgao:plan.orgao,cargo:plan.cargo,data_prova:plan.dataProva,banca:plan.banca,total_questoes:plan.totalQuestoes,tem_redacao:plan.temRedacao,grupos:plan.grupos,discursiva:plan.discursiva,horas:plan.horas,concluido:true});}setScreen("dashboard");}} onBack={()=>setScreen("landing")}/>;
   if(screen==="dashboard")return<Dashboard user={userData} onLogout={async()=>{await supabase.auth.signOut();setScreen("landing");}}/>;
-  return<Landing onCadastro={()=>setScreen("cadastro")} onLogin={()=>setScreen("login")}/>;
+  const handleAreaAluno=async()=>{
+    try{
+      const{data:{session}}=await supabase.auth.getSession();
+      if(session?.user){setUserData(session.user);await routeUser(session.user);}
+      else{setScreen("login");}
+    }catch(e){setScreen("login");}
+  };
+  return<Landing onCadastro={()=>setScreen("cadastro")} onLogin={handleAreaAluno}/>;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
