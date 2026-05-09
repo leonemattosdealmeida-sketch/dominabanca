@@ -723,18 +723,39 @@ function Dashboard({user,onLogout}){
 }
 
 export default function App(){
-  const [screen,setScreen]=useState("landing");const [userData,setUserData]=useState(null);
+  const [screen,setScreen]=useState("loading");const [userData,setUserData]=useState(null);
   useEffect(()=>{const s=document.createElement("style");s.id="db-global";s.textContent=css;document.head.appendChild(s);},[]);
+
+  /* helper: dado um user, decide qual tela mostrar */
+  const routeUser=async(user)=>{
+    try{
+      const{data}=await supabase.from("onboarding").select("concluido").eq("user_id",user.id).single();
+      setScreen(data?.concluido?"dashboard":"onboarding_intro");
+    }catch(e){
+      setScreen("onboarding_intro");
+    }
+  };
+
   useEffect(()=>{
-    const checkSession=async()=>{try{const{data:{session}}=await supabase.auth.getSession();if(session?.user){setUserData(session.user);const{data}=await supabase.from("onboarding").select("concluido").eq("user_id",session.user.id).single();setScreen(data?.concluido?"dashboard":"onboarding_intro");}else{setScreen("landing");}}catch(e){setScreen("landing");}};
+    /* 1. verifica sessão existente no carregamento */
+    const checkSession=async()=>{
+      try{
+        const{data:{session}}=await supabase.auth.getSession();
+        if(session?.user){setUserData(session.user);await routeUser(session.user);}
+        else{setScreen("landing");}
+      }catch(e){setScreen("landing");}
+    };
     checkSession();
+
+    /* 2. onAuthStateChange: só lida com OAuth (Google) e logout */
     const{data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
-      // Só reage a login via OAuth (Google) ou logout — não no carregamento inicial
       if(event==="SIGNED_IN"&&session?.user){
-        setUserData(session.user);
-        const{data}=await supabase.from("onboarding").select("concluido").eq("user_id",session.user.id).single();
-        setScreen(data?.concluido?"dashboard":"onboarding_intro");
-      } else if(event==="SIGNED_OUT"){
+        /* evita re-checar se já estamos logados (TOKEN_REFRESHED dispara SIGNED_IN no Supabase v2) */
+        setUserData(prev=>{
+          if(prev?.id===session.user.id) return prev; // mesmo usuário, não faz nada
+          return session.user;
+        });
+      }else if(event==="SIGNED_OUT"){
         setUserData(null);
         setScreen("landing");
       }
@@ -744,7 +765,7 @@ export default function App(){
 
   if(screen==="loading")return(<div style={{height:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#F8F7FF"}}><div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}><div style={{width:40,height:40,border:"4px solid #EDE9FE",borderTop:"4px solid #6C3CE1",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/><p style={{fontSize:13,color:"#6C3CE1",fontWeight:600}}>Carregando...</p></div></div>);
   if(screen==="cadastro")return<Cadastro onBack={()=>setScreen("landing")} onLogin={()=>setScreen("login")} onSuccess={u=>{setUserData(u);setScreen("onboarding_intro");}}/>;
-  if(screen==="login")return<Login onBack={()=>setScreen("landing")} onCadastro={()=>setScreen("cadastro")} onSuccess={u=>{setUserData(u);setScreen("onboarding_intro");}}/>;
+  if(screen==="login")return<Login onBack={()=>setScreen("landing")} onCadastro={()=>setScreen("cadastro")} onSuccess={async u=>{setUserData(u);await routeUser(u);}}/>;
   if(screen==="onboarding_intro")return(
     <div style={{fontFamily:"'Sora',sans-serif",minHeight:"100vh",background:"#F8F7FF",display:"flex",flexDirection:"column"}}>
       <nav style={{background:"white",borderBottom:"1px solid #E8E8F0",height:62,display:"flex",alignItems:"center",padding:"0 24px",justifyContent:"space-between",boxShadow:"0 1px 6px rgba(0,0,0,0.04)"}}>
