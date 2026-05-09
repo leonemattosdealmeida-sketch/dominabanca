@@ -55,9 +55,8 @@ const css = `
   .plan-card{transition:all 0.2s ease;}
   @media(max-width:768px){
     .nav-desktop{display:none!important;}
-    .logo-img{width:38px!important;height:38px!important;}
-    .logo-name{font-size:15px!important;}
-    .logo-sub{display:none!important;}
+    .logo-img{width:44px!important;height:44px!important;}
+    .logo-name{font-size:16px!important;}
     .hero-section{grid-template-columns:1fr!important;padding:40px 16px 32px!important;}
     .redacao-grid{grid-template-columns:1fr!important;}
     .plans-grid{grid-template-columns:1fr!important;}
