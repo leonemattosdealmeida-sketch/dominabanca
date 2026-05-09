@@ -57,6 +57,7 @@ const css = `
     .nav-desktop{display:none!important;}
     .logo-img{width:44px!important;height:44px!important;}
     .logo-name{font-size:16px!important;}
+    .logo-sub{font-size:8px!important;}
     .hero-section{grid-template-columns:1fr!important;padding:40px 16px 32px!important;}
     .redacao-grid{grid-template-columns:1fr!important;}
     .plans-grid{grid-template-columns:1fr!important;}
