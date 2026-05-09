@@ -388,12 +388,22 @@ function Login({onBack,onCadastro,onSuccess}){
 }
 
 export default function App(){
-  const [screen,setScreen]=useState("loading");const [userData,setUserData]=useState(null);
+  const [screen,setScreen]=useState("landing");const [userData,setUserData]=useState(null);
   useEffect(()=>{const s=document.createElement("style");s.id="db-global";s.textContent=css;document.head.appendChild(s);},[]);
   useEffect(()=>{
     const checkSession=async()=>{try{const{data:{session}}=await supabase.auth.getSession();if(session?.user){setUserData(session.user);const{data}=await supabase.from("onboarding").select("concluido").eq("user_id",session.user.id).single();setScreen(data?.concluido?"dashboard":"onboarding_intro");}else{setScreen("landing");}}catch(e){setScreen("landing");}};
     checkSession();
-    const{data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{if(event==="SIGNED_IN"&&session?.user){setUserData(session.user);const{data}=await supabase.from("onboarding").select("concluido").eq("user_id",session.user.id).single();setScreen(data?.concluido?"dashboard":"onboarding_intro");}else if(event==="SIGNED_OUT"){setUserData(null);setScreen("landing");}});
+    const{data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
+      // Só reage a login via OAuth (Google) ou logout — não no carregamento inicial
+      if(event==="SIGNED_IN"&&session?.user){
+        setUserData(session.user);
+        const{data}=await supabase.from("onboarding").select("concluido").eq("user_id",session.user.id).single();
+        setScreen(data?.concluido?"dashboard":"onboarding_intro");
+      } else if(event==="SIGNED_OUT"){
+        setUserData(null);
+        setScreen("landing");
+      }
+    });
     return()=>subscription.unsubscribe();
   },[]);
 
