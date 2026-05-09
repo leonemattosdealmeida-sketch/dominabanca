@@ -60,6 +60,7 @@ const css = `
     .logo-sub{font-size:8px!important;}
     .stats-grid{grid-template-columns:1fr!important;}
     .cal-grid{grid-template-columns:repeat(4,1fr)!important;}
+    .dash-grid{grid-template-columns:1fr!important;}
     .hero-section{grid-template-columns:1fr!important;padding:40px 16px 32px!important;}
     .redacao-grid{grid-template-columns:1fr!important;}
     .plans-grid{grid-template-columns:1fr!important;}
@@ -589,10 +590,10 @@ function CronogramaCalendario({plan,mats,meta,dias,totalQ,getPrevisoSemanas}){
 
 /* ─── DASHBOARD ─────────────────────────────────────────────────── */
 function Dashboard({user,onLogout}){
-  const [tab,setTab]=useState("cronograma");
-  const [plan,setPlan]=useState(null);
-  const [loading,setLoading]=useState(true);
-  const [cicloIdx,setCicloIdx]=useState(0);
+  const [tab,setTab]=React.useState("cronograma");
+  const [plan,setPlan]=React.useState(null);
+  const [loading,setLoading]=React.useState(true);
+  const [simuladoConfirmado,setSimuladoConfirmado]=React.useState(false);
 
   React.useEffect(()=>{
     (async()=>{
@@ -604,14 +605,7 @@ function Dashboard({user,onLogout}){
     })();
   },[]);
 
-  const TABS=[
-    {id:"cronograma",icon:"📅",label:"Cronograma"},
-    {id:"questoes",icon:"🎯",label:"Questões"},
-    {id:"redacao",icon:"✍️",label:"Redação"},
-    {id:"evolucao",icon:"📊",label:"Evolução"},
-  ];
-
-  /* ── helpers cronograma ── */
+  /* ── helpers ── */
   const getMaterias=()=>{
     if(!plan?.grupos) return [];
     const flat=[];
@@ -620,31 +614,83 @@ function Dashboard({user,onLogout}){
     });
     return flat.sort((a,b)=>b.questoes-a.questoes);
   };
-
   const getDiasAteProva=()=>{
     if(!plan?.data_prova) return null;
     const diff=Math.ceil((new Date(plan.data_prova)-new Date())/(1000*60*60*24));
     return diff>0?diff:0;
   };
-
   const getMetaDiaria=()=>{
     const h=Number(plan?.horas)||14;
-    const por_dia=h/7;
-    return Math.min(80,Math.max(30,Math.round(por_dia*18)));
+    return Math.min(80,Math.max(30,Math.round((h/7)*18)));
   };
-
   const getPrevisoSemanas=()=>{
     const total=Number(plan?.total_questoes)||400;
-    const meta=getMetaDiaria();
-    return Math.ceil(total/meta/7);
+    return Math.ceil(total/getMetaDiaria()/7);
+  };
+  const getProximoDomingo=()=>{
+    const d=new Date();
+    const dow=d.getDay();
+    const diff=dow===0?7:7-dow;
+    d.setDate(d.getDate()+diff);
+    return d.toLocaleDateString("pt-BR",{day:"2-digit",month:"long"});
+  };
+  const getSaudacao=()=>{
+    const h=new Date().getHours();
+    if(h>=5&&h<12) return "Bom dia";
+    if(h>=12&&h<18) return "Boa tarde";
+    return "Boa noite";
+  };
+  const getNomeAluno=()=>{
+    const meta=user?.user_metadata;
+    if(meta?.nome) return meta.nome.split(" ")[0];
+    if(meta?.full_name) return meta.full_name.split(" ")[0];
+    return user?.email?.split("@")[0]||"Aluno";
+  };
+  const PILL_COLORS=["#6C3CE1","#10B981","#F59E0B","#EF4444","#3B82F6","#8B5CF6","#EC4899","#14B8A6"];
+  const grupoColor=(grupo)=>{
+    if(!grupo) return PILL_COLORS[0];
+    return PILL_COLORS[Math.abs(grupo.split("").reduce((a,c)=>a+c.charCodeAt(0),0))%PILL_COLORS.length];
+  };
+
+  /* ── distribuição semanal ── */
+  const buildWeekPlan=(mats,meta)=>{
+    if(!mats||!mats.length) return {};
+    const p={};
+    const dias=[1,2,3,4,5];
+    if(Number(plan?.horas)>=20) dias.push(6);
+    let cursor=0;
+    const tot=mats.length;
+    dias.forEach(dow=>{
+      let acum=0; const ms=[]; let lim=0;
+      while(acum<meta&&lim<4){
+        const m=mats[cursor%tot];
+        const q=Math.max(8,Math.round(m.questoes>0?(m.questoes/(tot*2)):10));
+        ms.push({...m,qtd:q}); acum+=q; cursor++; lim++;
+      }
+      p[dow]={mats:ms,total:acum};
+    });
+    return p;
   };
 
   const mats=getMaterias();
   const dias=getDiasAteProva();
   const meta=plan?getMetaDiaria():50;
   const totalQ=Number(plan?.total_questoes)||400;
+  const weekPlan=buildWeekPlan(mats,meta);
 
-  /* ── render ── */
+  /* ── hoje ── */
+  const todayDow=new Date().getDay();
+  const todayPlan=weekPlan[todayDow];
+  const isWeekendToday=todayDow===0||todayDow===6;
+  const todayStr=new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long"});
+
+  const TABS=[
+    {id:"cronograma",icon:"📅",label:"Cronograma"},
+    {id:"questoes",icon:"🎯",label:"Questões"},
+    {id:"redacao",icon:"✍️",label:"Redação"},
+    {id:"evolucao",icon:"📊",label:"Evolução"},
+  ];
+
   if(loading)return(
     <div style={{height:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:C.bg}}>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
@@ -656,41 +702,209 @@ function Dashboard({user,onLogout}){
 
   return(
     <div style={{fontFamily:"'Sora',sans-serif",background:C.bg,minHeight:"100vh",display:"flex",flexDirection:"column"}}>
+
       {/* NAV */}
       <nav style={{background:C.white,borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,zIndex:100,boxShadow:"0 1px 8px rgba(0,0,0,0.04)"}}>
-        <div style={{maxWidth:1100,margin:"0 auto",padding:"0 20px",height:62,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{maxWidth:1200,margin:"0 auto",padding:"0 24px",height:62,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <LogoMark/>
-          <div style={{display:"flex",alignItems:"center",gap:12}}>
-            <span style={{fontSize:12,color:C.textMed,fontWeight:600}}>{plan?.cargo||"Aluno"}</span>
-            <button onClick={onLogout} style={{fontSize:12,color:C.textLight,background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,padding:"6px 12px",cursor:"pointer",fontWeight:600}}>Sair</button>
+          <div style={{display:"flex",alignItems:"center",gap:14}}>
+            <div style={{textAlign:"right",display:"flex",flexDirection:"column"}}>
+              <span style={{fontSize:12,fontWeight:700,color:C.text}}>{getNomeAluno()}</span>
+              {plan?.cargo&&<span style={{fontSize:10,color:C.textLight}}>{plan.cargo}</span>}
+            </div>
+            <div style={{width:34,height:34,borderRadius:"50%",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontWeight:800,fontSize:13}}>
+              {getNomeAluno().charAt(0).toUpperCase()}
+            </div>
+            <button onClick={onLogout} style={{fontSize:12,color:C.textLight,background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,padding:"6px 14px",cursor:"pointer",fontWeight:600}}>Sair</button>
           </div>
         </div>
       </nav>
 
       {/* TABS */}
       <div style={{background:C.white,borderBottom:`1px solid ${C.border}`,position:"sticky",top:62,zIndex:99}}>
-        <div style={{maxWidth:1100,margin:"0 auto",padding:"0 20px",display:"flex",gap:2,overflowX:"auto"}}>
+        <div style={{maxWidth:1200,margin:"0 auto",padding:"0 24px",display:"flex",gap:0,overflowX:"auto"}}>
           {TABS.map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)} style={{
-              padding:"14px 20px",background:"transparent",border:"none",borderBottom:`3px solid ${tab===t.id?C.primary:"transparent"}`,
-              color:tab===t.id?C.primary:C.textMed,fontWeight:tab===t.id?700:500,fontSize:13,cursor:"pointer",
-              display:"flex",alignItems:"center",gap:6,whiteSpace:"nowrap",transition:"all 0.15s",flexShrink:0
+              padding:"15px 22px",background:"transparent",border:"none",
+              borderBottom:`3px solid ${tab===t.id?C.primary:"transparent"}`,
+              color:tab===t.id?C.primary:C.textMed,fontWeight:tab===t.id?700:500,
+              fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:6,
+              whiteSpace:"nowrap",transition:"all 0.15s",flexShrink:0
             }}>{t.icon} {t.label}</button>
           ))}
         </div>
       </div>
 
-      {/* CONTENT */}
-      <div style={{flex:1,maxWidth:1100,width:"100%",margin:"0 auto",padding:"28px 20px"}}>
+      {/* CONTEÚDO */}
+      <div style={{flex:1,maxWidth:1200,width:"100%",margin:"0 auto",padding:"28px 24px"}}>
 
         {/* ── CRONOGRAMA ── */}
         {tab==="cronograma"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:20}}>
-            <CronogramaCalendario plan={plan} mats={mats} meta={meta} dias={dias} totalQ={totalQ} getPrevisoSemanas={getPrevisoSemanas}/>
+          <div style={{display:"flex",flexDirection:"column",gap:22}}>
+
+            {/* GREETING BANNER */}
+            <div style={{background:`linear-gradient(135deg,${C.primaryDark} 0%,${C.primary} 100%)`,borderRadius:20,padding:"24px 28px",color:"white",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
+              <div>
+                <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:6}}>{getSaudacao()}</div>
+                <div style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:700,marginBottom:6}}>{getNomeAluno()}! 👋</div>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                  {plan?.orgao&&<span style={{background:"rgba(255,255,255,0.15)",borderRadius:100,padding:"4px 12px",fontSize:11,fontWeight:600}}>{plan.orgao}</span>}
+                  {plan?.cargo&&<span style={{background:"rgba(255,255,255,0.15)",borderRadius:100,padding:"4px 12px",fontSize:11,fontWeight:600}}>{plan.cargo}</span>}
+                  {plan?.banca&&<span style={{background:"rgba(255,255,255,0.15)",borderRadius:100,padding:"4px 12px",fontSize:11,fontWeight:600}}>{plan.banca}</span>}
+                </div>
+              </div>
+              {dias!=null&&(
+                <div style={{textAlign:"center",background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:16,padding:"16px 24px"}}>
+                  <div style={{fontFamily:"'Lora',serif",fontSize:36,fontWeight:800,lineHeight:1}}>{dias}</div>
+                  <div style={{fontSize:11,fontWeight:600,color:"rgba(255,255,255,0.8)",marginTop:4}}>dias para a prova</div>
+                </div>
+              )}
+            </div>
+
+            {/* GRID PRINCIPAL */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 320px",gap:22,alignItems:"start"}} className="dash-grid">
+
+              {/* COLUNA ESQUERDA */}
+              <div style={{display:"flex",flexDirection:"column",gap:22}}>
+
+                {/* CARD HOJE */}
+                <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:20,padding:"24px 26px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:12}}>
+                    <div>
+                      <div style={{fontSize:11,fontWeight:700,color:C.textLight,letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>Seu plano para hoje</div>
+                      <div style={{fontFamily:"'Lora',serif",fontSize:18,fontWeight:700,color:C.text,textTransform:"capitalize"}}>{todayStr}</div>
+                    </div>
+                    {!isWeekendToday&&todayPlan&&(
+                      <div style={{background:C.primaryXLight,border:`1px solid ${C.borderPurple}`,borderRadius:12,padding:"10px 18px",textAlign:"center"}}>
+                        <div style={{fontSize:22,fontWeight:800,color:C.primary,fontFamily:"'Lora',serif"}}>{todayPlan.total}</div>
+                        <div style={{fontSize:10,color:C.primary,fontWeight:700,letterSpacing:0.5}}>questões hoje</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {isWeekendToday?(
+                    <div style={{textAlign:"center",padding:"32px 16px",background:C.bg,borderRadius:14}}>
+                      <div style={{fontSize:36,marginBottom:10}}>{todayDow===0?"🌅":"🏃"}</div>
+                      <div style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:6}}>{todayDow===0?"Dia de descanso":"Sábado: revisão livre"}</div>
+                      <div style={{fontSize:13,color:C.textMed}}>Descanse bem. Amanhã tem mais!</div>
+                    </div>
+                  ):todayPlan?(
+                    <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                      {todayPlan.mats.map((m,i)=>{
+                        const cor=grupoColor(m.grupo);
+                        return(
+                          <div key={i} style={{display:"flex",alignItems:"center",gap:14,padding:"14px 16px",background:i===0?C.primaryXLight:"#FAFAFA",border:`1.5px solid ${i===0?C.borderPurple:C.border}`,borderRadius:14,transition:"all 0.15s"}}>
+                            <div style={{width:36,height:36,borderRadius:12,background:i===0?C.primary:cor+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:i===0?"white":cor,flexShrink:0}}>{i===0?"▶":""+( i+1)}</div>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontSize:12,fontWeight:600,color:cor,letterSpacing:0.3,textTransform:"uppercase",marginBottom:2}}>{m.grupo}</div>
+                              <div style={{fontSize:14,fontWeight:700,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.nome}</div>
+                            </div>
+                            <div style={{textAlign:"right",flexShrink:0}}>
+                              <div style={{fontSize:16,fontWeight:800,color:i===0?C.primary:C.textMed}}>{m.qtd}</div>
+                              <div style={{fontSize:10,color:C.textLight}}>questões</div>
+                            </div>
+                            {i===0&&<button style={{padding:"8px 16px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>Começar →</button>}
+                          </div>
+                        );
+                      })}
+                      <div style={{marginTop:6,textAlign:"center"}}>
+                        <span style={{fontSize:11,color:C.textLight}}>Meta do dia: </span>
+                        <span style={{fontSize:11,fontWeight:700,color:C.primary}}>{todayPlan.total} questões</span>
+                        <span style={{fontSize:11,color:C.textLight}}> · Tempo estimado: {Math.round(todayPlan.total*1.5)}min</span>
+                      </div>
+                    </div>
+                  ):(
+                    <div style={{textAlign:"center",padding:"24px",color:C.textLight}}>
+                      <div style={{fontSize:11}}>Nenhuma matéria para hoje.<br/>Faça o onboarding com seu edital para gerar o plano.</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* CALENDÁRIO SEMANAL */}
+                <CronogramaCalendario plan={plan} mats={mats} meta={meta} dias={dias} totalQ={totalQ} getPrevisoSemanas={getPrevisoSemanas}/>
+              </div>
+
+              {/* SIDEBAR DIREITA */}
+              <div style={{display:"flex",flexDirection:"column",gap:16}}>
+
+                {/* SIMULADO COLETIVO */}
+                <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"22px 20px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+                    <div style={{width:38,height:38,borderRadius:12,background:"#FEF3C7",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🏆</div>
+                    <div>
+                      <div style={{fontSize:12,fontWeight:700,color:C.text}}>Simulado Coletivo</div>
+                      <div style={{fontSize:10,color:C.textLight}}>Todo domingo com todos os alunos</div>
+                    </div>
+                  </div>
+                  <div style={{background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:12,padding:"12px 14px",marginBottom:14}}>
+                    <div style={{fontSize:10,fontWeight:700,color:"#92400E",letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>Próximo simulado</div>
+                    <div style={{fontSize:14,fontWeight:700,color:"#78350F"}}>Domingo, {getProximoDomingo()}</div>
+                    <div style={{fontSize:11,color:"#92400E",marginTop:2}}>Participe junto com toda a turma</div>
+                  </div>
+                  {simuladoConfirmado?(
+                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",background:"#D1FAE5",border:"1px solid #6EE7B7",borderRadius:10}}>
+                      <span style={{fontSize:14}}>✅</span>
+                      <span style={{fontSize:12,fontWeight:700,color:"#065F46"}}>Participação confirmada!</span>
+                    </div>
+                  ):(
+                    <button onClick={()=>setSimuladoConfirmado(true)} style={{width:"100%",padding:"11px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 12px rgba(108,60,225,0.3)"}}>
+                      Confirmar participação →
+                    </button>
+                  )}
+                </div>
+
+                {/* PROGRESSO SEMANAL */}
+                <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"22px 20px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
+                  <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>📈 Progresso desta semana</div>
+                  {[
+                    {label:"Meta semanal",val:`${meta*5}q`,sub:"questões",pct:0,cor:C.primary},
+                    {label:"Ciclo atual",val:`1/${getPrevisoSemanas()}`,sub:"semanas",pct:Math.round(1/getPrevisoSemanas()*100),cor:"#10B981"},
+                  ].map(s=>(
+                    <div key={s.label} style={{marginBottom:14}}>
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                        <span style={{fontSize:11,color:C.textMed,fontWeight:600}}>{s.label}</span>
+                        <span style={{fontSize:11,fontWeight:800,color:s.cor}}>{s.val} <span style={{fontWeight:400,color:C.textLight}}>{s.sub}</span></span>
+                      </div>
+                      <div style={{height:6,background:"#F3F4F6",borderRadius:100}}>
+                        <div style={{height:"100%",width:`${s.pct}%`,background:s.cor,borderRadius:100,transition:"width 0.8s ease"}}/>
+                      </div>
+                    </div>
+                  ))}
+                  <div style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",background:C.bg,borderRadius:10,marginTop:4}}>
+                    <span style={{fontSize:11,color:C.textMed}}>Matérias no edital</span>
+                    <span style={{fontSize:12,fontWeight:700,color:C.text}}>{mats.length}</span>
+                  </div>
+                </div>
+
+                {/* SEQUÊNCIA */}
+                <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"20px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)",textAlign:"center"}}>
+                  <div style={{fontSize:32,marginBottom:8}}>🔥</div>
+                  <div style={{fontFamily:"'Lora',serif",fontSize:28,fontWeight:800,color:C.text}}>0</div>
+                  <div style={{fontSize:12,color:C.textMed,marginTop:4}}>dias de estudo seguidos</div>
+                  <div style={{fontSize:11,color:C.textLight,marginTop:8,padding:"8px 12px",background:C.bg,borderRadius:8}}>Comece hoje e construa sua sequência!</div>
+                </div>
+
+                {/* RESUMO DO PLANO */}
+                <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"20px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
+                  <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>📋 Seu plano de estudo</div>
+                  {[
+                    {icon:"⏱️",label:"Horas por semana",val:`${Number(plan?.horas)||14}h`},
+                    {icon:"📚",label:"Questões no edital",val:totalQ},
+                    {icon:"🎯",label:"Meta diária",val:`${meta}q`},
+                    {icon:"🏁",label:"Previsão de conclusão",val:`${getPrevisoSemanas()} semanas`},
+                    {icon:"✍️",label:"Tem redação",val:plan?.tem_redacao?"Sim":"Não"},
+                  ].map(r=>(
+                    <div key={r.label} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${C.border}`}}>
+                      <span style={{fontSize:11,color:C.textMed,display:"flex",alignItems:"center",gap:6}}><span>{r.icon}</span>{r.label}</span>
+                      <span style={{fontSize:12,fontWeight:700,color:C.text}}>{r.val}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
-                {/* ── QUESTÕES placeholder ── */}
         {tab==="questoes"&&(
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:400,gap:16}}>
             <div style={{fontSize:48}}>🎯</div>
@@ -698,8 +912,6 @@ function Dashboard({user,onLogout}){
             <p style={{fontSize:14,color:C.textMed,textAlign:"center",maxWidth:360}}>Questões diárias no estilo exato da sua banca, com comentário técnico e caderno de erros.</p>
           </div>
         )}
-
-        {/* ── REDAÇÃO placeholder ── */}
         {tab==="redacao"&&(
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:400,gap:16}}>
             <div style={{fontSize:48}}>✍️</div>
@@ -707,8 +919,6 @@ function Dashboard({user,onLogout}){
             <p style={{fontSize:14,color:C.textMed,textAlign:"center",maxWidth:360}}>Envie sua redação manuscrita, receba correção com nota por critério e sugestões de evolução.</p>
           </div>
         )}
-
-        {/* ── EVOLUÇÃO placeholder ── */}
         {tab==="evolucao"&&(
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:400,gap:16}}>
             <div style={{fontSize:48}}>📊</div>
@@ -716,7 +926,6 @@ function Dashboard({user,onLogout}){
             <p style={{fontSize:14,color:C.textMed,textAlign:"center",maxWidth:360}}>Acompanhe seu progresso semana a semana, pontos fortes, fracos e caderno de erros.</p>
           </div>
         )}
-
       </div>
     </div>
   );
