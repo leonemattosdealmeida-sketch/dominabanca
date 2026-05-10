@@ -947,7 +947,7 @@ function Dashboard({user,onLogout}){
 }
 
 export default function App(){
-  const [screen,setScreen]=useState("landing");const [userData,setUserData]=useState(null);
+  const [screen,setScreen]=useState("loading");const [userData,setUserData]=useState(null);
   useEffect(()=>{const s=document.createElement("style");s.id="db-global";s.textContent=css;document.head.appendChild(s);},[]);
 
   /* helper: rota o usuário logado para dashboard ou onboarding */
@@ -967,10 +967,16 @@ export default function App(){
   useEffect(()=>{
     // Verifica sessão ativa ao carregar — cobre retorno do Google OAuth
     const checkSession=async()=>{
-      const{data:{session}}=await supabase.auth.getSession();
-      if(session?.user){
-        setUserData(session.user);
-        await routeUser(session.user);
+      try{
+        const{data:{session}}=await supabase.auth.getSession();
+        if(session?.user){
+          setUserData(session.user);
+          await routeUser(session.user);
+        }else{
+          setScreen("landing");
+        }
+      }catch(e){
+        setScreen("landing");
       }
     };
     checkSession();
@@ -985,6 +991,14 @@ export default function App(){
     return()=>subscription.unsubscribe();
   },[]);
 
+  if(screen==="loading")return(
+    <div style={{height:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#F8F7FF"}}>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
+        <img src={LOGO_SRC} alt="DominaBanca" style={{width:64,height:64,objectFit:"contain"}}/>
+        <div style={{width:36,height:36,border:"4px solid #EDE9FE",borderTop:`4px solid ${C.primary}`,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+      </div>
+    </div>
+  );
   if(screen==="cadastro")return<Cadastro onBack={()=>setScreen("landing")} onLogin={()=>setScreen("login")} onSuccess={u=>{setUserData(u);setScreen("onboarding_intro");}}/>;
   if(screen==="login")return<Login onBack={()=>setScreen("landing")} onCadastro={()=>setScreen("cadastro")} onSuccess={async u=>{setUserData(u);await routeUser(u);}}/>;
   if(screen==="onboarding_intro")return(
