@@ -373,7 +373,7 @@ function Cadastro({onBack,onSuccess,onLogin}){
   const validate=()=>{const e={};if(!form.nome.trim())e.nome="Nome obrigatório";if(!form.email)e.email="Email obrigatório";else if(!/\S+@\S+\.\S+/.test(form.email))e.email="Email inválido";if(!form.telefone.trim())e.telefone="Telefone obrigatório";if(!form.senha)e.senha="Senha obrigatória";else if(form.senha.length<6)e.senha="Mínimo 6 caracteres";return e;};
   const [jaTemConta,setJaTemConta]=useState(false);
   const handleSubmit=async()=>{const e=validate();if(Object.keys(e).length>0){setErrors(e);return;}setLoading(true);setAuthError("");setJaTemConta(false);try{const{data,error}=await supabase.auth.signUp({email:form.email,password:form.senha,options:{data:{nome:form.nome}}});if(error){const msg=error.message||"";if(msg.toLowerCase().includes("already")||msg.toLowerCase().includes("registered")||msg.toLowerCase().includes("existe")){setJaTemConta(true);setLoading(false);return;}setAuthError(msg);setLoading(false);return;}// Supabase v2: email já cadastrado retorna user sem session e identities vazio
-if(data.user&&(!data.user.identities||data.user.identities.length===0)){setJaTemConta(true);setLoading(false);return;}if(data.user){await supabase.from("profiles").upsert({id:data.user.id,nome:form.nome,telefone:form.telefone});}setLoading(false);setDone(true);}catch(e){setAuthError("Erro ao criar conta. Tente novamente.");setLoading(false);}};
+if(data.user&&(!data.user.identities||data.user.identities.length===0)){setJaTemConta(true);setLoading(false);return;}if(data.user){await supabase.from("alunos").upsert({id:data.user.id,nome:form.nome,email:form.email,telefone:form.telefone,origem_cadastro:"organico",primeiro_acesso:true,plano:"gratuito",status_pagamento:"trial"});}setLoading(false);setDone(true);}catch(e){setAuthError("Erro ao criar conta. Tente novamente.");setLoading(false);}};
   const handleGoogle=async()=>{setLoadingGoogle(true);await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:window.location.origin}});};
   const Sucesso=()=>(<div style={{textAlign:"center",animation:"fadeUp 0.5s ease"}}><div style={{width:72,height:72,borderRadius:"50%",background:C.accentLight,border:`3px solid ${C.accent}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,margin:"0 auto 20px"}}>✓</div><h2 style={{fontFamily:"'Lora',serif",fontSize:26,fontWeight:700,color:C.text,marginBottom:10}}>Bem-vindo ao DominaBanca, {form.nome?.split(" ")[0]}!</h2><p style={{fontSize:14,color:C.textMed,lineHeight:1.7,marginBottom:32,maxWidth:320,margin:"0 auto 32px"}}>Sua conta foi criada. Agora vamos montar seu plano de estudos personalizado.</p><button onClick={()=>onSuccess&&onSuccess({...form})} style={{width:"100%",padding:"15px",background:C.primary,color:"white",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:C.shadowMd}}>Montar meu plano de estudos →</button></div>);
   return(<div style={{fontFamily:"'Sora',sans-serif",minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column"}}><nav style={{background:C.white,borderBottom:`1px solid ${C.border}`,height:64,display:"flex",alignItems:"center",padding:"0 28px",boxShadow:"0 1px 6px rgba(0,0,0,0.04)",justifyContent:"space-between"}}><button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",padding:0}}><CadastroLogo/></button><button onClick={onBack} style={{display:"flex",alignItems:"center",gap:6,background:"transparent",border:`1.5px solid ${C.border}`,borderRadius:10,padding:"7px 16px",fontSize:13,fontWeight:600,color:C.textMed,cursor:"pointer"}}>← Voltar ao início</button></nav><div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"40px 16px"}}><div style={{width:"100%",maxWidth:440}}><div style={{background:C.white,borderRadius:24,padding:"36px 32px",boxShadow:C.shadowLg,border:`1px solid ${C.border}`}}>{done?<Sucesso/>:(<><div style={{textAlign:"center",marginBottom:28}}><h1 style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:700,color:C.text,marginBottom:8}}>Crie sua conta</h1><p style={{fontSize:13,color:C.textMed}}>Comece sua preparação hoje.</p></div><button onClick={handleGoogle} disabled={loadingGoogle} style={{width:"100%",padding:"13px",background:C.white,border:`1.5px solid ${C.border}`,borderRadius:12,fontSize:14,fontWeight:600,color:C.text,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginBottom:20,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}><img src="https://www.google.com/favicon.ico" width={18} height={18} alt="Google"/>{loadingGoogle?"Redirecionando...":"Continuar com Google"}</button><div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}><div style={{flex:1,height:1,background:C.border}}/><span style={{fontSize:12,color:C.textLight}}>ou</span><div style={{flex:1,height:1,background:C.border}}/></div><div style={{display:"flex",flexDirection:"column",gap:14}}>{[{name:"nome",label:"Nome completo",placeholder:"Seu nome completo",type:"text"},{name:"email",label:"Email",placeholder:"seu@email.com",type:"email"},{name:"telefone",label:"Telefone",placeholder:"(11) 99999-9999",type:"tel"}].map(f=>(<div key={f.name} style={{display:"flex",flexDirection:"column",gap:5}}><label style={{fontSize:13,fontWeight:700,color:C.textMed}}>{f.label}</label><input type={f.type} value={form[f.name]} onChange={e=>handleChange(f.name,e.target.value)} placeholder={f.placeholder} style={{padding:"12px 14px",border:`1.5px solid ${errors[f.name]?C.danger:C.border}`,borderRadius:10,fontSize:13,color:C.text,background:"white",outline:"none",width:"100%",boxSizing:"border-box"}}/>{errors[f.name]&&<span style={{fontSize:11,color:C.danger,fontWeight:600}}>{errors[f.name]}</span>}</div>))}<div style={{display:"flex",flexDirection:"column",gap:5}}><label style={{fontSize:13,fontWeight:700,color:C.textMed}}>Senha</label><div style={{position:"relative"}}><input type={showPass?"text":"password"} value={form.senha} onChange={e=>handleChange("senha",e.target.value)} placeholder="Mínimo 6 caracteres" style={{padding:"12px 44px 12px 14px",border:`1.5px solid ${errors.senha?C.danger:C.border}`,borderRadius:10,fontSize:13,color:C.text,background:"white",outline:"none",width:"100%",boxSizing:"border-box"}}/><button onClick={()=>setShowPass(!showPass)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.textLight,fontSize:15}}>{showPass?"🙈":"👁️"}</button></div>{errors.senha&&<span style={{fontSize:11,color:C.danger,fontWeight:600}}>{errors.senha}</span>}</div>{jaTemConta&&<div style={{background:"#EFF6FF",border:"1.5px solid #BFDBFE",borderRadius:12,padding:"14px 16px",display:"flex",flexDirection:"column",gap:10}}><div style={{fontSize:13,fontWeight:700,color:"#1E40AF"}}>📧 Este e-mail já está cadastrado</div><div style={{fontSize:12,color:"#3B82F6",lineHeight:1.5}}>Você já tem uma conta no DominaBanca. Faça login para acessar seu painel.</div><button onClick={onLogin} style={{padding:"10px",background:"#2563EB",color:"white",border:"none",borderRadius:9,fontSize:13,fontWeight:700,cursor:"pointer"}}>Ir para o Login →</button></div>}{authError&&<div style={{background:"#FEE8E8",border:`1px solid ${C.danger}`,borderRadius:9,padding:"9px 13px",fontSize:12,color:C.danger}}>{authError}</div>}<button onClick={handleSubmit} disabled={loading} style={{padding:"14px",background:C.primary,color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",boxShadow:C.shadowMd,display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:4}}>{loading&&<div style={{width:16,height:16,border:"2px solid rgba(255,255,255,0.3)",borderTop:"2px solid white",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>}{loading?"Criando conta...":"Criar conta →"}</button><p style={{textAlign:"center",fontSize:13,color:C.textMed,marginTop:4}}>Já tem conta?{" "}<button onClick={onLogin} style={{background:"none",border:"none",color:C.primary,fontWeight:700,cursor:"pointer",fontSize:13}}>Entrar</button></p></div></>)}</div>{!done&&<div style={{display:"flex",justifyContent:"center",marginTop:24}}><CadastroLogo/></div>}</div></div></div>);
@@ -600,8 +600,10 @@ function Dashboard({user,onLogout}){
   React.useEffect(()=>{
     (async()=>{
       try{
-        const{data}=await supabase.from("onboarding").select("*").eq("user_id",user.id).single();
-        setPlan(data);
+        const{data,error}=await supabase.from("onboarding").select("*").eq("user_id",user.id).maybeSingle();
+        if(!error && data) setPlan(data);
+        // Atualiza último acesso (silenciosamente, sem travar se falhar)
+        supabase.from("alunos").update({ultimo_acesso:new Date().toISOString()}).eq("id",user.id).then(()=>{});
       }catch(e){}
       setLoading(false);
     })();
@@ -743,6 +745,17 @@ function Dashboard({user,onLogout}){
         {/* ── CRONOGRAMA ── */}
         {tab==="cronograma"&&(
           <div style={{display:"flex",flexDirection:"column",gap:22}}>
+
+            {/* BANNER: SEM ONBOARDING */}
+            {!plan?.concluido&&(
+              <div style={{background:"#FEF3C7",border:"2px solid #F59E0B",borderRadius:16,padding:"20px 24px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
+                <div>
+                  <div style={{fontSize:14,fontWeight:700,color:"#92400E",marginBottom:4}}>⚠️ Seu plano de estudos ainda não foi configurado</div>
+                  <div style={{fontSize:12,color:"#78350F"}}>Configure agora para ver seu cronograma, metas e acompanhamento personalizados.</div>
+                </div>
+                <button onClick={()=>window.location.reload()} style={{padding:"10px 20px",background:"#D97706",color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>Configurar meu plano →</button>
+              </div>
+            )}
 
             {/* GREETING BANNER */}
             <div style={{background:`linear-gradient(135deg,${C.primaryDark} 0%,${C.primary} 100%)`,borderRadius:20,padding:"24px 28px",color:"white",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
@@ -940,10 +953,14 @@ export default function App(){
   /* helper: rota o usuário logado para dashboard ou onboarding */
   const routeUser=async(user)=>{
     try{
-      const{data}=await supabase.from("onboarding").select("concluido").eq("user_id",user.id).single();
-      setScreen(data?.concluido?"dashboard":"onboarding_intro");
+      const{data,error}=await supabase.from("onboarding").select("concluido").eq("user_id",user.id).maybeSingle();
+      if(!error && data && data.concluido===false){
+        setScreen("onboarding_intro");
+      }else{
+        setScreen("dashboard");
+      }
     }catch(e){
-      setScreen("onboarding_intro");
+      setScreen("dashboard");
     }
   };
 
@@ -979,7 +996,7 @@ export default function App(){
       </div>
     </div>
   );
-  if(screen==="onboarding")return<Onboarding user={userData} onComplete={async plan=>{if(userData?.id){await supabase.from("onboarding").upsert({user_id:userData.id,orgao:plan.orgao,cargo:plan.cargo,data_prova:plan.dataProva,banca:plan.banca,total_questoes:plan.totalQuestoes,tem_redacao:plan.temRedacao,grupos:plan.grupos,discursiva:plan.discursiva,horas:plan.horas,concluido:true});}setScreen("dashboard");}} onBack={()=>setScreen("landing")}/>;
+  if(screen==="onboarding")return<Onboarding user={userData} onComplete={async plan=>{if(userData?.id){const metaDiaria=Math.min(80,Math.max(30,Math.round(((Number(plan.horas)||14)/7)*18)));const semanas=Math.ceil((Number(plan.totalQuestoes)||400)/metaDiaria/7);const previsao=new Date();previsao.setDate(previsao.getDate()+semanas*7);await supabase.from("onboarding").upsert({user_id:userData.id,orgao:plan.orgao,cargo:plan.cargo,banca:plan.banca,data_prova:plan.dataProva,total_questoes:plan.totalQuestoes,tem_redacao:plan.temRedacao,grupos:plan.grupos,discursiva:plan.discursiva,horas:plan.horas,meta_diaria:metaDiaria,data_inicio:new Date().toISOString().split("T")[0],previsao_conclusao:previsao.toISOString().split("T")[0],ciclo_atual:1,concluido:true});await supabase.from("alunos").update({primeiro_acesso:false,ultimo_acesso:new Date().toISOString()}).eq("id",userData.id);}setScreen("dashboard");}} onBack={()=>setScreen("landing")}/>;
   if(screen==="dashboard")return<Dashboard user={userData} onLogout={async()=>{await supabase.auth.signOut();setScreen("landing");}}/>;
   return<Landing onCadastro={()=>setScreen("cadastro")} onLogin={()=>setScreen("login")}/>;
 }
