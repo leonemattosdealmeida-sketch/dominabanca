@@ -688,9 +688,34 @@ function Dashboard({user,onLogout}){
   const isWeekendToday=todayDow===0||todayDow===6;
   const todayStr=new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long"});
 
+  /* ── hero dinâmico ── */
+  const getHeroMessage=(dias,meta,streak,evolucao)=>{
+    const questoesHoje=evolucao?.questoes_hoje||0;
+    const restam=Math.max(0,meta-questoesHoje);
+    const pctDia=meta>0?Math.round((questoesHoje/meta)*100):0;
+    const streakN=streak||0;
+    const aprovGeral=evolucao?.aproveitamento_geral||0;
+    const totalFeitas=evolucao?.total_questoes_feitas||0;
+
+    // Prioridade: urgência → progresso do dia → streak → motivação geral
+    if(dias!=null&&dias<=30&&dias>0){
+      if(dias<=7) return{titulo:`⚡ Reta final: ${dias} dias`,sub:"Cada questão agora vale ouro. Não pare.",cor:"#EF4444",bg:"#FEF2F2",border:"#FECACA"};
+      if(dias<=15) return{titulo:`🎯 ${dias} dias para a prova`,sub:"Hora de acelerar. Seu edital não espera.",cor:"#F59E0B",bg:"#FFFBEB",border:"#FDE68A"};
+      return{titulo:`📅 Faltam ${dias} dias`,sub:"Você está na fase decisiva. Mantenha o foco.",cor:"#6C3CE1",bg:"#F5F3FF",border:"#DDD6FE"};
+    }
+    if(pctDia>=100) return{titulo:"✅ Meta do dia batida!",sub:`Você já fez ${questoesHoje} questões hoje. Quer ir além?`,cor:"#10B981",bg:"#ECFDF5",border:"#A7F3D0"};
+    if(pctDia>=70) return{titulo:`🔥 ${pctDia}% da meta concluída`,sub:`Faltam só ${restam} questões para fechar o dia.`,cor:"#10B981",bg:"#ECFDF5",border:"#A7F3D0"};
+    if(pctDia>=30) return{titulo:`📈 Você já evoluiu hoje`,sub:`${questoesHoje} feitas. Mais ${restam} e você fecha a meta.`,cor:"#6C3CE1",bg:"#F5F3FF",border:"#DDD6FE"};
+    if(streakN>=7) return{titulo:`🔥 ${streakN} dias seguidos!`,sub:"Sua sequência está forte. Não quebre agora.",cor:"#F59E0B",bg:"#FFFBEB",border:"#FDE68A"};
+    if(streakN>=3) return{titulo:`💪 ${streakN} dias consecutivos`,sub:"Sua sequência está viva hoje. Continue.",cor:"#6C3CE1",bg:"#F5F3FF",border:"#DDD6FE"};
+    if(totalFeitas>0&&aprovGeral>0) return{titulo:`📊 Aproveitamento geral: ${aprovGeral}%`,sub:"Você está mais perto da aprovação do que ontem.",cor:"#6C3CE1",bg:"#F5F3FF",border:"#DDD6FE"};
+    if(dias!=null&&dias>0) return{titulo:`🎯 ${dias} dias para a prova`,sub:`Meta de hoje: ${meta} questões. Comece agora.`,cor:"#6C3CE1",bg:"#F5F3FF",border:"#DDD6FE"};
+    return{titulo:`🚀 Bora, ${getNomeAluno()}!`,sub:`Meta de hoje: ${meta} questões. Cada uma conta.`,cor:"#6C3CE1",bg:"#F5F3FF",border:"#DDD6FE"};
+  };
+
   const TABS=[
-    {id:"cronograma",icon:"📅",label:"Cronograma"},
-    {id:"questoes",icon:"🎯",label:"Questões"},
+    {id:"cronograma",icon:"🏠",label:"Área do Aluno"},
+    {id:"questoes",icon:"🎯",label:"Treino"},
     {id:"redacao",icon:"✍️",label:"Redação"},
     {id:"evolucao",icon:"📊",label:"Evolução"},
   ];
@@ -757,24 +782,36 @@ function Dashboard({user,onLogout}){
               </div>
             )}
 
-            {/* GREETING BANNER */}
-            <div style={{background:`linear-gradient(135deg,${C.primaryDark} 0%,${C.primary} 100%)`,borderRadius:20,padding:"24px 28px",color:"white",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
-              <div>
-                <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:6}}>{getSaudacao()}</div>
-                <div style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:700,marginBottom:6}}>{getNomeAluno()}! 👋</div>
-                <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                  {plan?.orgao&&<span style={{background:"rgba(255,255,255,0.15)",borderRadius:100,padding:"4px 12px",fontSize:11,fontWeight:600}}>{plan.orgao}</span>}
-                  {plan?.cargo&&<span style={{background:"rgba(255,255,255,0.15)",borderRadius:100,padding:"4px 12px",fontSize:11,fontWeight:600}}>{plan.cargo}</span>}
-                  {plan?.banca&&<span style={{background:"rgba(255,255,255,0.15)",borderRadius:100,padding:"4px 12px",fontSize:11,fontWeight:600}}>{plan.banca}</span>}
+            {/* HERO DINÂMICO */}
+            {(()=>{
+              const hero=getHeroMessage(dias,meta,0,null);
+              return(
+                <div style={{background:hero.bg,border:`2px solid ${hero.border}`,borderRadius:20,padding:"22px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
+                  <div style={{flex:1,minWidth:200}}>
+                    <div style={{fontSize:11,fontWeight:700,color:hero.cor,letterSpacing:1.5,textTransform:"uppercase",marginBottom:6}}>{getSaudacao()}, {getNomeAluno()}</div>
+                    <div style={{fontFamily:"'Lora',serif",fontSize:22,fontWeight:800,color:"#1E1B4B",marginBottom:6,lineHeight:1.3}}>{hero.titulo}</div>
+                    <div style={{fontSize:13,color:"#374151",lineHeight:1.5}}>{hero.sub}</div>
+                    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginTop:12}}>
+                      {plan?.orgao&&<span style={{background:"white",border:`1px solid ${hero.border}`,borderRadius:100,padding:"3px 10px",fontSize:10,fontWeight:700,color:hero.cor}}>{plan.orgao}</span>}
+                      {plan?.cargo&&<span style={{background:"white",border:`1px solid ${hero.border}`,borderRadius:100,padding:"3px 10px",fontSize:10,fontWeight:700,color:hero.cor}}>{plan.cargo}</span>}
+                      {plan?.banca&&<span style={{background:"white",border:`1px solid ${hero.border}`,borderRadius:100,padding:"3px 10px",fontSize:10,fontWeight:700,color:hero.cor}}>{plan.banca}</span>}
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+                    {dias!=null&&(
+                      <div style={{textAlign:"center",background:"white",border:`1px solid ${hero.border}`,borderRadius:16,padding:"14px 20px",minWidth:80}}>
+                        <div style={{fontFamily:"'Lora',serif",fontSize:32,fontWeight:800,color:hero.cor,lineHeight:1}}>{dias}</div>
+                        <div style={{fontSize:10,fontWeight:700,color:"#6B7280",marginTop:4}}>dias p/ prova</div>
+                      </div>
+                    )}
+                    <div style={{textAlign:"center",background:"white",border:`1px solid ${hero.border}`,borderRadius:16,padding:"14px 20px",minWidth:80}}>
+                      <div style={{fontFamily:"'Lora',serif",fontSize:32,fontWeight:800,color:hero.cor,lineHeight:1}}>{meta}</div>
+                      <div style={{fontSize:10,fontWeight:700,color:"#6B7280",marginTop:4}}>meta do dia</div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              {dias!=null&&(
-                <div style={{textAlign:"center",background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:16,padding:"16px 24px"}}>
-                  <div style={{fontFamily:"'Lora',serif",fontSize:36,fontWeight:800,lineHeight:1}}>{dias}</div>
-                  <div style={{fontSize:11,fontWeight:600,color:"rgba(255,255,255,0.8)",marginTop:4}}>dias para a prova</div>
-                </div>
-              )}
-            </div>
+              );
+            })()}
 
             {/* GRID PRINCIPAL */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 320px",gap:22,alignItems:"start"}} className="dash-grid">
@@ -842,72 +879,126 @@ function Dashboard({user,onLogout}){
               {/* SIDEBAR DIREITA */}
               <div style={{display:"flex",flexDirection:"column",gap:16}}>
 
-                {/* SIMULADO COLETIVO */}
+                {/* PROGRESSO HOJE */}
                 <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"22px 20px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
-                    <div style={{width:38,height:38,borderRadius:12,background:"#FEF3C7",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🏆</div>
-                    <div>
-                      <div style={{fontSize:12,fontWeight:700,color:C.text}}>Simulado Coletivo</div>
-                      <div style={{fontSize:10,color:C.textLight}}>Todo domingo com todos os alunos</div>
-                    </div>
-                  </div>
-                  <div style={{background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:12,padding:"12px 14px",marginBottom:14}}>
-                    <div style={{fontSize:10,fontWeight:700,color:"#92400E",letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>Próximo simulado</div>
-                    <div style={{fontSize:14,fontWeight:700,color:"#78350F"}}>Domingo, {getProximoDomingo()}</div>
-                    <div style={{fontSize:11,color:"#92400E",marginTop:2}}>Participe junto com toda a turma</div>
-                  </div>
-                  {simuladoConfirmado?(
-                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",background:"#D1FAE5",border:"1px solid #6EE7B7",borderRadius:10}}>
-                      <span style={{fontSize:14}}>✅</span>
-                      <span style={{fontSize:12,fontWeight:700,color:"#065F46"}}>Participação confirmada!</span>
-                    </div>
-                  ):(
-                    <button onClick={()=>setSimuladoConfirmado(true)} style={{width:"100%",padding:"11px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 12px rgba(108,60,225,0.3)"}}>
-                      Confirmar participação →
-                    </button>
-                  )}
+                  <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:16}}>⚡ Seu progresso hoje</div>
+                  {(()=>{
+                    const feitas=0;
+                    const pct=meta>0?Math.min(100,Math.round((feitas/meta)*100)):0;
+                    const cor=pct>=100?"#10B981":pct>=50?C.primary:"#F59E0B";
+                    return(
+                      <div>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:8}}>
+                          <div>
+                            <span style={{fontSize:28,fontWeight:800,color:cor,fontFamily:"'Lora',serif"}}>{pct}%</span>
+                            <span style={{fontSize:11,color:C.textLight,marginLeft:6}}>da meta</span>
+                          </div>
+                          <span style={{fontSize:11,color:C.textMed,fontWeight:600}}>{feitas}/{meta}q</span>
+                        </div>
+                        <div style={{height:8,background:"#F3F4F6",borderRadius:100,overflow:"hidden",marginBottom:12}}>
+                          <div style={{height:"100%",width:`${pct||2}%`,background:`linear-gradient(90deg,${cor},${cor}cc)`,borderRadius:100,transition:"width 1s ease"}}/>
+                        </div>
+                        <div style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:C.bg,borderRadius:10}}>
+                          <span style={{fontSize:11,color:C.textMed}}>Restam hoje</span>
+                          <span style={{fontSize:12,fontWeight:800,color:C.primary}}>{Math.max(0,meta-feitas)}q</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
-                {/* PROGRESSO SEMANAL */}
+                {/* EVOLUÇÃO — comparação consigo mesmo */}
                 <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"22px 20px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
-                  <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>📈 Progresso desta semana</div>
+                  <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:4}}>📈 Sua evolução</div>
+                  <div style={{fontSize:10,color:C.textLight,marginBottom:14}}>Você vs. você mesmo</div>
                   {[
-                    {label:"Meta semanal",val:`${meta*5}q`,sub:"questões",pct:0,cor:C.primary},
-                    {label:"Ciclo atual",val:`1/${getPrevisoSemanas()}`,sub:"semanas",pct:Math.round(1/getPrevisoSemanas()*100),cor:"#10B981"},
-                  ].map(s=>(
-                    <div key={s.label} style={{marginBottom:14}}>
-                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                        <span style={{fontSize:11,color:C.textMed,fontWeight:600}}>{s.label}</span>
-                        <span style={{fontSize:11,fontWeight:800,color:s.cor}}>{s.val} <span style={{fontWeight:400,color:C.textLight}}>{s.sub}</span></span>
+                    {label:"Questões hoje",atual:0,antes:0,unidade:"q",icone:"📝"},
+                    {label:"Esta semana",atual:0,antes:0,unidade:"q",icone:"📅"},
+                    {label:"Aproveitamento",atual:0,antes:0,unidade:"%",icone:"🎯"},
+                  ].map((item,i)=>{
+                    const diff=item.atual-item.antes;
+                    const subindo=diff>0;
+                    const igual=diff===0;
+                    return(
+                      <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 0",borderBottom:i<2?`1px solid ${C.border}`:"none"}}>
+                        <span style={{fontSize:11,color:C.textMed}}>{item.icone} {item.label}</span>
+                        <div style={{textAlign:"right"}}>
+                          <div style={{fontSize:13,fontWeight:800,color:C.text}}>{item.atual}{item.unidade}</div>
+                          <div style={{fontSize:10,color:igual?"#9CA3AF":subindo?"#10B981":"#EF4444",fontWeight:600}}>
+                            {igual?"—":subindo?`▲ +${diff}${item.unidade}`:`▼ ${diff}${item.unidade}`}
+                          </div>
+                        </div>
                       </div>
-                      <div style={{height:6,background:"#F3F4F6",borderRadius:100}}>
-                        <div style={{height:"100%",width:`${s.pct}%`,background:s.cor,borderRadius:100,transition:"width 0.8s ease"}}/>
-                      </div>
-                    </div>
-                  ))}
-                  <div style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",background:C.bg,borderRadius:10,marginTop:4}}>
-                    <span style={{fontSize:11,color:C.textMed}}>Matérias no edital</span>
-                    <span style={{fontSize:12,fontWeight:700,color:C.text}}>{mats.length}</span>
+                    );
+                  })}
+                  <div style={{marginTop:12,padding:"10px 12px",background:"#F0FDF4",border:"1px solid #A7F3D0",borderRadius:10,fontSize:11,color:"#065F46",fontWeight:600,textAlign:"center"}}>
+                    🤖 {meta>0?`Mantendo ${meta}q/dia → fecha em ${getPrevisoSemanas()} semanas`:"Configure seu plano"}
+                  </div>
+                </div>
+
+                {/* RADAR DE DESEMPENHO */}
+                <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"22px 20px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
+                  <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>🏅 Radar de desempenho</div>
+                  <div style={{padding:"10px 12px",background:"#F0FDF4",border:"1px solid #A7F3D0",borderRadius:10,marginBottom:10}}>
+                    <div style={{fontSize:10,fontWeight:700,color:"#065F46",letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Ponto forte</div>
+                    <div style={{fontSize:12,fontWeight:700,color:"#065F46"}}>{mats[0]?.nome||"—"}</div>
+                    <div style={{fontSize:10,color:"#6EE7B7"}}>Maior peso no edital</div>
+                  </div>
+                  <div style={{padding:"10px 12px",background:"#FFF7ED",border:"1px solid #FED7AA",borderRadius:10}}>
+                    <div style={{fontSize:10,fontWeight:700,color:"#92400E",letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Atenção</div>
+                    <div style={{fontSize:12,fontWeight:700,color:"#92400E"}}>{mats[mats.length-1]?.nome||"—"}</div>
+                    <div style={{fontSize:10,color:"#F97316"}}>Menor peso — não negligencie</div>
                   </div>
                 </div>
 
                 {/* SEQUÊNCIA */}
-                <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"20px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)",textAlign:"center"}}>
-                  <div style={{fontSize:32,marginBottom:8}}>🔥</div>
-                  <div style={{fontFamily:"'Lora',serif",fontSize:28,fontWeight:800,color:C.text}}>0</div>
-                  <div style={{fontSize:12,color:C.textMed,marginTop:4}}>dias de estudo seguidos</div>
-                  <div style={{fontSize:11,color:C.textLight,marginTop:8,padding:"8px 12px",background:C.bg,borderRadius:8}}>Comece hoje e construa sua sequência!</div>
+                <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:18,padding:"20px",boxShadow:"0 4px 20px rgba(108,60,225,0.3)",textAlign:"center",color:"white"}}>
+                  <div style={{fontSize:28,marginBottom:6}}>🔥</div>
+                  <div style={{fontFamily:"'Lora',serif",fontSize:36,fontWeight:800}}>0</div>
+                  <div style={{fontSize:12,color:"rgba(255,255,255,0.8)",marginTop:4,fontWeight:600}}>dias consecutivos</div>
+                  <div style={{display:"flex",justifyContent:"space-around",marginTop:14,gap:4}}>
+                    {["S","T","Q","Q","S","S","D"].map((d,i)=>(
+                      <div key={i} style={{flex:1,height:28,borderRadius:8,background:"rgba(255,255,255,0.1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.4)"}}>
+                        {d}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{fontSize:9,color:"rgba(255,255,255,0.4)",marginTop:6}}>Comece hoje e construa sua sequência</div>
+                </div>
+
+                {/* SIMULADO COLETIVO */}
+                <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"22px 20px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+                    <div style={{width:38,height:38,borderRadius:12,background:"#FEF3C7",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🏆</div>
+                    <div>
+                      <div style={{fontSize:12,fontWeight:700,color:C.text}}>Simulado Coletivo</div>
+                      <div style={{fontSize:10,color:C.textLight}}>Domingo com toda a turma</div>
+                    </div>
+                  </div>
+                  <div style={{background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:10,padding:"10px 12px",marginBottom:12}}>
+                    <div style={{fontSize:10,fontWeight:700,color:"#92400E",letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>Próximo</div>
+                    <div style={{fontSize:13,fontWeight:700,color:"#78350F"}}>Dom, {getProximoDomingo()}</div>
+                  </div>
+                  {simuladoConfirmado?(
+                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px",background:"#D1FAE5",border:"1px solid #6EE7B7",borderRadius:10,justifyContent:"center"}}>
+                      <span>✅</span><span style={{fontSize:12,fontWeight:700,color:"#065F46"}}>Confirmado!</span>
+                    </div>
+                  ):(
+                    <button onClick={()=>setSimuladoConfirmado(true)} style={{width:"100%",padding:"11px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                      Confirmar participação →
+                    </button>
+                  )}
                 </div>
 
                 {/* RESUMO DO PLANO */}
                 <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"20px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
                   <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>📋 Seu plano de estudo</div>
                   {[
-                    {icon:"⏱️",label:"Horas por semana",val:`${Number(plan?.horas)||14}h`},
+                    {icon:"⏱️",label:"Horas/semana",val:`${Number(plan?.horas)||14}h`},
                     {icon:"📚",label:"Questões no edital",val:totalQ},
                     {icon:"🎯",label:"Meta diária",val:`${meta}q`},
-                    {icon:"🏁",label:"Previsão de conclusão",val:`${getPrevisoSemanas()} semanas`},
-                    {icon:"✍️",label:"Tem redação",val:plan?.tem_redacao?"Sim":"Não"},
+                    {icon:"🏁",label:"Previsão",val:`${getPrevisoSemanas()} sem`},
+                    {icon:"✍️",label:"Redação",val:plan?.tem_redacao?"Sim":"Não"},
                   ].map(r=>(
                     <div key={r.label} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${C.border}`}}>
                       <span style={{fontSize:11,color:C.textMed,display:"flex",alignItems:"center",gap:6}}><span>{r.icon}</span>{r.label}</span>
@@ -915,7 +1006,7 @@ function Dashboard({user,onLogout}){
                     </div>
                   ))}
                 </div>
-              </div>
+              </div>              </div>
             </div>
           </div>
         )}
@@ -923,8 +1014,8 @@ function Dashboard({user,onLogout}){
         {tab==="questoes"&&(
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:400,gap:16}}>
             <div style={{fontSize:48}}>🎯</div>
-            <h3 style={{fontFamily:"'Lora',serif",fontSize:22,color:C.text}}>Questões em breve</h3>
-            <p style={{fontSize:14,color:C.textMed,textAlign:"center",maxWidth:360}}>Questões diárias no estilo exato da sua banca, com comentário técnico e caderno de erros.</p>
+            <h3 style={{fontFamily:"'Lora',serif",fontSize:22,color:C.text}}>Treino em breve</h3>
+            <p style={{fontSize:14,color:C.textMed,textAlign:"center",maxWidth:400}}>Questões extras para treinar além do cronograma. Escolha matéria, dificuldade e treine no seu ritmo — sem limite.</p>
           </div>
         )}
         {tab==="redacao"&&(
