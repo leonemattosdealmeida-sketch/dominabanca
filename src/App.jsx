@@ -851,22 +851,23 @@ function Dashboard({user,onLogout}){
                   ))}
                 </div>
               </div>
-              {/* Card: Dias para prova */}
-              <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"20px 22px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-                <div style={{fontSize:11,fontWeight:700,color:C.textLight,letterSpacing:1.2,textTransform:"uppercase",marginBottom:10}}>🎯 Meta do plano</div>
-                <div style={{display:"flex",gap:16,alignItems:"center"}}>
-                  {dias!=null&&(
-                    <div style={{textAlign:"center"}}>
-                      <div style={{fontSize:26,fontWeight:800,color:dias<=30?"#EF4444":C.primary,fontFamily:"'Lora',serif",lineHeight:1}}>{dias}</div>
-                      <div style={{fontSize:10,color:C.textLight,marginTop:4}}>dias p/ prova</div>
-                    </div>
-                  )}
-                  <div style={{flex:1,paddingLeft:dias!=null?12:0,borderLeft:dias!=null?`1px solid ${C.border}`:"none"}}>
-                    <div style={{fontSize:22,fontWeight:800,color:C.primary,fontFamily:"'Lora',serif",lineHeight:1}}>{meta}q</div>
-                    <div style={{fontSize:10,color:C.textLight,marginTop:4}}>meta diária</div>
-                    <div style={{fontSize:10,color:C.textMed,marginTop:6}}>{getPrevisoSemanas()} sem p/ concluir</div>
-                  </div>
+              {/* Card: Simulado Coletivo */}
+              <div style={{background:"linear-gradient(135deg,#78350F,#D97706)",borderRadius:16,padding:"20px 22px",boxShadow:"0 4px 16px rgba(217,119,6,0.3)",color:"white"}}>
+                <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.7)",letterSpacing:1.2,textTransform:"uppercase",marginBottom:10}}>🏆 Simulado Coletivo</div>
+                <div style={{marginBottom:10}}>
+                  <div style={{fontSize:13,fontWeight:700,color:"white",marginBottom:2}}>Próximo: Dom, {getProximoDomingo()}</div>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,0.7)"}}>Com todos os alunos ao mesmo tempo</div>
                 </div>
+                {simuladoConfirmado?(
+                  <div style={{display:"flex",alignItems:"center",gap:6,padding:"7px 12px",background:"rgba(255,255,255,0.2)",borderRadius:8}}>
+                    <span style={{fontSize:12}}>✅</span>
+                    <span style={{fontSize:11,fontWeight:700}}>Participação confirmada!</span>
+                  </div>
+                ):(
+                  <button onClick={()=>setSimuladoConfirmado(true)} style={{width:"100%",padding:"8px",background:"rgba(255,255,255,0.2)",color:"white",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                    Confirmar participação →
+                  </button>
+                )}
               </div>
             </div>
 
@@ -878,15 +879,20 @@ function Dashboard({user,onLogout}){
 
                 {/* CARD HOJE */}
                 <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:20,padding:"24px 26px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:12}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:12}}>
                     <div>
                       <div style={{fontSize:11,fontWeight:700,color:C.textLight,letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>Seu plano para hoje</div>
                       <div style={{fontFamily:"'Lora',serif",fontSize:18,fontWeight:700,color:C.text,textTransform:"capitalize"}}>{todayStr}</div>
                     </div>
                     {!isWeekendToday&&todayPlan&&(
-                      <div style={{background:C.primaryXLight,border:`1px solid ${C.borderPurple}`,borderRadius:12,padding:"10px 18px",textAlign:"center"}}>
-                        <div style={{fontSize:22,fontWeight:800,color:C.primary,fontFamily:"'Lora',serif"}}>{todayPlan.total}</div>
-                        <div style={{fontSize:10,color:C.primary,fontWeight:700,letterSpacing:0.5}}>questões hoje</div>
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        <div style={{background:C.primaryXLight,border:`1px solid ${C.borderPurple}`,borderRadius:12,padding:"10px 18px",textAlign:"center"}}>
+                          <div style={{fontSize:22,fontWeight:800,color:C.primary,fontFamily:"'Lora',serif"}}>{todayPlan.total}</div>
+                          <div style={{fontSize:10,color:C.primary,fontWeight:700,letterSpacing:0.5}}>questões hoje</div>
+                        </div>
+                        <button style={{padding:"12px 20px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:12,fontSize:13,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 14px rgba(108,60,225,0.35)",whiteSpace:"nowrap",lineHeight:1.3,textAlign:"center"}}>
+                          🚀 Começar<br/>estudos agora
+                        </button>
                       </div>
                     )}
                   </div>
@@ -965,61 +971,7 @@ function Dashboard({user,onLogout}){
                   </div>
                 </div>
 
-                {/* RADAR DE DESEMPENHO */}
-                <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"22px 20px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
-                  <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>🏅 Radar de desempenho</div>
-                  <div style={{padding:"10px 12px",background:"#F0FDF4",border:"1px solid #A7F3D0",borderRadius:10,marginBottom:10}}>
-                    <div style={{fontSize:10,fontWeight:700,color:"#065F46",letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Ponto forte</div>
-                    <div style={{fontSize:12,fontWeight:700,color:"#065F46"}}>{mats[0]?.nome||"—"}</div>
-                    <div style={{fontSize:10,color:"#6EE7B7"}}>Maior peso no edital</div>
-                  </div>
-                  <div style={{padding:"10px 12px",background:"#FFF7ED",border:"1px solid #FED7AA",borderRadius:10}}>
-                    <div style={{fontSize:10,fontWeight:700,color:"#92400E",letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>Atenção</div>
-                    <div style={{fontSize:12,fontWeight:700,color:"#92400E"}}>{mats[mats.length-1]?.nome||"—"}</div>
-                    <div style={{fontSize:10,color:"#F97316"}}>Menor peso — não negligencie</div>
-                  </div>
-                </div>
 
-                {/* SIMULADO COLETIVO */}
-                <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"22px 20px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-                    <div style={{width:38,height:38,borderRadius:12,background:"#FEF3C7",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🏆</div>
-                    <div>
-                      <div style={{fontSize:12,fontWeight:700,color:C.text}}>Simulado Coletivo</div>
-                      <div style={{fontSize:10,color:C.textLight}}>Domingo com toda a turma</div>
-                    </div>
-                  </div>
-                  <div style={{background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:10,padding:"10px 12px",marginBottom:12}}>
-                    <div style={{fontSize:10,fontWeight:700,color:"#92400E",letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>Próximo</div>
-                    <div style={{fontSize:13,fontWeight:700,color:"#78350F"}}>Dom, {getProximoDomingo()}</div>
-                  </div>
-                  {simuladoConfirmado?(
-                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px",background:"#D1FAE5",border:"1px solid #6EE7B7",borderRadius:10,justifyContent:"center"}}>
-                      <span>✅</span><span style={{fontSize:12,fontWeight:700,color:"#065F46"}}>Confirmado!</span>
-                    </div>
-                  ):(
-                    <button onClick={()=>setSimuladoConfirmado(true)} style={{width:"100%",padding:"11px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer"}}>
-                      Confirmar participação →
-                    </button>
-                  )}
-                </div>
-
-                {/* RESUMO DO PLANO */}
-                <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"20px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
-                  <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>📋 Seu plano de estudo</div>
-                  {[
-                    {icon:"⏱️",label:"Horas/semana",val:`${Number(plan?.horas)||14}h`},
-                    {icon:"📚",label:"Questões no edital",val:totalQ},
-                    {icon:"🎯",label:"Meta diária",val:`${meta}q`},
-                    {icon:"🏁",label:"Previsão",val:`${getPrevisoSemanas()} sem`},
-                    {icon:"✍️",label:"Redação",val:plan?.tem_redacao?"Sim":"Não"},
-                  ].map(r=>(
-                    <div key={r.label} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${C.border}`}}>
-                      <span style={{fontSize:11,color:C.textMed,display:"flex",alignItems:"center",gap:6}}><span>{r.icon}</span>{r.label}</span>
-                      <span style={{fontSize:12,fontWeight:700,color:C.text}}>{r.val}</span>
-                    </div>
-                  ))}
-                </div>
               </div>
             </div>
           </div>
