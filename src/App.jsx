@@ -592,12 +592,651 @@ function CronogramaCalendario({plan,mats,meta,dias,totalQ,getPrevisoSemanas}){
   );
 }
 
+/* ─── PAINEL ADMIN ──────────────────────────────────────────── */
+function AdminPanel({user,onBack}){
+  const [grupos,setGrupos]=React.useState([]);
+  const [selecionado,setSelecionado]=React.useState(null); // {grupo,materia,topico}
+  const [questoes,setQuestoes]=React.useState([]);
+  const [loadingQ,setLoadingQ]=React.useState(false);
+  const [form,setForm]=React.useState(null); // null=lista, {}=novo, {id,...}=editar
+  const [saving,setSaving]=React.useState(false);
+  const [busca,setBusca]=React.useState("");
+  const [expandido,setExpandido]=React.useState({});
+
+  // Carrega árvore de grupos/matérias/tópicos com contagem
+  React.useEffect(()=>{
+    (async()=>{
+      const{data}=await supabase.from("questoes").select("grupo,materia,topico").eq("ativa",true);
+      if(!data) return;
+      const tree={};
+      data.forEach(q=>{
+        if(!tree[q.grupo]) tree[q.grupo]={};
+        if(!tree[q.grupo][q.materia]) tree[q.grupo][q.materia]={};
+        if(!tree[q.grupo][q.materia][q.topico]) tree[q.grupo][q.materia][q.topico]=0;
+        tree[q.grupo][q.materia][q.topico]++;
+      });
+      // Converte para array
+      const arr=Object.entries(tree).map(([g,mats])=>({
+        nome:g,
+        total:Object.values(mats).reduce((s,ts)=>s+Object.values(ts).reduce((a,b)=>a+b,0),0),
+        materias:Object.entries(mats).map(([m,tops])=>({
+          nome:m,
+          total:Object.values(tops).reduce((a,b)=>a+b,0),
+          topicos:Object.entries(tops).map(([t,c])=>({nome:t,total:c}))
+        }))
+      }));
+      setGrupos(arr);
+    })();
+  },[saving]);
+
+  const loadQuestoes=async(g,m,t)=>{
+    setLoadingQ(true);
+    setSelecionado({grupo:g,materia:m,topico:t});
+    setForm(null);
+    const{data}=await supabase.from("questoes").select("*")
+      .eq("grupo",g).eq("materia",m).eq("topico",t).eq("ativa",true).order("created_at",{ascending:false});
+    setQuestoes(data||[]);
+    setLoadingQ(false);
+  };
+
+  const novaQuestao=()=>setForm({
+    grupo:selecionado?.grupo||"",materia:selecionado?.materia||"",topico:selecionado?.topico||"",
+    banca:"",fonte:"",nivel:"medio",enunciado:"",
+    alternativas:{A:"",B:"",C:"",D:"",E:""},gabarito:"A",comentario:""
+  });
+
+  const salvarQuestao=async()=>{
+    if(!form.enunciado||!form.grupo||!form.materia||!form.topico) return alert("Preencha todos os campos obrigatórios.");
+    const alts=form.alternativas;
+    if(!alts.A||!alts.B||!alts.C||!alts.D) return alert("Preencha as alternativas A, B, C e D no mínimo.");
+    setSaving(true);
+    const payload={grupo:form.grupo,materia:form.materia,topico:form.topico,
+      banca:form.banca,fonte:form.fonte,nivel:form.nivel,enunciado:form.enunciado,
+      alternativas:form.alternativas,gabarito:form.gabarito,comentario:form.comentario};
+    if(form.id){
+      await supabase.from("questoes").update(payload).eq("id",form.id);
+    }else{
+      await supabase.from("questoes").insert(payload);
+    }
+    setSaving(false);
+    setForm(null);
+    if(selecionado) loadQuestoes(selecionado.grupo,selecionado.materia,selecionado.topico);
+  };
+
+  const excluirQuestao=async(id)=>{
+    if(!confirm("Excluir esta questão?")) return;
+    await supabase.from("questoes").update({ativa:false}).eq("id",id);
+    if(selecionado) loadQuestoes(selecionado.grupo,selecionado.materia,selecionado.topico);
+  };
+
+  const F=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const FA=(k,v)=>setForm(f=>({...f,alternativas:{...f.alternativas,[k]:v}}));
+  const toggleG=(g)=>setExpandido(e=>({...e,[g]:!e[g]}));
+
+  const NIVEIS=[{v:"facil",l:"Fácil 🟢"},{v:"medio",l:"Médio 🟡"},{v:"dificil",l:"Difícil 🔴"}];
+
+  return(
+    <div style={{fontFamily:"'Sora',sans-serif",minHeight:"100vh",background:"#F8F7FF",display:"flex",flexDirection:"column"}}>
+      {/* NAV */}
+      <nav style={{background:C.white,borderBottom:`1px solid ${C.border}`,padding:"0 24px",height:62,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100}}>
+        <div style={{display:"flex",alignItems:"center",gap:16}}>
+          <button onClick={onBack} style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,padding:"6px 14px",fontSize:12,fontWeight:600,color:C.textMed,cursor:"pointer"}}>← Dashboard</button>
+          <div style={{fontFamily:"'Lora',serif",fontSize:16,fontWeight:700,color:C.text}}>Painel Admin — Banco de Questões</div>
+        </div>
+        <button onClick={novaQuestao} style={{padding:"8px 18px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>+ Nova questão</button>
+      </nav>
+
+      <div style={{display:"flex",flex:1,maxWidth:1300,width:"100%",margin:"0 auto",padding:"24px",gap:20,alignItems:"start"}}>
+
+        {/* SIDEBAR — ÁRVORE */}
+        <div style={{width:280,flexShrink:0,background:C.white,borderRadius:16,border:`1px solid ${C.border}`,padding:"16px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+          <div style={{fontSize:11,fontWeight:700,color:C.textLight,letterSpacing:1.2,textTransform:"uppercase",marginBottom:12}}>Banco de questões</div>
+          <input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Buscar matéria..." style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,marginBottom:12,boxSizing:"border-box",outline:"none"}}/>
+          <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:"calc(100vh - 240px)",overflowY:"auto"}}>
+            {grupos.filter(g=>!busca||g.nome.toLowerCase().includes(busca.toLowerCase())||
+              g.materias.some(m=>m.nome.toLowerCase().includes(busca.toLowerCase()))).map(g=>(
+              <div key={g.nome}>
+                <div onClick={()=>toggleG(g.nome)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",borderRadius:8,cursor:"pointer",background:expandido[g.nome]?C.primaryXLight:"transparent",fontWeight:700,fontSize:12,color:expandido[g.nome]?C.primary:C.text}}>
+                  <span>{expandido[g.nome]?"▼":"▶"} {g.nome}</span>
+                  <span style={{fontSize:10,background:expandido[g.nome]?C.primary:"#E5E7EB",color:expandido[g.nome]?"white":C.textMed,borderRadius:100,padding:"2px 7px",fontWeight:700}}>{g.total}</span>
+                </div>
+                {expandido[g.nome]&&g.materias.map(m=>(
+                  <div key={m.nome} style={{marginLeft:12}}>
+                    <div style={{padding:"6px 10px",fontSize:11,fontWeight:600,color:C.textMed,display:"flex",justifyContent:"space-between"}}>
+                      <span>📚 {m.nome}</span>
+                      <span style={{fontSize:10,color:C.textLight}}>{m.total}q</span>
+                    </div>
+                    {m.topicos.map(t=>(
+                      <div key={t.nome} onClick={()=>loadQuestoes(g.nome,m.nome,t.nome)}
+                        style={{marginLeft:12,padding:"5px 10px",borderRadius:6,cursor:"pointer",fontSize:11,
+                          background:selecionado?.topico===t.nome&&selecionado?.materia===m.nome?C.primaryXLight:"transparent",
+                          color:selecionado?.topico===t.nome&&selecionado?.materia===m.nome?C.primary:C.textMed,
+                          display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <span>📄 {t.nome}</span>
+                        <span style={{fontSize:10,color:t.total===0?"#EF4444":C.textLight,fontWeight:t.total===0?700:400}}>{t.total===0?"⚠️ 0":t.total}q</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ))}
+            {grupos.length===0&&<div style={{fontSize:12,color:C.textLight,textAlign:"center",padding:"24px 0"}}>Nenhuma questão cadastrada ainda.<br/>Clique em "+ Nova questão".</div>}
+          </div>
+        </div>
+
+        {/* CONTEÚDO PRINCIPAL */}
+        <div style={{flex:1,minWidth:0}}>
+          {/* FORMULÁRIO */}
+          {form&&(
+            <div style={{background:C.white,borderRadius:16,border:`1px solid ${C.border}`,padding:"24px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)",marginBottom:20}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+                <div style={{fontFamily:"'Lora',serif",fontSize:16,fontWeight:700,color:C.text}}>{form.id?"Editar questão":"Nova questão"}</div>
+                <button onClick={()=>setForm(null)} style={{background:"transparent",border:"none",fontSize:18,cursor:"pointer",color:C.textLight}}>✕</button>
+              </div>
+              {/* Classificação */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:16}}>
+                {[["grupo","Grupo *","Ex: Direito Público"],["materia","Matéria *","Ex: Direito Constitucional"],["topico","Tópico *","Ex: Princípios Fundamentais"]].map(([k,l,p])=>(
+                  <div key={k}>
+                    <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>{l}</div>
+                    <input value={form[k]} onChange={e=>F(k,e.target.value)} placeholder={p}
+                      style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,boxSizing:"border-box",outline:"none"}}/>
+                  </div>
+                ))}
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:16}}>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>Banca</div>
+                  <input value={form.banca} onChange={e=>F("banca",e.target.value)} placeholder="Ex: CESPE"
+                    style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,boxSizing:"border-box",outline:"none"}}/>
+                </div>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>Fonte</div>
+                  <input value={form.fonte} onChange={e=>F("fonte",e.target.value)} placeholder="Ex: TRF 2023"
+                    style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,boxSizing:"border-box",outline:"none"}}/>
+                </div>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>Nível</div>
+                  <select value={form.nivel} onChange={e=>F("nivel",e.target.value)}
+                    style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,boxSizing:"border-box",outline:"none"}}>
+                    {NIVEIS.map(n=><option key={n.v} value={n.v}>{n.l}</option>)}
+                  </select>
+                </div>
+              </div>
+              {/* Enunciado */}
+              <div style={{marginBottom:16}}>
+                <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>Enunciado *</div>
+                <textarea value={form.enunciado} onChange={e=>F("enunciado",e.target.value)} rows={4} placeholder="Digite o enunciado da questão..."
+                  style={{width:"100%",padding:"10px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:13,lineHeight:1.6,resize:"vertical",boxSizing:"border-box",outline:"none"}}/>
+              </div>
+              {/* Alternativas */}
+              <div style={{marginBottom:16}}>
+                <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:8}}>Alternativas *</div>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {["A","B","C","D","E"].map(l=>(
+                    <div key={l} style={{display:"flex",alignItems:"center",gap:10}}>
+                      <div onClick={()=>F("gabarito",l)} style={{width:32,height:32,borderRadius:10,border:`2px solid ${form.gabarito===l?C.primary:C.border}`,background:form.gabarito===l?C.primary:"white",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:form.gabarito===l?"white":C.textMed,cursor:"pointer",flexShrink:0}}>{l}</div>
+                      <input value={form.alternativas[l]} onChange={e=>FA(l,e.target.value)} placeholder={`Alternativa ${l}${l==="E"?" (opcional)":""}`}
+                        style={{flex:1,padding:"8px 12px",border:`1.5px solid ${form.gabarito===l?C.primary:C.border}`,borderRadius:8,fontSize:12,outline:"none"}}/>
+                    </div>
+                  ))}
+                  <div style={{fontSize:11,color:C.textLight,marginTop:4}}>Clique na letra para marcar como gabarito</div>
+                </div>
+              </div>
+              {/* Comentário */}
+              <div style={{marginBottom:20}}>
+                <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>Comentário / Explicação do gabarito</div>
+                <textarea value={form.comentario} onChange={e=>F("comentario",e.target.value)} rows={3} placeholder="Explique por que o gabarito está correto..."
+                  style={{width:"100%",padding:"10px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,lineHeight:1.6,resize:"vertical",boxSizing:"border-box",outline:"none"}}/>
+              </div>
+              <div style={{display:"flex",gap:12,justifyContent:"flex-end"}}>
+                <button onClick={()=>setForm(null)} style={{padding:"10px 20px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer",color:C.textMed}}>Cancelar</button>
+                <button onClick={salvarQuestao} disabled={saving} style={{padding:"10px 24px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",opacity:saving?0.7:1}}>
+                  {saving?"Salvando...":"Salvar questão"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* LISTA DE QUESTÕES */}
+          {selecionado&&!form&&(
+            <div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+                <div>
+                  <div style={{fontSize:11,color:C.textLight,marginBottom:2}}>{selecionado.grupo} → {selecionado.materia}</div>
+                  <div style={{fontFamily:"'Lora',serif",fontSize:18,fontWeight:700,color:C.text}}>{selecionado.topico}</div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:12}}>
+                  <span style={{fontSize:12,color:C.textMed}}>{questoes.length} questões</span>
+                  <button onClick={novaQuestao} style={{padding:"8px 16px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Adicionar</button>
+                </div>
+              </div>
+              {loadingQ?(
+                <div style={{textAlign:"center",padding:"48px",color:C.textLight}}>Carregando...</div>
+              ):questoes.length===0?(
+                <div style={{textAlign:"center",padding:"48px",background:C.white,borderRadius:16,border:`2px dashed ${C.border}`}}>
+                  <div style={{fontSize:32,marginBottom:12}}>📝</div>
+                  <div style={{fontSize:14,fontWeight:600,color:C.text,marginBottom:6}}>Nenhuma questão ainda</div>
+                  <div style={{fontSize:12,color:C.textMed,marginBottom:16}}>Este tópico está sem questões. Adicione a primeira!</div>
+                  <button onClick={novaQuestao} style={{padding:"10px 20px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>+ Adicionar questão</button>
+                </div>
+              ):(
+                <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                  {questoes.map((q,i)=>{
+                    const corNivel=q.nivel==="facil"?"#10B981":q.nivel==="dificil"?"#EF4444":"#F59E0B";
+                    return(
+                      <div key={q.id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
+                              <span style={{background:corNivel+"22",color:corNivel,borderRadius:100,padding:"2px 8px",fontSize:10,fontWeight:700}}>{q.nivel}</span>
+                              {q.banca&&<span style={{background:C.primaryXLight,color:C.primary,borderRadius:100,padding:"2px 8px",fontSize:10,fontWeight:700}}>{q.banca}</span>}
+                              {q.fonte&&<span style={{background:"#F3F4F6",color:C.textMed,borderRadius:100,padding:"2px 8px",fontSize:10}}>{q.fonte}</span>}
+                              {q.gerada_ia&&<span style={{background:"#EFF6FF",color:"#3B82F6",borderRadius:100,padding:"2px 8px",fontSize:10,fontWeight:700}}>🤖 IA</span>}
+                            </div>
+                            <div style={{fontSize:13,color:C.text,lineHeight:1.6,marginBottom:8}}>{q.enunciado.substring(0,200)}{q.enunciado.length>200?"...":""}</div>
+                            <div style={{fontSize:11,color:C.textMed}}>Gabarito: <strong style={{color:C.primary}}>{q.gabarito}</strong></div>
+                          </div>
+                          <div style={{display:"flex",gap:8,flexShrink:0}}>
+                            <button onClick={()=>setForm({...q})} style={{padding:"6px 12px",background:C.primaryXLight,color:C.primary,border:"none",borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer"}}>Editar</button>
+                            <button onClick={()=>excluirQuestao(q.id)} style={{padding:"6px 12px",background:"#FEE2E2",color:"#EF4444",border:"none",borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer"}}>Excluir</button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!selecionado&&!form&&(
+            <div style={{textAlign:"center",padding:"80px 24px",background:C.white,borderRadius:16,border:`1px solid ${C.border}`}}>
+              <div style={{fontSize:48,marginBottom:16}}>📚</div>
+              <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,color:C.text,marginBottom:8}}>Selecione um tópico</div>
+              <div style={{fontSize:13,color:C.textMed,marginBottom:24}}>Escolha um tópico na árvore ao lado para ver e gerenciar as questões.<br/>Ou clique em "+ Nova questão" para começar.</div>
+              <div style={{display:"flex",justifyContent:"center",gap:16,flexWrap:"wrap"}}>
+                {[{l:"Total de grupos",v:grupos.length},{l:"Total de matérias",v:grupos.reduce((s,g)=>s+g.materias.length,0)},{l:"Total de questões",v:grupos.reduce((s,g)=>s+g.total,0)}].map(s=>(
+                  <div key={s.l} style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:12,padding:"16px 24px",textAlign:"center"}}>
+                    <div style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:800,color:C.primary}}>{s.v}</div>
+                    <div style={{fontSize:11,color:C.textLight,marginTop:4}}>{s.l}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── SESSÃO DE ESTUDOS ─────────────────────────────────────── */
+function SessaoEstudos({user,plano,onConcluir,onVoltar}){
+  const [fase,setFase]=React.useState("carregando"); // carregando|estudando|resultado
+  const [questoes,setQuestoes]=React.useState([]);
+  const [idx,setIdx]=React.useState(0);
+  const [respostas,setRespostas]=React.useState([]);
+  const [selecionada,setSelecionada]=React.useState(null);
+  const [confirmada,setConfirmada]=React.useState(false);
+  const [gerandoIA,setGerandoIA]=React.useState(false);
+  const [iniciouEm]=React.useState(Date.now());
+  const [salvandoCaderno,setSalvandoCaderno]=React.useState(false);
+  const [noCaderno,setNoCaderno]=React.useState(false);
+  const [sessaoId,setSessaoId]=React.useState(null);
+
+  // Carrega questões baseadas no plano do dia
+  React.useEffect(()=>{loadQuestoes();},[]);
+
+  const loadQuestoes=async()=>{
+    setFase("carregando");
+    try{
+      // Pega matérias do dia do cronograma
+      const today=new Date().getDay();
+      const diasEstudo=[1,2,3,4,5];
+      if(Number(plano?.horas)>=20) diasEstudo.push(6);
+
+      if(!diasEstudo.includes(today)){
+        setQuestoes([]);
+        setFase("estudando");
+        return;
+      }
+
+      const mats=getMatsHoje(plano);
+      if(!mats.length){setQuestoes([]);setFase("estudando");return;}
+
+      // Busca questões do banco para cada matéria
+      const todasQ=[];
+      for(const m of mats){
+        const{data}=await supabase.from("questoes")
+          .select("*").eq("materia",m.nome).eq("ativa",true)
+          .order("created_at",{ascending:false}).limit(m.qtd*2);
+
+        if(data&&data.length>=m.qtd){
+          // Tem questões suficientes — embaralha e pega a quantidade certa
+          const shuffled=data.sort(()=>Math.random()-0.5).slice(0,m.qtd);
+          todasQ.push(...shuffled);
+        }else{
+          // Poucos ou nenhum — usa o que tem + gera o resto com IA
+          if(data) todasQ.push(...data);
+          const faltam=m.qtd-(data?.length||0);
+          if(faltam>0){
+            setGerandoIA(true);
+            const geradas=await gerarQuestoesIA(plano,m,faltam);
+            todasQ.push(...geradas);
+            setGerandoIA(false);
+          }
+        }
+      }
+
+      // Cria sessão no Supabase
+      const{data:sessao}=await supabase.from("sessoes_estudo")
+        .insert({user_id:user.id,materias:mats.map(m=>m.nome),total_questoes:todasQ.length})
+        .select().single();
+      if(sessao) setSessaoId(sessao.id);
+
+      setQuestoes(todasQ);
+      setFase("estudando");
+    }catch(e){
+      setQuestoes([]);
+      setFase("estudando");
+    }
+  };
+
+  const getMatsHoje=(p)=>{
+    if(!p?.grupos) return [];
+    const flat=[];
+    (p.grupos||[]).forEach(g=>{
+      (g.materias||[]).forEach(m=>flat.push({grupo:g.nome,nome:m.nome,questoes:Number(m.questoes)||0}));
+    });
+    const sorted=flat.sort((a,b)=>b.questoes-a.questoes);
+    const meta=Math.min(80,Math.max(30,Math.round(((Number(p.horas)||14)/7)*18)));
+    const tot=sorted.reduce((s,m)=>s+m.questoes,0)||1;
+    return sorted.slice(0,4).map(m=>({
+      ...m,
+      qtd:Math.max(5,Math.round(meta*(m.questoes/tot)))
+    }));
+  };
+
+  const gerarQuestoesIA=async(p,materia,quantidade)=>{
+    try{
+      const prompt=`Você é um especialista em concursos públicos.
+Gere ${quantidade} questões de múltipla escolha sobre "${materia.nome}" no estilo da banca ${p?.banca||"CESPE"}.
+Retorne SOMENTE um JSON válido assim:
+[{"enunciado":"...","alternativas":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"gabarito":"A","comentario":"..."}]
+Nível médio. Sem texto fora do JSON.`;
+
+      const resp=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,messages:[{role:"user",content:prompt}]})
+      });
+      const d=await resp.json();
+      const text=d.content?.[0]?.text||"[]";
+      const clean=text.replace(/```json|```/g,"").trim();
+      const arr=JSON.parse(clean);
+      // Salva as geradas no banco para reutilizar
+      const para_salvar=arr.map(q=>({
+        grupo:materia.grupo,materia:materia.nome,topico:"Gerado por IA",
+        banca:p?.banca||"",nivel:"medio",gerada_ia:true,...q
+      }));
+      const{data}=await supabase.from("questoes").insert(para_salvar).select();
+      return data||arr.map((q,i)=>({...q,id:`ia_${i}`,grupo:materia.grupo,materia:materia.nome,topico:"Gerado por IA",gerada_ia:true}));
+    }catch(e){return [];}
+  };
+
+  const confirmarResposta=async()=>{
+    if(!selecionada) return;
+    const q=questoes[idx];
+    const correta=selecionada===q.gabarito;
+    const resp={questao_id:q.id,resposta:selecionada,correta,materia:q.materia,topico:q.topico};
+    setRespostas(r=>[...r,resp]);
+    setConfirmada(true);
+    setNoCaderno(false);
+    // Salva resposta no Supabase
+    if(sessaoId&&q.id&&!q.id.startsWith("ia_")){
+      supabase.from("respostas_sessao").insert({
+        sessao_id:sessaoId,user_id:user.id,questao_id:q.id,resposta:selecionada,correta
+      }).then(()=>{});
+    }
+  };
+
+  const salvarNoCaderno=async()=>{
+    const q=questoes[idx];
+    if(!q.id||q.id.startsWith("ia_")) return;
+    setSalvandoCaderno(true);
+    const revisarEm=new Date();
+    revisarEm.setDate(revisarEm.getDate()+1);
+    await supabase.from("caderno_erros").upsert({
+      user_id:user.id,questao_id:q.id,materia:q.materia,topico:q.topico,
+      resposta_dada:selecionada,revisar_em:revisarEm.toISOString().split("T")[0]
+    },{onConflict:"user_id,questao_id"});
+    // Atualiza resposta com no_caderno=true
+    if(sessaoId){
+      supabase.from("respostas_sessao").update({no_caderno:true})
+        .eq("sessao_id",sessaoId).eq("questao_id",q.id).then(()=>{});
+    }
+    setNoCaderno(true);
+    setSalvandoCaderno(false);
+  };
+
+  const proxima=()=>{
+    if(idx+1>=questoes.length){
+      finalizarSessao();
+    }else{
+      setIdx(i=>i+1);
+      setSelecionada(null);
+      setConfirmada(false);
+      setNoCaderno(false);
+    }
+  };
+
+  const finalizarSessao=async()=>{
+    const acertos=respostas.filter(r=>r.correta).length;
+    const erros=respostas.filter(r=>!r.correta).length;
+    const aprov=respostas.length>0?Math.round((acertos/respostas.length)*100):0;
+    const duracao=Math.round((Date.now()-iniciouEm)/60000);
+    // Finaliza sessão no Supabase
+    if(sessaoId){
+      await supabase.from("sessoes_estudo").update({
+        total_questoes:respostas.length,total_acertos:acertos,
+        total_erros:erros,aproveitamento:aprov,duracao_minutos:duracao,concluida:true
+      }).eq("id",sessaoId);
+    }
+    // Atualiza evolução geral
+    const{data:ev}=await supabase.from("evolucao").select("*").eq("user_id",user.id).maybeSingle();
+    if(ev){
+      const novoTotal=ev.total_questoes_feitas+respostas.length;
+      const novosAcertos=ev.total_acertos+acertos;
+      await supabase.from("evolucao").update({
+        total_questoes_feitas:novoTotal,total_acertos:novosAcertos,
+        total_erros:ev.total_erros+erros,
+        aproveitamento_geral:novoTotal>0?Math.round((novosAcertos/novoTotal)*100):0
+      }).eq("user_id",user.id);
+    }
+    // Atualiza streak
+    await supabase.from("alunos").update({ultimo_acesso:new Date().toISOString()}).eq("id",user.id);
+    setFase("resultado");
+  };
+
+  const q=questoes[idx];
+  const acertosAte=respostas.filter(r=>r.correta).length;
+  const LETRAS=["A","B","C","D","E"];
+  const corLetra=(l)=>{
+    if(!confirmada) return selecionada===l?{bg:C.primaryXLight,border:C.primary,color:C.primary}:{bg:"white",border:C.border,color:C.text};
+    if(l===q?.gabarito) return{bg:"#D1FAE5",border:"#10B981",color:"#065F46"};
+    if(l===selecionada&&l!==q?.gabarito) return{bg:"#FEE2E2",border:"#EF4444",color:"#991B1B"};
+    return{bg:"#F9FAFB",border:C.border,color:C.textLight};
+  };
+
+  // ── TELA: CARREGANDO ──
+  if(fase==="carregando") return(
+    <div style={{height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,gap:20}}>
+      <div style={{width:48,height:48,border:"4px solid rgba(255,255,255,0.2)",borderTop:"4px solid white",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+      <div style={{color:"white",fontSize:14,fontWeight:600}}>{gerandoIA?"🤖 Gerando questões com IA...":"Preparando sua sessão de estudos..."}</div>
+    </div>
+  );
+
+  // ── TELA: RESULTADO ──
+  if(fase==="resultado"){
+    const total=respostas.length;
+    const acertos=respostas.filter(r=>r.correta).length;
+    const aprov=total>0?Math.round((acertos/total)*100):0;
+    const cor=aprov>=70?"#10B981":aprov>=50?"#F59E0B":"#EF4444";
+    const duracao=Math.round((Date.now()-iniciouEm)/60000);
+    // Por matéria
+    const porMat={};
+    respostas.forEach(r=>{
+      if(!porMat[r.materia]) porMat[r.materia]={a:0,t:0};
+      porMat[r.materia].t++;
+      if(r.correta) porMat[r.materia].a++;
+    });
+    return(
+      <div style={{minHeight:"100vh",background:`linear-gradient(135deg,#1E1B4B 0%,${C.primary} 100%)`,display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}}>
+        <div style={{background:"white",borderRadius:24,padding:"40px 36px",maxWidth:520,width:"100%",boxShadow:"0 24px 64px rgba(0,0,0,0.3)"}}>
+          <div style={{textAlign:"center",marginBottom:28}}>
+            <div style={{fontSize:48,marginBottom:8}}>{aprov>=70?"🏆":aprov>=50?"📈":"💪"}</div>
+            <div style={{fontFamily:"'Lora',serif",fontSize:26,fontWeight:800,color:cor}}>{aprov}%</div>
+            <div style={{fontSize:13,color:C.textMed,marginTop:4}}>de aproveitamento</div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:24}}>
+            {[{l:"Questões",v:total,c:C.primary},{l:"Acertos",v:acertos,c:"#10B981"},{l:"Tempo",v:`${duracao}min`,c:C.textMed}].map(s=>(
+              <div key={s.l} style={{background:C.bg,borderRadius:12,padding:"14px",textAlign:"center"}}>
+                <div style={{fontFamily:"'Lora',serif",fontSize:22,fontWeight:800,color:s.c}}>{s.v}</div>
+                <div style={{fontSize:10,color:C.textLight,marginTop:4}}>{s.l}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{marginBottom:24}}>
+            <div style={{fontSize:11,fontWeight:700,color:C.textLight,letterSpacing:1,textTransform:"uppercase",marginBottom:12}}>Por matéria</div>
+            {Object.entries(porMat).map(([mat,d])=>{
+              const pct=Math.round((d.a/d.t)*100);
+              const c2=pct>=70?"#10B981":pct>=50?"#F59E0B":"#EF4444";
+              return(
+                <div key={mat} style={{marginBottom:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                    <span style={{fontSize:12,color:C.text,fontWeight:600}}>{mat}</span>
+                    <span style={{fontSize:12,fontWeight:700,color:c2}}>{d.a}/{d.t} ({pct}%)</span>
+                  </div>
+                  <div style={{height:6,background:"#F3F4F6",borderRadius:100}}>
+                    <div style={{height:"100%",width:`${pct}%`,background:c2,borderRadius:100}}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <div style={{padding:"12px 16px",background:aprov>=70?"#D1FAE5":"#FEF3C7",borderRadius:12,fontSize:12,color:aprov>=70?"#065F46":"#92400E",textAlign:"center",fontWeight:600}}>
+              {aprov>=70?"🎯 Ótimo desempenho! Continue nesse ritmo.":aprov>=50?"📚 Bom! Revise os erros no caderno.":"💪 Revise as matérias com erro antes de avançar."}
+            </div>
+            <button onClick={onConcluir} style={{padding:"14px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 14px rgba(108,60,225,0.3)"}}>
+              Voltar ao painel →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── TELA: QUESTÃO ──
+  if(questoes.length===0) return(
+    <div style={{height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:C.bg,gap:16}}>
+      <div style={{fontSize:48}}>😴</div>
+      <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,color:C.text}}>Hoje é dia de descanso!</div>
+      <div style={{fontSize:13,color:C.textMed}}>Sem questões programadas para hoje. Aproveite.</div>
+      <button onClick={onVoltar} style={{padding:"12px 24px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>Voltar</button>
+    </div>
+  );
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column"}}>
+      {/* BARRA DE PROGRESSO */}
+      <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,padding:"16px 24px",position:"sticky",top:0,zIndex:100}}>
+        <div style={{maxWidth:720,margin:"0 auto"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,color:"white"}}>
+            <button onClick={onVoltar} style={{background:"rgba(255,255,255,0.15)",border:"none",color:"white",borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer"}}>← Sair</button>
+            <span style={{fontSize:12,fontWeight:700}}>Questão {idx+1} de {questoes.length}</span>
+            <span style={{fontSize:12,background:"rgba(255,255,255,0.2)",padding:"4px 10px",borderRadius:100}}>{acertosAte} ✓</span>
+          </div>
+          <div style={{height:6,background:"rgba(255,255,255,0.2)",borderRadius:100}}>
+            <div style={{height:"100%",width:`${((idx+1)/questoes.length)*100}%`,background:"white",borderRadius:100,transition:"width 0.4s ease"}}/>
+          </div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",marginTop:6}}>{q?.materia} · {q?.topico}</div>
+        </div>
+      </div>
+
+      {/* QUESTÃO */}
+      <div style={{flex:1,maxWidth:720,width:"100%",margin:"0 auto",padding:"28px 20px"}}>
+        <div style={{background:"white",borderRadius:20,padding:"28px 28px",boxShadow:"0 4px 20px rgba(0,0,0,0.08)",marginBottom:16}}>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
+            {q?.banca&&<span style={{background:C.primaryXLight,color:C.primary,borderRadius:100,padding:"3px 10px",fontSize:10,fontWeight:700}}>{q.banca}</span>}
+            {q?.fonte&&<span style={{background:"#F3F4F6",color:C.textMed,borderRadius:100,padding:"3px 10px",fontSize:10}}>{q.fonte}</span>}
+            {q?.gerada_ia&&<span style={{background:"#EFF6FF",color:"#3B82F6",borderRadius:100,padding:"3px 10px",fontSize:10,fontWeight:700}}>🤖 IA</span>}
+            <span style={{background:q?.nivel==="facil"?"#D1FAE5":q?.nivel==="dificil"?"#FEE2E2":"#FEF3C7",color:q?.nivel==="facil"?"#065F46":q?.nivel==="dificil"?"#991B1B":"#92400E",borderRadius:100,padding:"3px 10px",fontSize:10,fontWeight:700}}>
+              {q?.nivel==="facil"?"🟢 Fácil":q?.nivel==="dificil"?"🔴 Difícil":"🟡 Médio"}
+            </span>
+          </div>
+          <div style={{fontSize:15,lineHeight:1.8,color:C.text,marginBottom:24}}>{q?.enunciado}</div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {LETRAS.filter(l=>q?.alternativas?.[l]).map(l=>{
+              const c=corLetra(l);
+              return(
+                <button key={l} onClick={()=>!confirmada&&setSelecionada(l)}
+                  style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 16px",border:`2px solid ${c.border}`,borderRadius:12,background:c.bg,cursor:confirmada?"default":"pointer",textAlign:"left",transition:"all 0.15s"}}>
+                  <span style={{width:28,height:28,borderRadius:8,border:`2px solid ${c.border}`,background:c.border===C.border?"transparent":c.border,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:c.color,flexShrink:0}}>{l}</span>
+                  <span style={{fontSize:13,lineHeight:1.6,color:c.color}}>{q?.alternativas?.[l]}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* GABARITO + COMENTÁRIO */}
+        {confirmada&&(
+          <div style={{background:"white",borderRadius:16,padding:"20px 24px",boxShadow:"0 4px 16px rgba(0,0,0,0.06)",marginBottom:16,animation:"bounceIn 0.3s ease"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+              <div style={{fontSize:20}}>{selecionada===q?.gabarito?"✅":"❌"}</div>
+              <div style={{fontFamily:"'Lora',serif",fontSize:16,fontWeight:700,color:selecionada===q?.gabarito?"#065F46":"#991B1B"}}>
+                {selecionada===q?.gabarito?"Resposta correta!":"Resposta incorreta"}
+              </div>
+              {selecionada!==q?.gabarito&&<span style={{fontSize:12,color:C.textMed}}>Gabarito: <strong style={{color:C.primary}}>{q?.gabarito}</strong></span>}
+            </div>
+            {q?.comentario&&<div style={{fontSize:13,color:C.text,lineHeight:1.7,padding:"12px 14px",background:C.bg,borderRadius:10,marginBottom:12}}>{q.comentario}</div>}
+            {selecionada!==q?.gabarito&&(
+              <button onClick={salvarNoCaderno} disabled={noCaderno||salvandoCaderno}
+                style={{display:"flex",alignItems:"center",gap:8,padding:"8px 14px",background:noCaderno?"#D1FAE5":"#FEF3C7",border:`1px solid ${noCaderno?"#10B981":"#FDE68A"}`,borderRadius:10,fontSize:12,fontWeight:700,cursor:noCaderno?"default":"pointer",color:noCaderno?"#065F46":"#92400E"}}>
+                {noCaderno?"✅ Salvo no caderno de erros":"📓 Salvar no caderno de erros"}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* BOTÕES */}
+        <div style={{display:"flex",gap:12,justifyContent:"space-between"}}>
+          {!confirmada?(
+            <button onClick={confirmarResposta} disabled={!selecionada}
+              style={{flex:1,padding:"14px",background:selecionada?`linear-gradient(135deg,${C.primary},${C.primaryLight})`:"#E5E7EB",color:selecionada?"white":C.textLight,border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:selecionada?"pointer":"not-allowed",boxShadow:selecionada?"0 4px 14px rgba(108,60,225,0.3)":"none"}}>
+              Confirmar resposta
+            </button>
+          ):(
+            <button onClick={proxima}
+              style={{flex:1,padding:"14px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 14px rgba(108,60,225,0.3)"}}>
+              {idx+1>=questoes.length?"Ver resultado 🏆":"Próxima →"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── DASHBOARD ─────────────────────────────────────────────────── */
 function Dashboard({user,onLogout}){
   const [tab,setTab]=React.useState("cronograma");
   const [plan,setPlan]=React.useState(null);
   const [loading,setLoading]=React.useState(true);
   const [simuladoConfirmado,setSimuladoConfirmado]=React.useState(false);
+  const [subTela,setSubTela]=React.useState(null); // null | "sessao" | "admin"
+  const isAdmin=user?.email==='leone@dominabanca.com.br' || user?.email?.endsWith("@dominabanca.com.br");
 
   React.useEffect(()=>{
     (async()=>{
@@ -731,6 +1370,9 @@ function Dashboard({user,onLogout}){
     </div>
   );
 
+  if(subTela==="sessao") return <SessaoEstudos user={user} plano={plan} onConcluir={()=>setSubTela(null)} onVoltar={()=>setSubTela(null)}/>;
+  if(subTela==="admin") return <AdminPanel user={user} onBack={()=>setSubTela(null)}/>;
+
   return(
     <div style={{fontFamily:"'Sora',sans-serif",background:C.bg,minHeight:"100vh",display:"flex",flexDirection:"column"}}>
 
@@ -746,6 +1388,7 @@ function Dashboard({user,onLogout}){
             <div style={{width:34,height:34,borderRadius:"50%",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontWeight:800,fontSize:13}}>
               {getNomeAluno().charAt(0).toUpperCase()}
             </div>
+            {isAdmin&&<button onClick={()=>setSubTela("admin")} style={{fontSize:12,color:C.primary,background:C.primaryXLight,border:`1px solid ${C.borderPurple}`,borderRadius:8,padding:"6px 14px",cursor:"pointer",fontWeight:700}}>⚙️ Admin</button>}
             <button onClick={onLogout} style={{fontSize:12,color:C.textLight,background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,padding:"6px 14px",cursor:"pointer",fontWeight:600}}>Sair</button>
           </div>
         </div>
@@ -890,7 +1533,7 @@ function Dashboard({user,onLogout}){
                           <div style={{fontSize:22,fontWeight:800,color:C.primary,fontFamily:"'Lora',serif"}}>{todayPlan.total}</div>
                           <div style={{fontSize:10,color:C.primary,fontWeight:700,letterSpacing:0.5}}>questões hoje</div>
                         </div>
-                        <button style={{padding:"12px 20px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:12,fontSize:13,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 14px rgba(108,60,225,0.35)",whiteSpace:"nowrap",lineHeight:1.3,textAlign:"center"}}>
+                        <button style={{padding:"12px 20px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:12,fontSize:13,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 14px rgba(108,60,225,0.35)",whiteSpace:"nowrap",lineHeight:1.3,textAlign:"center"}} onClick={()=>setSubTela("sessao")}>
                           🚀 Começar<br/>estudos agora
                         </button>
                       </div>
