@@ -878,7 +878,6 @@ function SessaoEstudos({user,plano,onConcluir,onVoltar}){
   const [respostas,setRespostas]=React.useState([]);
   const [selecionada,setSelecionada]=React.useState(null);
   const [confirmada,setConfirmada]=React.useState(false);
-  const [gerandoIA,setGerandoIA]=React.useState(false);
   const [iniciouEm]=React.useState(Date.now());
   const [salvandoCaderno,setSalvandoCaderno]=React.useState(false);
   const [noCaderno,setNoCaderno]=React.useState(false);
@@ -911,21 +910,13 @@ function SessaoEstudos({user,plano,onConcluir,onVoltar}){
           .select("*").eq("materia",m.nome).eq("ativa",true)
           .order("created_at",{ascending:false}).limit(m.qtd*2);
 
-        if(data&&data.length>=m.qtd){
-          // Tem questões suficientes — embaralha e pega a quantidade certa
+        if(data&&data.length>0){
+          // Embaralha e usa o que tiver disponível
           const shuffled=data.sort(()=>Math.random()-0.5).slice(0,m.qtd);
           todasQ.push(...shuffled);
-        }else{
-          // Poucos ou nenhum — usa o que tem + gera o resto com IA
-          if(data) todasQ.push(...data);
-          const faltam=m.qtd-(data?.length||0);
-          if(faltam>0){
-            setGerandoIA(true);
-            const geradas=await gerarQuestoesIA(plano,m,faltam);
-            todasQ.push(...geradas);
-            setGerandoIA(false);
-          }
         }
+        // Se não tiver questões suficientes, usa só o que tem
+        // Novas questões são adicionadas pelo admin no painel
       }
 
       // Cria sessão no Supabase
@@ -957,32 +948,7 @@ function SessaoEstudos({user,plano,onConcluir,onVoltar}){
     }));
   };
 
-  const gerarQuestoesIA=async(p,materia,quantidade)=>{
-    try{
-      const prompt=`Você é um especialista em concursos públicos.
-Gere ${quantidade} questões de múltipla escolha sobre "${materia.nome}" no estilo da banca ${p?.banca||"CESPE"}.
-Retorne SOMENTE um JSON válido assim:
-[{"enunciado":"...","alternativas":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"gabarito":"A","comentario":"..."}]
-Nível médio. Sem texto fora do JSON.`;
 
-      const resp=await fetch("https://api.anthropic.com/v1/messages",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,messages:[{role:"user",content:prompt}]})
-      });
-      const d=await resp.json();
-      const text=d.content?.[0]?.text||"[]";
-      const clean=text.replace(/```json|```/g,"").trim();
-      const arr=JSON.parse(clean);
-      // Salva as geradas no banco para reutilizar
-      const para_salvar=arr.map(q=>({
-        grupo:materia.grupo,materia:materia.nome,topico:"Gerado por IA",
-        banca:p?.banca||"",nivel:"medio",gerada_ia:true,...q
-      }));
-      const{data}=await supabase.from("questoes").insert(para_salvar).select();
-      return data||arr.map((q,i)=>({...q,id:`ia_${i}`,grupo:materia.grupo,materia:materia.nome,topico:"Gerado por IA",gerada_ia:true}));
-    }catch(e){return [];}
-  };
 
   const confirmarResposta=async()=>{
     if(!selecionada) return;
@@ -1072,7 +1038,7 @@ Nível médio. Sem texto fora do JSON.`;
   if(fase==="carregando") return(
     <div style={{height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,gap:20}}>
       <div style={{width:48,height:48,border:"4px solid rgba(255,255,255,0.2)",borderTop:"4px solid white",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
-      <div style={{color:"white",fontSize:14,fontWeight:600}}>{gerandoIA?"🤖 Gerando questões com IA...":"Preparando sua sessão de estudos..."}</div>
+      <div style={{color:"white",fontSize:14,fontWeight:600}}>"Preparando sua sessão de estudos..."</div>
     </div>
   );
 
@@ -1236,7 +1202,7 @@ function Dashboard({user,onLogout}){
   const [loading,setLoading]=React.useState(true);
   const [simuladoConfirmado,setSimuladoConfirmado]=React.useState(false);
   const [subTela,setSubTela]=React.useState(null); // null | "sessao" | "admin"
-  const isAdmin=user?.email==='leone@dominabanca.com.br' || user?.email?.endsWith("@dominabanca.com.br");
+  const isAdmin=user?.email==='leonemattosdealmeida@gmail.com';
 
   React.useEffect(()=>{
     (async()=>{
