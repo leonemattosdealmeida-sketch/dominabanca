@@ -61,6 +61,8 @@ const css = `
     .stats-grid{grid-template-columns:1fr!important;}
     .cal-grid{grid-template-columns:repeat(4,1fr)!important;}
     .dash-grid{grid-template-columns:1fr!important;}
+    .hero-stats{flex-direction:column!important;}
+    .top-cards{grid-template-columns:1fr!important;}
     .hero-section{grid-template-columns:1fr!important;padding:40px 16px 32px!important;}
     .redacao-grid{grid-template-columns:1fr!important;}
     .plans-grid{grid-template-columns:1fr!important;}
@@ -813,8 +815,63 @@ function Dashboard({user,onLogout}){
               );
             })()}
 
+            {/* TOP CARDS — 3 colunas */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16,marginBottom:4}} className="top-cards">
+              {/* Card: Progresso hoje */}
+              {(()=>{
+                const feitas=0;
+                const pct=meta>0?Math.min(100,Math.round((feitas/meta)*100)):0;
+                const cor=pct>=100?"#10B981":pct>=50?C.primary:"#F59E0B";
+                return(
+                  <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"20px 22px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+                    <div style={{fontSize:11,fontWeight:700,color:C.textLight,letterSpacing:1.2,textTransform:"uppercase",marginBottom:10}}>⚡ Progresso hoje</div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:8}}>
+                      <span style={{fontSize:26,fontWeight:800,color:cor,fontFamily:"'Lora',serif"}}>{pct}%</span>
+                      <span style={{fontSize:11,color:C.textMed,fontWeight:600}}>{feitas}/{meta}q</span>
+                    </div>
+                    <div style={{height:6,background:"#F3F4F6",borderRadius:100,overflow:"hidden",marginBottom:10}}>
+                      <div style={{height:"100%",width:`${pct||2}%`,background:cor,borderRadius:100,transition:"width 1s ease"}}/>
+                    </div>
+                    <div style={{fontSize:11,color:C.textLight}}>Restam: <strong style={{color:C.primary}}>{Math.max(0,meta-feitas)} questões</strong></div>
+                  </div>
+                );
+              })()}
+              {/* Card: Sequência */}
+              <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:16,padding:"20px 22px",boxShadow:"0 4px 16px rgba(108,60,225,0.25)",color:"white"}}>
+                <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.2,textTransform:"uppercase",marginBottom:10}}>🔥 Sequência</div>
+                <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:8}}>
+                  <span style={{fontSize:26,fontWeight:800,fontFamily:"'Lora',serif"}}>0</span>
+                  <span style={{fontSize:11,color:"rgba(255,255,255,0.7)"}}>dias consecutivos</span>
+                </div>
+                <div style={{display:"flex",gap:4,marginTop:6}}>
+                  {["S","T","Q","Q","S","S","D"].map((d,i)=>(
+                    <div key={i} style={{flex:1,height:22,borderRadius:6,background:"rgba(255,255,255,0.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:700,color:"rgba(255,255,255,0.5)"}}>
+                      {d}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Card: Dias para prova */}
+              <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"20px 22px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+                <div style={{fontSize:11,fontWeight:700,color:C.textLight,letterSpacing:1.2,textTransform:"uppercase",marginBottom:10}}>🎯 Meta do plano</div>
+                <div style={{display:"flex",gap:16,alignItems:"center"}}>
+                  {dias!=null&&(
+                    <div style={{textAlign:"center"}}>
+                      <div style={{fontSize:26,fontWeight:800,color:dias<=30?"#EF4444":C.primary,fontFamily:"'Lora',serif",lineHeight:1}}>{dias}</div>
+                      <div style={{fontSize:10,color:C.textLight,marginTop:4}}>dias p/ prova</div>
+                    </div>
+                  )}
+                  <div style={{flex:1,paddingLeft:dias!=null?12:0,borderLeft:dias!=null?`1px solid ${C.border}`:"none"}}>
+                    <div style={{fontSize:22,fontWeight:800,color:C.primary,fontFamily:"'Lora',serif",lineHeight:1}}>{meta}q</div>
+                    <div style={{fontSize:10,color:C.textLight,marginTop:4}}>meta diária</div>
+                    <div style={{fontSize:10,color:C.textMed,marginTop:6}}>{getPrevisoSemanas()} sem p/ concluir</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* GRID PRINCIPAL */}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 320px",gap:22,alignItems:"start"}} className="dash-grid">
+            <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:22,alignItems:"start"}} className="dash-grid">
 
               {/* COLUNA ESQUERDA */}
               <div style={{display:"flex",flexDirection:"column",gap:22}}>
@@ -879,34 +936,6 @@ function Dashboard({user,onLogout}){
               {/* SIDEBAR DIREITA */}
               <div style={{display:"flex",flexDirection:"column",gap:16}}>
 
-                {/* PROGRESSO HOJE */}
-                <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"22px 20px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
-                  <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:16}}>⚡ Seu progresso hoje</div>
-                  {(()=>{
-                    const feitas=0;
-                    const pct=meta>0?Math.min(100,Math.round((feitas/meta)*100)):0;
-                    const cor=pct>=100?"#10B981":pct>=50?C.primary:"#F59E0B";
-                    return(
-                      <div>
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:8}}>
-                          <div>
-                            <span style={{fontSize:28,fontWeight:800,color:cor,fontFamily:"'Lora',serif"}}>{pct}%</span>
-                            <span style={{fontSize:11,color:C.textLight,marginLeft:6}}>da meta</span>
-                          </div>
-                          <span style={{fontSize:11,color:C.textMed,fontWeight:600}}>{feitas}/{meta}q</span>
-                        </div>
-                        <div style={{height:8,background:"#F3F4F6",borderRadius:100,overflow:"hidden",marginBottom:12}}>
-                          <div style={{height:"100%",width:`${pct||2}%`,background:`linear-gradient(90deg,${cor},${cor}cc)`,borderRadius:100,transition:"width 1s ease"}}/>
-                        </div>
-                        <div style={{display:"flex",justifyContent:"space-between",padding:"8px 12px",background:C.bg,borderRadius:10}}>
-                          <span style={{fontSize:11,color:C.textMed}}>Restam hoje</span>
-                          <span style={{fontSize:12,fontWeight:800,color:C.primary}}>{Math.max(0,meta-feitas)}q</span>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-
                 {/* EVOLUÇÃO — comparação consigo mesmo */}
                 <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"22px 20px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
                   <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:4}}>📈 Sua evolução</div>
@@ -949,21 +978,6 @@ function Dashboard({user,onLogout}){
                     <div style={{fontSize:12,fontWeight:700,color:"#92400E"}}>{mats[mats.length-1]?.nome||"—"}</div>
                     <div style={{fontSize:10,color:"#F97316"}}>Menor peso — não negligencie</div>
                   </div>
-                </div>
-
-                {/* SEQUÊNCIA */}
-                <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:18,padding:"20px",boxShadow:"0 4px 20px rgba(108,60,225,0.3)",textAlign:"center",color:"white"}}>
-                  <div style={{fontSize:28,marginBottom:6}}>🔥</div>
-                  <div style={{fontFamily:"'Lora',serif",fontSize:36,fontWeight:800}}>0</div>
-                  <div style={{fontSize:12,color:"rgba(255,255,255,0.8)",marginTop:4,fontWeight:600}}>dias consecutivos</div>
-                  <div style={{display:"flex",justifyContent:"space-around",marginTop:14,gap:4}}>
-                    {["S","T","Q","Q","S","S","D"].map((d,i)=>(
-                      <div key={i} style={{flex:1,height:28,borderRadius:8,background:"rgba(255,255,255,0.1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.4)"}}>
-                        {d}
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{fontSize:9,color:"rgba(255,255,255,0.4)",marginTop:6}}>Comece hoje e construa sua sequência</div>
                 </div>
 
                 {/* SIMULADO COLETIVO */}
