@@ -641,7 +641,7 @@ function AdminPanel({user,onBack}){
 
   const novaQuestao=()=>setForm({
     grupo:selecionado?.grupo||"",materia:selecionado?.materia||"",topico:selecionado?.topico||"",
-    banca:"",fonte:"",nivel:"medio",enunciado:"",
+    banca:"",fonte:"",nivel:"medio",tipo:"multipla",enunciado:"",
     alternativas:{A:"",B:"",C:"",D:"",E:""},gabarito:"A",comentario:""
   });
 
@@ -651,8 +651,9 @@ function AdminPanel({user,onBack}){
     if(!alts.A||!alts.B||!alts.C||!alts.D) return alert("Preencha as alternativas A, B, C e D no mínimo.");
     setSaving(true);
     const payload={grupo:form.grupo,materia:form.materia,topico:form.topico,
-      banca:form.banca,fonte:form.fonte,nivel:form.nivel,enunciado:form.enunciado,
-      alternativas:form.alternativas,gabarito:form.gabarito,comentario:form.comentario};
+      banca:form.banca,fonte:form.fonte,nivel:form.nivel,tipo:form.tipo||"multipla",enunciado:form.enunciado,
+      alternativas:(form.tipo||"multipla")==="certo_errado"?{C:"Certo",E:"Errado"}:form.alternativas,
+      gabarito:form.gabarito,comentario:form.comentario};
     if(form.id){
       await supabase.from("questoes").update(payload).eq("id",form.id);
     }else{
@@ -761,6 +762,14 @@ function AdminPanel({user,onBack}){
                     {NIVEIS.map(n=><option key={n.v} value={n.v}>{n.l}</option>)}
                   </select>
                 </div>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>Tipo</div>
+                  <select value={form.tipo||"multipla"} onChange={e=>{F("tipo",e.target.value);F("gabarito",e.target.value==="certo_errado"?"C":"A");}}
+                    style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,boxSizing:"border-box",outline:"none"}}>
+                    <option value="multipla">Múltipla escolha (A-E)</option>
+                    <option value="certo_errado">Certo ou Errado (CESPE)</option>
+                  </select>
+                </div>
               </div>
               {/* Enunciado */}
               <div style={{marginBottom:16}}>
@@ -770,17 +779,34 @@ function AdminPanel({user,onBack}){
               </div>
               {/* Alternativas */}
               <div style={{marginBottom:16}}>
-                <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:8}}>Alternativas *</div>
-                <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                  {["A","B","C","D","E"].map(l=>(
-                    <div key={l} style={{display:"flex",alignItems:"center",gap:10}}>
-                      <div onClick={()=>F("gabarito",l)} style={{width:32,height:32,borderRadius:10,border:`2px solid ${form.gabarito===l?C.primary:C.border}`,background:form.gabarito===l?C.primary:"white",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:form.gabarito===l?"white":C.textMed,cursor:"pointer",flexShrink:0}}>{l}</div>
-                      <input value={form.alternativas[l]} onChange={e=>FA(l,e.target.value)} placeholder={`Alternativa ${l}${l==="E"?" (opcional)":""}`}
-                        style={{flex:1,padding:"8px 12px",border:`1.5px solid ${form.gabarito===l?C.primary:C.border}`,borderRadius:8,fontSize:12,outline:"none"}}/>
+                {(form.tipo||"multipla")==="certo_errado"?(
+                  <div>
+                    <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:8}}>Gabarito *</div>
+                    <div style={{display:"flex",gap:12}}>
+                      {[{v:"C",l:"✅ Certo",bg:"#D1FAE5",border:"#10B981",color:"#065F46"},{v:"E",l:"❌ Errado",bg:"#FEE2E2",border:"#EF4444",color:"#991B1B"}].map(opt=>(
+                        <button key={opt.v} onClick={()=>F("gabarito",opt.v)}
+                          style={{flex:1,padding:"16px",border:`2px solid ${form.gabarito===opt.v?opt.border:C.border}`,borderRadius:12,background:form.gabarito===opt.v?opt.bg:"white",fontSize:15,fontWeight:800,cursor:"pointer",color:form.gabarito===opt.v?opt.color:C.textMed}}>
+                          {opt.l}
+                        </button>
+                      ))}
                     </div>
-                  ))}
-                  <div style={{fontSize:11,color:C.textLight,marginTop:4}}>Clique na letra para marcar como gabarito</div>
-                </div>
+                    <div style={{fontSize:11,color:C.textLight,marginTop:8}}>Questão no estilo CESPE — o aluno julga Certo ou Errado</div>
+                  </div>
+                ):(
+                  <div>
+                    <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:8}}>Alternativas *</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                      {["A","B","C","D","E"].map(l=>(
+                        <div key={l} style={{display:"flex",alignItems:"center",gap:10}}>
+                          <div onClick={()=>F("gabarito",l)} style={{width:32,height:32,borderRadius:10,border:`2px solid ${form.gabarito===l?C.primary:C.border}`,background:form.gabarito===l?C.primary:"white",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:form.gabarito===l?"white":C.textMed,cursor:"pointer",flexShrink:0}}>{l}</div>
+                          <input value={form.alternativas[l]} onChange={e=>FA(l,e.target.value)} placeholder={`Alternativa ${l}${l==="E"?" (opcional)":""}`}
+                            style={{flex:1,padding:"8px 12px",border:`1.5px solid ${form.gabarito===l?C.primary:C.border}`,borderRadius:8,fontSize:12,outline:"none"}}/>
+                        </div>
+                      ))}
+                      <div style={{fontSize:11,color:C.textLight,marginTop:4}}>Clique na letra para marcar como gabarito</div>
+                    </div>
+                  </div>
+                )}
               </div>
               {/* Comentário */}
               <div style={{marginBottom:20}}>
@@ -1142,18 +1168,34 @@ function SessaoEstudos({user,plano,onConcluir,onVoltar}){
             </span>
           </div>
           <div style={{fontSize:15,lineHeight:1.8,color:C.text,marginBottom:24}}>{q?.enunciado}</div>
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {LETRAS.filter(l=>q?.alternativas?.[l]).map(l=>{
-              const c=corLetra(l);
-              return(
-                <button key={l} onClick={()=>!confirmada&&setSelecionada(l)}
-                  style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 16px",border:`2px solid ${c.border}`,borderRadius:12,background:c.bg,cursor:confirmada?"default":"pointer",textAlign:"left",transition:"all 0.15s"}}>
-                  <span style={{width:28,height:28,borderRadius:8,border:`2px solid ${c.border}`,background:c.border===C.border?"transparent":c.border,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:c.color,flexShrink:0}}>{l}</span>
-                  <span style={{fontSize:13,lineHeight:1.6,color:c.color}}>{q?.alternativas?.[l]}</span>
-                </button>
-              );
-            })}
-          </div>
+          {(q?.tipo||"multipla")==="certo_errado"?(
+            <div style={{display:"flex",gap:12}}>
+              {[{v:"C",l:"✅ Certo"},{v:"E",l:"❌ Errado"}].map(opt=>{
+                const isGab=confirmada&&opt.v===q?.gabarito;
+                const isErro=confirmada&&selecionada===opt.v&&opt.v!==q?.gabarito;
+                const isSel=!confirmada&&selecionada===opt.v;
+                return(
+                  <button key={opt.v} onClick={()=>!confirmada&&setSelecionada(opt.v)}
+                    style={{flex:1,padding:"24px 16px",border:`2px solid ${isGab?"#10B981":isErro?"#EF4444":isSel?C.primary:C.border}`,borderRadius:14,background:isGab?"#D1FAE5":isErro?"#FEE2E2":isSel?C.primaryXLight:"white",fontSize:18,fontWeight:800,cursor:confirmada?"default":"pointer",color:isGab?"#065F46":isErro?"#991B1B":isSel?C.primary:C.textMed,transition:"all 0.15s"}}>
+                    {opt.l}
+                  </button>
+                );
+              })}
+            </div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {LETRAS.filter(l=>q?.alternativas?.[l]).map(l=>{
+                const c=corLetra(l);
+                return(
+                  <button key={l} onClick={()=>!confirmada&&setSelecionada(l)}
+                    style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 16px",border:`2px solid ${c.border}`,borderRadius:12,background:c.bg,cursor:confirmada?"default":"pointer",textAlign:"left",transition:"all 0.15s"}}>
+                    <span style={{width:28,height:28,borderRadius:8,border:`2px solid ${c.border}`,background:c.border===C.border?"transparent":c.border,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:c.color,flexShrink:0}}>{l}</span>
+                    <span style={{fontSize:13,lineHeight:1.6,color:c.color}}>{q?.alternativas?.[l]}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* GABARITO + COMENTÁRIO */}
