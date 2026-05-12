@@ -838,7 +838,7 @@ function Dashboard({user,onLogout}){
               })()}
               {/* Card: Sequência */}
               <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:16,padding:"20px 22px",boxShadow:"0 4px 16px rgba(108,60,225,0.25)",color:"white"}}>
-                <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.2,textTransform:"uppercase",marginBottom:10}}>🔥 Sequência</div>
+                <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.2,textTransform:"uppercase",marginBottom:10}}>🔥 Ritmo de estudos</div>
                 <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:8}}>
                   <span style={{fontSize:26,fontWeight:800,fontFamily:"'Lora',serif"}}>0</span>
                   <span style={{fontSize:11,color:"rgba(255,255,255,0.7)"}}>dias consecutivos</span>
