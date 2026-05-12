@@ -63,6 +63,9 @@ const css = `
     .dash-grid{grid-template-columns:1fr!important;}
     .hero-stats{flex-direction:column!important;}
     .top-cards{grid-template-columns:1fr!important;}
+    .evo-grid{grid-template-columns:1fr 1fr!important;}
+    .evo-grid2{grid-template-columns:1fr!important;}
+    .evo-grid2-inner{grid-template-columns:1fr!important;}
     .hero-section{grid-template-columns:1fr!important;padding:40px 16px 32px!important;}
     .redacao-grid{grid-template-columns:1fr!important;}
     .plans-grid{grid-template-columns:1fr!important;}
@@ -1237,6 +1240,405 @@ function SessaoEstudos({user,plano,onConcluir,onVoltar}){
   );
 }
 
+/* ─── ABA EVOLUÇÃO ──────────────────────────────────────────── */
+/* ─── ABA EVOLUÇÃO ──────────────────────────────────────────── */
+/* ─── ABA EVOLUÇÃO ──────────────────────────────────────────── */
+function EvolucaoTab({userId,plano}){
+  const [subAba,setSubAba]=React.useState("semanal");
+  const [ev,setEv]=React.useState(null);
+  const [sessoes,setSessoes]=React.useState([]);
+  const [simuladosFeitos,setSimuladosFeitos]=React.useState([]);
+  const [aluno,setAluno]=React.useState(null);
+  const [loading,setLoading]=React.useState(true);
+
+  React.useEffect(()=>{
+    if(!userId) return;
+    (async()=>{
+      const[{data:evData},{data:sesData},{data:simData},{data:alunoData}]=await Promise.all([
+        supabase.from("evolucao").select("*").eq("user_id",userId).maybeSingle(),
+        supabase.from("sessoes_estudo").select("*").eq("user_id",userId).eq("concluida",true).order("created_at",{ascending:false}).limit(50),
+        supabase.from("inscricoes_simulado").select("*,simulados(titulo,data_hora)").eq("user_id",userId).eq("concluido",true).order("created_at",{ascending:false}),
+        supabase.from("alunos").select("streak_atual,streak_maximo,ultimo_acesso").eq("id",userId).maybeSingle()
+      ]);
+      setEv(evData); setSessoes(sesData||[]); setSimuladosFeitos(simData||[]); setAluno(alunoData);
+      setLoading(false);
+    })();
+  },[userId]);
+
+  /* ── helpers ── */
+  const meta=plano?Math.min(80,Math.max(30,Math.round(((Number(plano.horas)||14)/7)*18))):50;
+  const totalQ=ev?.total_questoes_feitas||0;
+  const totalAcertos=ev?.total_acertos||0;
+  const aprov=ev?.aproveitamento_geral||0;
+  const desempenho=ev?.desempenho_materias||{};
+  const streak=aluno?.streak_atual||0;
+  const streakMax=aluno?.streak_maximo||0;
+  const totalQEdital=Number(plano?.total_questoes)||400;
+  const horasSemanais=Number(plano?.horas)||14;
+  const diasProva=plano?.data_prova?Math.ceil((new Date(plano.data_prova)-new Date())/(1000*60*60*24)):null;
+
+  /* Progresso vs edital */
+  const pctEdital=totalQEdital>0?Math.min(100,Math.round((totalQ/totalQEdital)*100)):0;
+
+  /* Ritmo atual vs necessário */
+  const semanaAtual=sessoes.filter(s=>(new Date()-new Date(s.created_at))/(1000*60*60*24)<=7);
+  const semanaPassada=sessoes.filter(s=>{const d=(new Date()-new Date(s.created_at))/(1000*60*60*24);return d>7&&d<=14;});
+  const qSemana=semanaAtual.reduce((s,x)=>s+x.total_questoes,0);
+  const qSemanaPassada=semanaPassada.reduce((s,x)=>s+x.total_questoes,0);
+  const diffSemana=qSemana-qSemanaPassada;
+  const ritmoAtual=qSemana>0?qSemana:meta*5; // questões/semana atual
+  const restantesQ=Math.max(0,totalQEdital-totalQ);
+  const semanasRitmoAtual=ritmoAtual>0?Math.ceil(restantesQ/ritmoAtual):99;
+  const semanasNecessarias=diasProva?Math.ceil(diasProva/7):null;
+  const ritmoNecessario=semanasNecessarias&&semanasNecessarias>0?Math.ceil(restantesQ/semanasNecessarias):null;
+  const noRitmo=!ritmoNecessario||(ritmoAtual>=ritmoNecessario);
+
+  /* Evolução temporal — aproveitamento por semana */
+  const aprovPorSemana=React.useMemo(()=>{
+    if(!sessoes.length) return [];
+    const semanas={};
+    sessoes.forEach(s=>{
+      const d=new Date(s.created_at);
+      d.setHours(0,0,0,0);
+      const dow=d.getDay();
+      const monday=new Date(d);
+      monday.setDate(d.getDate()-((dow===0?7:dow)-1));
+      const key=monday.toISOString().split("T")[0];
+      if(!semanas[key]) semanas[key]={total:0,acertos:0,questoes:0};
+      semanas[key].total+=s.total_questoes;
+      semanas[key].acertos+=s.total_acertos;
+      semanas[key].questoes+=s.total_questoes;
+    });
+    return Object.entries(semanas)
+      .sort(([a],[b])=>a.localeCompare(b))
+      .slice(-8)
+      .map(([key,d])=>({
+        semana:new Date(key).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"}),
+        aprov:d.total>0?Math.round((d.acertos/d.total)*100):0,
+        questoes:d.total
+      }));
+  },[sessoes]);
+
+  const matsComDados=Object.entries(desempenho)
+    .map(([nome,d])=>({nome,feitas:d.feitas||0,acertos:d.acertos||0,pct:d.feitas>0?Math.round((d.acertos/d.feitas)*100):0}))
+    .filter(m=>m.feitas>=5).sort((a,b)=>b.pct-a.pct);
+  const melhorMat=matsComDados[0];
+  const piorMat=matsComDados[matsComDados.length-1];
+  const mediaSimulados=simuladosFeitos.length>0?Math.round(simuladosFeitos.reduce((s,x)=>s+(Number(x.nota)||0),0)/simuladosFeitos.length):0;
+
+  /* insight */
+  const getInsight=()=>{
+    if(totalQ===0) return{msg:"Comece a estudar para ver seus insights aqui.",icon:"🚀",cor:"#6C3CE1"};
+    if(!noRitmo&&ritmoNecessario) return{msg:`Seu ritmo atual (${ritmoAtual}q/sem) está abaixo do necessário (${ritmoNecessario}q/sem) para chegar antes da prova. Acelere!`,icon:"⚠️",cor:"#EF4444"};
+    if(aprov>=80) return{msg:`${aprov}% de aproveitamento — você está entre os melhores. Mantenha o ritmo!`,icon:"🏆",cor:"#10B981"};
+    if(aprov>=70) return{msg:`${aprov}% de aproveitamento. Foque nas matérias abaixo de 70% para acelerar.`,icon:"📈",cor:"#10B981"};
+    if(piorMat) return{msg:`Atenção: ${piorMat.nome} com ${piorMat.pct}%. Revise antes de avançar para novas matérias.`,icon:"⚠️",cor:"#F59E0B"};
+    return{msg:`${totalQ} questões respondidas. Consistência diária é o caminho para a aprovação.`,icon:"💪",cor:"#6C3CE1"};
+  };
+  const insight=getInsight();
+
+  const SUBABAS=[
+    {id:"semanal",icon:"📅",label:"Exercícios semanais"},
+    {id:"livre",icon:"🎯",label:"Treino livre"},
+    {id:"simulado",icon:"🏆",label:"Simulado coletivo"},
+  ];
+
+  if(loading)return(
+    <div style={{display:"flex",justifyContent:"center",padding:"60px"}}>
+      <div style={{width:36,height:36,border:"4px solid #EDE9FE",borderTop:`4px solid ${C.primary}`,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+    </div>
+  );
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:20}}>
+
+      {/* INSIGHT IA */}
+      <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:18,padding:"18px 24px",display:"flex",alignItems:"center",gap:16,color:"white"}}>
+        <div style={{fontSize:28,flexShrink:0}}>{insight.icon}</div>
+        <div style={{flex:1}}>
+          <div style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>🤖 Insight da IA</div>
+          <div style={{fontSize:13,fontWeight:600,lineHeight:1.5}}>{insight.msg}</div>
+        </div>
+      </div>
+
+      {/* 2 CARDS + STREAK + PROGRESSO EDITAL */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:14}} className="evo-grid">
+
+        {/* Total questões */}
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:"16px 18px",boxShadow:"0 2px 6px rgba(0,0,0,0.04)"}}>
+          <div style={{fontSize:16,marginBottom:6}}>📝</div>
+          <div style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:800,color:C.primary,lineHeight:1}}>{totalQ}</div>
+          <div style={{fontSize:10,color:C.textLight,marginTop:4}}>Questões feitas</div>
+        </div>
+
+        {/* Aproveitamento */}
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:"16px 18px",boxShadow:"0 2px 6px rgba(0,0,0,0.04)"}}>
+          <div style={{fontSize:16,marginBottom:6}}>🎯</div>
+          <div style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:800,color:aprov>=70?"#10B981":aprov>=50?"#F59E0B":"#EF4444",lineHeight:1}}>{aprov}%</div>
+          <div style={{fontSize:10,color:C.textLight,marginTop:4}}>Aproveitamento geral</div>
+        </div>
+
+        {/* Streak */}
+        <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:14,padding:"16px 18px",boxShadow:"0 4px 14px rgba(108,60,225,0.25)",color:"white"}}>
+          <div style={{fontSize:16,marginBottom:6}}>🔥</div>
+          <div style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:800,lineHeight:1}}>{streak}</div>
+          <div style={{fontSize:10,color:"rgba(255,255,255,0.7)",marginTop:4}}>Dias consecutivos</div>
+          {streakMax>0&&<div style={{fontSize:9,color:"rgba(255,255,255,0.5)",marginTop:2}}>Recorde: {streakMax}d</div>}
+        </div>
+
+        {/* Progresso vs edital */}
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:"16px 18px",boxShadow:"0 2px 6px rgba(0,0,0,0.04)"}}>
+          <div style={{fontSize:16,marginBottom:6}}>📚</div>
+          <div style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:800,color:C.primary,lineHeight:1}}>{pctEdital}%</div>
+          <div style={{fontSize:10,color:C.textLight,marginTop:4}}>do edital coberto</div>
+          <div style={{marginTop:6,height:4,background:"#F3F4F6",borderRadius:100}}>
+            <div style={{height:"100%",width:`${pctEdital}%`,background:C.primary,borderRadius:100}}/>
+          </div>
+        </div>
+      </div>
+
+      {/* RITMO ATUAL vs NECESSÁRIO */}
+      {ritmoNecessario&&(
+        <div style={{background:noRitmo?"#F0FDF4":"#FFF7ED",border:`1px solid ${noRitmo?"#A7F3D0":"#FED7AA"}`,borderRadius:14,padding:"16px 22px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
+          <div>
+            <div style={{fontSize:11,fontWeight:700,color:noRitmo?"#065F46":"#92400E",letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>
+              {noRitmo?"✅ Ritmo adequado":"⚠️ Ritmo abaixo do necessário"}
+            </div>
+            <div style={{fontSize:13,color:noRitmo?"#065F46":"#78350F",lineHeight:1.5}}>
+              {noRitmo
+                ?`Você está estudando ${ritmoAtual}q/semana. Continue nesse ritmo para concluir o edital a tempo.`
+                :`Para concluir antes da prova, você precisa de ${ritmoNecessario}q/semana. Hoje você faz ${ritmoAtual}q.`
+              }
+            </div>
+          </div>
+          <div style={{display:"flex",gap:16,flexShrink:0}}>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:800,color:noRitmo?"#10B981":"#F59E0B"}}>{ritmoAtual}q</div>
+              <div style={{fontSize:9,color:"#9CA3AF",marginTop:2}}>ritmo atual/sem</div>
+            </div>
+            <div style={{width:1,background:"#E5E7EB"}}/>
+            <div style={{textAlign:"center"}}>
+              <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:800,color:C.primary}}>{ritmoNecessario}q</div>
+              <div style={{fontSize:9,color:"#9CA3AF",marginTop:2}}>necessário/sem</div>
+            </div>
+            {semanasRitmoAtual&&(
+              <>
+                <div style={{width:1,background:"#E5E7EB"}}/>
+                <div style={{textAlign:"center"}}>
+                  <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:800,color:C.text}}>{semanasRitmoAtual}</div>
+                  <div style={{fontSize:9,color:"#9CA3AF",marginTop:2}}>semanas p/ concluir</div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* SUB-ABAS */}
+      <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+        <div style={{display:"flex",borderBottom:`1px solid ${C.border}`,overflowX:"auto"}}>
+          {SUBABAS.map(a=>(
+            <button key={a.id} onClick={()=>setSubAba(a.id)} style={{
+              padding:"14px 22px",background:"transparent",border:"none",
+              borderBottom:`3px solid ${subAba===a.id?C.primary:"transparent"}`,
+              color:subAba===a.id?C.primary:C.textMed,fontWeight:subAba===a.id?700:500,
+              fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:6,
+              whiteSpace:"nowrap",flexShrink:0,transition:"all 0.15s"
+            }}>{a.icon} {a.label}</button>
+          ))}
+        </div>
+
+        <div style={{padding:"24px"}}>
+
+          {/* ── EXERCÍCIOS SEMANAIS ── */}
+          {subAba==="semanal"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:20}}>
+
+              {/* Esta semana vs semana passada + histórico unificados */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}} className="evo-grid2-inner">
+                <div style={{background:C.bg,borderRadius:12,padding:"16px 20px"}}>
+                  <div style={{fontSize:11,color:C.textLight,fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Esta semana</div>
+                  <div style={{fontFamily:"'Lora',serif",fontSize:28,fontWeight:800,color:C.primary}}>{qSemana}q</div>
+                  <div style={{fontSize:11,fontWeight:700,marginTop:4,color:diffSemana>0?"#10B981":diffSemana<0?"#EF4444":"#9CA3AF"}}>
+                    {diffSemana===0?"igual à anterior":diffSemana>0?`▲ +${diffSemana} vs semana passada`:`▼ ${Math.abs(diffSemana)} vs semana passada`}
+                  </div>
+                </div>
+                <div style={{background:C.bg,borderRadius:12,padding:"16px 20px"}}>
+                  <div style={{fontSize:11,color:C.textLight,fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Meta semanal</div>
+                  <div style={{fontFamily:"'Lora',serif",fontSize:28,fontWeight:800,color:C.text}}>{meta*5}q</div>
+                  <div style={{marginTop:8,height:6,background:"#E5E7EB",borderRadius:100}}>
+                    <div style={{height:"100%",width:`${Math.min(100,Math.round((qSemana/(meta*5))*100))}%`,background:C.primary,borderRadius:100}}/>
+                  </div>
+                  <div style={{fontSize:10,color:C.textLight,marginTop:4}}>{Math.min(100,Math.round((qSemana/(meta*5))*100))}% da meta</div>
+                </div>
+              </div>
+
+              {/* Evolução temporal — aproveitamento por semana */}
+              {aprovPorSemana.length>=2&&(
+                <div>
+                  <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:4}}>Evolução do aproveitamento</div>
+                  <div style={{fontSize:10,color:C.textLight,marginBottom:14}}>Sua evolução semana a semana</div>
+                  <div style={{display:"flex",alignItems:"flex-end",gap:8,height:90}}>
+                    {aprovPorSemana.map((s,i)=>{
+                      const h=Math.max(8,s.aprov);
+                      const cor=s.aprov>=70?"#10B981":s.aprov>=50?C.primary:"#F59E0B";
+                      const isLast=i===aprovPorSemana.length-1;
+                      return(
+                        <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                          <div style={{fontSize:9,fontWeight:700,color:isLast?cor:C.textLight}}>{s.aprov}%</div>
+                          <div style={{width:"100%",height:`${h}%`,background:isLast?cor:cor+"66",borderRadius:"4px 4px 0 0",minHeight:6,boxShadow:isLast?`0 0 8px ${cor}44`:"none"}}/>
+                          <div style={{fontSize:8,color:C.textLight}}>{s.semana}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* Seta de evolução */}
+                  {aprovPorSemana.length>=2&&(()=>{
+                    const primeira=aprovPorSemana[0].aprov;
+                    const ultima=aprovPorSemana[aprovPorSemana.length-1].aprov;
+                    const diff=ultima-primeira;
+                    if(diff===0) return null;
+                    return(
+                      <div style={{marginTop:10,padding:"8px 12px",background:diff>0?"#F0FDF4":"#FFF7ED",borderRadius:8,display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{fontSize:12}}>{diff>0?"📈":"📉"}</span>
+                        <span style={{fontSize:11,fontWeight:700,color:diff>0?"#065F46":"#92400E"}}>
+                          {diff>0?`+${diff}%`:`${diff}%`} desde a primeira semana
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Desempenho por matéria */}
+              <div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
+                  <div style={{fontSize:12,fontWeight:700,color:C.text}}>Desempenho por matéria</div>
+                  {melhorMat&&piorMat&&melhorMat.nome!==piorMat.nome&&(
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <span style={{background:"#D1FAE5",color:"#065F46",borderRadius:100,padding:"3px 10px",fontSize:10,fontWeight:700}}>✅ {melhorMat.nome} {melhorMat.pct}%</span>
+                      <span style={{background:"#FEE2E2",color:"#991B1B",borderRadius:100,padding:"3px 10px",fontSize:10,fontWeight:700}}>⚠️ {piorMat.nome} {piorMat.pct}%</span>
+                    </div>
+                  )}
+                </div>
+                {matsComDados.length===0?(
+                  <div style={{textAlign:"center",padding:"24px",color:C.textLight,fontSize:12,background:C.bg,borderRadius:10}}>
+                    Responda pelo menos 5 questões por matéria para ver o desempenho.
+                  </div>
+                ):(
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    {matsComDados.map((m,i)=>{
+                      const cor=m.pct>=70?"#10B981":m.pct>=50?C.primary:"#EF4444";
+                      return(
+                        <div key={m.nome} style={{display:"flex",alignItems:"center",gap:12}}>
+                          <div style={{width:22,fontSize:10,fontWeight:700,color:C.textLight,textAlign:"right",flexShrink:0}}>#{i+1}</div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                              <span style={{fontSize:12,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.nome}</span>
+                              <span style={{fontSize:10,color:C.textMed,flexShrink:0,marginLeft:6}}>{m.acertos}/{m.feitas}q</span>
+                            </div>
+                            <div style={{height:7,background:"#F3F4F6",borderRadius:100}}>
+                              <div style={{height:"100%",width:`${m.pct}%`,background:cor,borderRadius:100}}/>
+                            </div>
+                          </div>
+                          <span style={{fontSize:11,fontWeight:800,color:cor,width:36,textAlign:"right",flexShrink:0}}>{m.pct}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {sessoes.length===0&&(
+                <div style={{textAlign:"center",padding:"32px",color:C.textLight}}>
+                  <div style={{fontSize:32,marginBottom:8}}>📅</div>
+                  <div style={{fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Nenhuma sessão ainda</div>
+                  <div style={{fontSize:12}}>Clique em "Começar estudos agora" no painel principal.</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── TREINO LIVRE ── */}
+          {subAba==="livre"&&(
+            <div style={{textAlign:"center",padding:"48px 24px"}}>
+              <div style={{fontSize:48,marginBottom:16}}>🎯</div>
+              <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,color:C.text,marginBottom:8}}>Treino livre em breve</div>
+              <div style={{fontSize:13,color:C.textMed,lineHeight:1.7,maxWidth:380,margin:"0 auto"}}>
+                A aba Treino está sendo construída. Em breve você poderá praticar questões extras fora do cronograma e ver seu desempenho aqui.
+              </div>
+            </div>
+          )}
+
+          {/* ── SIMULADOS COLETIVOS ── */}
+          {subAba==="simulado"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:20}}>
+              {simuladosFeitos.length===0?(
+                <div style={{textAlign:"center",padding:"48px 24px"}}>
+                  <div style={{fontSize:48,marginBottom:16}}>🏆</div>
+                  <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,color:C.text,marginBottom:8}}>Nenhum simulado realizado</div>
+                  <div style={{fontSize:13,color:C.textMed,maxWidth:360,margin:"0 auto"}}>Confirme sua participação no próximo simulado coletivo de domingo e veja seu desempenho aqui.</div>
+                </div>
+              ):(
+                <>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14}} className="evo-grid2-inner">
+                    {[
+                      {label:"Simulados feitos",val:simuladosFeitos.length,cor:C.primary,icon:"📋"},
+                      {label:"Média geral",val:`${mediaSimulados}%`,cor:mediaSimulados>=70?"#10B981":mediaSimulados>=50?"#F59E0B":"#EF4444",icon:"🎯"},
+                      {label:"Melhor resultado",val:`${Math.max(...simuladosFeitos.map(s=>Number(s.nota)||0))}%`,cor:"#10B981",icon:"🏆"},
+                    ].map(s=>(
+                      <div key={s.label} style={{background:C.bg,borderRadius:12,padding:"16px",textAlign:"center"}}>
+                        <div style={{fontSize:18,marginBottom:6}}>{s.icon}</div>
+                        <div style={{fontFamily:"'Lora',serif",fontSize:22,fontWeight:800,color:s.cor}}>{s.val}</div>
+                        <div style={{fontSize:10,color:C.textLight,marginTop:4}}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:12}}>Histórico de simulados</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                      {simuladosFeitos.map((s,i)=>{
+                        const nota=Number(s.nota)||0;
+                        const cor=nota>=70?"#10B981":nota>=50?"#F59E0B":"#EF4444";
+                        const bg=nota>=70?"#F0FDF4":nota>=50?"#FFFBEB":"#FFF1F1";
+                        return(
+                          <div key={s.id} style={{background:bg,border:`1px solid ${cor}33`,borderRadius:14,padding:"16px 18px"}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10}}>
+                              <div>
+                                <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:2}}>{s.simulados?.titulo||"Simulado coletivo"}</div>
+                                <div style={{fontSize:11,color:C.textMed}}>{s.simulados?.data_hora?new Date(s.simulados.data_hora).toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"}):"—"}</div>
+                              </div>
+                              <div style={{textAlign:"right"}}>
+                                <div style={{fontFamily:"'Lora',serif",fontSize:26,fontWeight:800,color:cor,lineHeight:1}}>{nota}%</div>
+                                {s.ranking_posicao&&<div style={{fontSize:10,color:C.textMed,marginTop:2}}>#{s.ranking_posicao} no ranking</div>}
+                              </div>
+                            </div>
+                            <div style={{marginTop:10,height:6,background:"rgba(0,0,0,0.08)",borderRadius:100}}>
+                              <div style={{height:"100%",width:`${nota}%`,background:cor,borderRadius:100}}/>
+                            </div>
+                            {s.por_materia&&Object.keys(s.por_materia).length>0&&(
+                              <div style={{marginTop:10,display:"flex",gap:6,flexWrap:"wrap"}}>
+                                {Object.entries(s.por_materia).map(([mat,d])=>{
+                                  const pct=d.total>0?Math.round((d.acertos/d.total)*100):0;
+                                  return <span key={mat} style={{fontSize:9,fontWeight:700,background:"rgba(255,255,255,0.7)",border:`1px solid ${cor}44`,borderRadius:100,padding:"2px 8px",color:C.text}}>{mat.split(" ").slice(0,2).join(" ")} {pct}%</span>;
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── DASHBOARD ─────────────────────────────────────────────────── */
 function Dashboard({user,onLogout}){
   const [tab,setTab]=React.useState("cronograma");
@@ -1643,11 +2045,7 @@ function Dashboard({user,onLogout}){
           </div>
         )}
         {tab==="evolucao"&&(
-          <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:400,gap:16}}>
-            <div style={{fontSize:48}}>📊</div>
-            <h3 style={{fontFamily:"'Lora',serif",fontSize:22,color:C.text}}>Evolução em breve</h3>
-            <p style={{fontSize:14,color:C.textMed,textAlign:"center",maxWidth:360}}>Acompanhe seu progresso semana a semana, pontos fortes, fracos e caderno de erros.</p>
-          </div>
+          <EvolucaoTab userId={user?.id} plano={plan}/>
         )}
       </div>
     </div>
