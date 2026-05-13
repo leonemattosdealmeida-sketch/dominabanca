@@ -1856,6 +1856,413 @@ function RevisaoTab({user}){
   );
 }
 
+/* ─── ABA REDAÇÃO ────────────────────────────────────────────── */
+function RedacaoTab({user,plano}){
+  const [fase,setFase]=React.useState("inicio"); // inicio|enviando|corrigindo|resultado|historico
+  const [imagem,setImagem]=React.useState(null); // base64
+  const [imagemPreview,setImagemPreview]=React.useState(null);
+  const [tema,setTema]=React.useState("");
+  const [resultado,setResultado]=React.useState(null);
+  const [historico,setHistorico]=React.useState([]);
+  const [loadingHist,setLoadingHist]=React.useState(false);
+  const [erro,setErro]=React.useState(null);
+  const fileRef=React.useRef();
+
+  const banca=plano?.banca||"CESPE";
+
+  /* Critérios por banca */
+  const getCriterios=(b)=>{
+    const bup=(b||"").toUpperCase();
+    if(bup.includes("CESPE")||bup.includes("CEBRASPE")) return [
+      {nome:"Domínio da modalidade escrita formal",nota_max:200},
+      {nome:"Compreensão da proposta e aplicação de conceitos",nota_max:200},
+      {nome:"Coerência e coesão textual",nota_max:200},
+      {nome:"Repertório sociocultural e argumentação",nota_max:200},
+      {nome:"Proposta de intervenção",nota_max:200},
+    ];
+    if(bup.includes("FCC")||bup.includes("VUNESP")) return [
+      {nome:"Adequação ao tema e ao gênero",nota_max:25},
+      {nome:"Coerência e coesão",nota_max:25},
+      {nome:"Registro e adequação vocabular",nota_max:25},
+      {nome:"Gramática e ortografia",nota_max:25},
+    ];
+    if(bup.includes("FGV")) return [
+      {nome:"Pertinência temática",nota_max:25},
+      {nome:"Argumentação e desenvolvimento",nota_max:25},
+      {nome:"Coesão textual",nota_max:25},
+      {nome:"Domínio da língua",nota_max:25},
+    ];
+    // Padrão geral
+    return [
+      {nome:"Adequação ao tema",nota_max:25},
+      {nome:"Argumentação",nota_max:25},
+      {nome:"Coesão e coerência",nota_max:25},
+      {nome:"Gramática e ortografia",nota_max:25},
+    ];
+  };
+
+  const criterios=getCriterios(banca);
+  const notaMax=criterios.reduce((s,c)=>s+c.nota_max,0);
+
+  /* Upload da imagem */
+  const handleImagem=(e)=>{
+    const file=e.target.files?.[0];
+    if(!file) return;
+    if(file.size>10*1024*1024){setErro("Imagem muito grande. Use uma foto menor que 10MB.");return;}
+    setErro(null);
+    const reader=new FileReader();
+    reader.onload=(ev)=>{
+      const b64=ev.target.result;
+      setImagem(b64);
+      setImagemPreview(b64);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  /* Corrigir via IA */
+  const corrigir=async()=>{
+    if(!imagem){setErro("Envie uma foto da sua redação.");return;}
+    setFase("corrigindo");
+    setErro(null);
+    try{
+      const criteriosStr=criterios.map(c=>`- ${c.nome} (0 a ${c.nota_max} pontos)`).join("\n");
+      const prompt=`Você é um corretor especialista em redações de concursos públicos da banca ${banca}.
+
+Analise a redação manuscrita na imagem e corrija seguindo os critérios da banca ${banca}:
+
+${criteriosStr}
+
+Responda SOMENTE com um JSON válido, sem texto fora do JSON, no formato:
+{
+  "transcricao": "texto transcrito da redação (máx 500 chars do início)",
+  "nota_total": número entre 0 e ${notaMax},
+  "criterios": [
+    {"nome": "nome do critério", "nota": número, "nota_max": ${criterios[0].nota_max}, "feedback": "comentário específico sobre este critério"}
+  ],
+  "comentario_geral": "avaliação geral da redação em 2-3 frases",
+  "pontos_fortes": "2-3 pontos positivos identificados",
+  "pontos_melhora": "2-3 pontos que precisam de melhoria"
+}`;
+
+      // Extrai base64 puro (sem o prefixo data:image/...)
+      const b64puro=imagem.split(",")[1];
+      const mimeType=imagem.split(";")[0].split(":")[1];
+
+      const resp=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          model:"claude-sonnet-4-20250514",
+          max_tokens:1500,
+          messages:[{
+            role:"user",
+            content:[
+              {type:"image",source:{type:"base64",media_type:mimeType,data:b64puro}},
+              {type:"text",text:prompt}
+            ]
+          }]
+        })
+      });
+
+      const d=await resp.json();
+      const text=d.content?.[0]?.text||"{}";
+      const clean=text.replace(/```json|```/g,"").trim();
+      const res=JSON.parse(clean);
+
+      // Salva no Supabase
+      const{data:saved}=await supabase.from("redacoes").insert({
+        user_id:user.id,
+        tema:tema||"Sem tema informado",
+        banca,
+        imagem_url:imagem.substring(0,100)+"...", // preview truncado
+        transcricao:res.transcricao,
+        nota_total:res.nota_total,
+        criterios:res.criterios,
+        comentario_geral:res.comentario_geral,
+        pontos_fortes:res.pontos_fortes,
+        pontos_melhora:res.pontos_melhora,
+        corrigida:true
+      }).select().single();
+
+      // Atualiza evolucao
+      const{data:ev}=await supabase.from("evolucao").select("redacoes_enviadas,media_redacoes,historico_redacoes").eq("user_id",user.id).maybeSingle();
+      if(ev){
+        const total=(ev.redacoes_enviadas||0)+1;
+        const hist=ev.historico_redacoes||[];
+        const novaMedia=Math.round(((ev.media_redacoes||0)*(total-1)+res.nota_total)/total);
+        await supabase.from("evolucao").update({
+          redacoes_enviadas:total,
+          media_redacoes:novaMedia,
+          historico_redacoes:[...hist,{data:new Date().toISOString(),nota:res.nota_total,banca}].slice(-20)
+        }).eq("user_id",user.id);
+      }
+
+      setResultado({...res,id:saved?.id,tema:tema||"Sem tema"});
+      setFase("resultado");
+    }catch(e){
+      setErro("Erro ao corrigir. Tente novamente.");
+      setFase("inicio");
+    }
+  };
+
+  const loadHistorico=async()=>{
+    setLoadingHist(true);
+    const{data}=await supabase.from("redacoes").select("*").eq("user_id",user.id).order("created_at",{ascending:false}).limit(20);
+    setHistorico(data||[]);
+    setLoadingHist(false);
+    setFase("historico");
+  };
+
+  const novaredacao=()=>{
+    setImagem(null);setImagemPreview(null);setTema("");setResultado(null);setErro(null);setFase("inicio");
+  };
+
+  const corPorNota=(nota,max)=>{
+    const pct=(nota/max)*100;
+    return pct>=70?"#10B981":pct>=50?"#F59E0B":"#EF4444";
+  };
+
+  /* ── TELA: CORRIGINDO ── */
+  if(fase==="corrigindo")return(
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"60vh",gap:24}}>
+      <div style={{width:56,height:56,border:"5px solid #EDE9FE",borderTop:`5px solid ${C.primary}`,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+      <div style={{textAlign:"center"}}>
+        <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,color:C.text,marginBottom:8}}>Corrigindo sua redação...</div>
+        <div style={{fontSize:13,color:C.textMed}}>A IA está lendo e avaliando sua escrita. Isso leva alguns segundos.</div>
+      </div>
+    </div>
+  );
+
+  /* ── TELA: RESULTADO ── */
+  if(fase==="resultado"&&resultado){
+    const pctTotal=notaMax>0?Math.round((resultado.nota_total/notaMax)*100):0;
+    const corTotal=pctTotal>=70?"#10B981":pctTotal>=50?"#F59E0B":"#EF4444";
+    return(
+      <div style={{display:"flex",flexDirection:"column",gap:20}}>
+        {/* Header resultado */}
+        <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:18,padding:"24px 28px",color:"white",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:16}}>
+          <div>
+            <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:6}}>Correção concluída · {banca}</div>
+            <div style={{fontFamily:"'Lora',serif",fontSize:22,fontWeight:700,marginBottom:4}}>{resultado.tema}</div>
+            <div style={{fontSize:13,color:"rgba(255,255,255,0.8)"}}>Corrida por IA com critérios da banca {banca}</div>
+          </div>
+          <div style={{textAlign:"center",background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:16,padding:"16px 24px"}}>
+            <div style={{fontFamily:"'Lora',serif",fontSize:36,fontWeight:800,lineHeight:1}}>{resultado.nota_total}</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",marginTop:4}}>de {notaMax} pontos</div>
+            <div style={{fontSize:13,fontWeight:700,color:pctTotal>=70?"#A7F3D0":pctTotal>=50?"#FDE68A":"#FCA5A5",marginTop:4}}>{pctTotal}%</div>
+          </div>
+        </div>
+
+        {/* Grid resultado */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}} className="evo-grid2-inner">
+
+          {/* Critérios */}
+          <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"22px 24px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:16}}>📊 Nota por critério</div>
+            <div style={{display:"flex",flexDirection:"column",gap:14}}>
+              {(resultado.criterios||[]).map((c,i)=>{
+                const cor=corPorNota(c.nota,c.nota_max);
+                const pct=Math.round((c.nota/c.nota_max)*100);
+                return(
+                  <div key={i}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+                      <span style={{fontSize:12,fontWeight:600,color:C.text,flex:1,marginRight:8}}>{c.nome}</span>
+                      <span style={{fontSize:12,fontWeight:800,color:cor,flexShrink:0}}>{c.nota}/{c.nota_max}</span>
+                    </div>
+                    <div style={{height:7,background:"#F3F4F6",borderRadius:100,marginBottom:4}}>
+                      <div style={{height:"100%",width:`${pct}%`,background:cor,borderRadius:100}}/>
+                    </div>
+                    <div style={{fontSize:11,color:C.textMed,lineHeight:1.5}}>{c.feedback}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Feedback geral */}
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            {/* Comentário geral */}
+            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"18px 20px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+              <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:10}}>💬 Avaliação geral</div>
+              <div style={{fontSize:13,color:C.text,lineHeight:1.7}}>{resultado.comentario_geral}</div>
+            </div>
+            {/* Pontos fortes */}
+            <div style={{background:"#F0FDF4",border:"1px solid #A7F3D0",borderRadius:16,padding:"16px 18px"}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#065F46",marginBottom:8}}>✅ Pontos fortes</div>
+              <div style={{fontSize:13,color:"#065F46",lineHeight:1.7}}>{resultado.pontos_fortes}</div>
+            </div>
+            {/* Pontos de melhora */}
+            <div style={{background:"#FFF7ED",border:"1px solid #FED7AA",borderRadius:16,padding:"16px 18px"}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#92400E",marginBottom:8}}>⚠️ Pontos de melhora</div>
+              <div style={{fontSize:13,color:"#78350F",lineHeight:1.7}}>{resultado.pontos_melhora}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Transcrição */}
+        {resultado.transcricao&&(
+          <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"18px 22px",boxShadow:"0 2px 6px rgba(0,0,0,0.04)"}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:10}}>📄 Trecho transcrito pela IA</div>
+            <div style={{fontSize:13,color:C.textMed,lineHeight:1.8,fontStyle:"italic"}}>"{resultado.transcricao}..."</div>
+          </div>
+        )}
+
+        {/* Ações */}
+        <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+          <button onClick={novaredacao} style={{flex:1,padding:"13px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:12,fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 14px rgba(108,60,225,0.3)"}}>
+            + Nova redação
+          </button>
+          <button onClick={loadHistorico} style={{flex:1,padding:"13px",background:"white",color:C.primary,border:`1.5px solid ${C.primary}`,borderRadius:12,fontSize:13,fontWeight:700,cursor:"pointer"}}>
+            Ver histórico
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── TELA: HISTÓRICO ── */
+  if(fase==="historico")return(
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,color:C.text}}>📋 Histórico de redações</div>
+        <button onClick={novaredacao} style={{padding:"9px 18px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>+ Nova redação</button>
+      </div>
+      {loadingHist?(
+        <div style={{display:"flex",justifyContent:"center",padding:"48px"}}>
+          <div style={{width:36,height:36,border:"4px solid #EDE9FE",borderTop:`4px solid ${C.primary}`,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+        </div>
+      ):historico.length===0?(
+        <div style={{textAlign:"center",padding:"48px",background:C.white,borderRadius:18,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:36,marginBottom:8}}>✍️</div>
+          <div style={{fontSize:14,fontWeight:600,color:C.text}}>Nenhuma redação ainda</div>
+        </div>
+      ):(
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {historico.map((r,i)=>{
+            const pct=r.nota_total&&r.criterios?Math.round((r.nota_total/r.criterios.reduce((s,c)=>s+(c.nota_max||0),0))*100):0;
+            const cor=pct>=70?"#10B981":pct>=50?"#F59E0B":"#EF4444";
+            return(
+              <div key={r.id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:"16px 20px",boxShadow:"0 2px 6px rgba(0,0,0,0.04)"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:4}}>{r.tema||"Sem tema"}</div>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <span style={{background:C.primaryXLight,color:C.primary,borderRadius:100,padding:"2px 8px",fontSize:10,fontWeight:700}}>{r.banca}</span>
+                      <span style={{fontSize:10,color:C.textLight}}>{new Date(r.created_at).toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"})}</span>
+                    </div>
+                    {r.comentario_geral&&<div style={{fontSize:11,color:C.textMed,marginTop:8,lineHeight:1.5}}>{r.comentario_geral.substring(0,120)}...</div>}
+                  </div>
+                  <div style={{textAlign:"center",flexShrink:0}}>
+                    <div style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:800,color:cor}}>{r.nota_total||0}</div>
+                    <div style={{fontSize:10,color:C.textLight}}>pontos</div>
+                    <div style={{fontSize:11,fontWeight:700,color:cor}}>{pct}%</div>
+                  </div>
+                </div>
+                {r.criterios&&(
+                  <div style={{marginTop:12,display:"flex",gap:6,flexWrap:"wrap"}}>
+                    {r.criterios.map((c,j)=>(
+                      <span key={j} style={{fontSize:9,fontWeight:700,background:corPorNota(c.nota,c.nota_max)+"22",color:corPorNota(c.nota,c.nota_max),borderRadius:100,padding:"2px 8px"}}>
+                        {c.nome.split(" ").slice(0,2).join(" ")} {c.nota}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
+  /* ── TELA: INÍCIO ── */
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:20}}>
+
+      {/* Header */}
+      <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:18,padding:"22px 26px",color:"white",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
+        <div>
+          <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,marginBottom:6}}>✍️ Redação</div>
+          <div style={{fontSize:13,color:"rgba(255,255,255,0.8)"}}>Envie uma foto da sua redação manuscrita e receba correção instantânea por IA no estilo {banca}.</div>
+        </div>
+        <button onClick={loadHistorico} style={{padding:"9px 18px",background:"rgba(255,255,255,0.15)",color:"white",border:"1px solid rgba(255,255,255,0.3)",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+          📋 Ver histórico
+        </button>
+      </div>
+
+      {/* Critérios da banca */}
+      <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"18px 22px",boxShadow:"0 2px 6px rgba(0,0,0,0.04)"}}>
+        <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:12}}>📊 Critérios de correção — {banca}</div>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+          {criterios.map((c,i)=>(
+            <div key={i} style={{background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,padding:"8px 14px",flex:"1 1 180px"}}>
+              <div style={{fontSize:11,fontWeight:700,color:C.text,marginBottom:2}}>{c.nome}</div>
+              <div style={{fontSize:11,color:C.primary,fontWeight:700}}>até {c.nota_max} pontos</div>
+            </div>
+          ))}
+        </div>
+        <div style={{marginTop:10,fontSize:11,color:C.textLight}}>Total: <strong style={{color:C.primary}}>{notaMax} pontos</strong></div>
+      </div>
+
+      {/* Formulário */}
+      <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"24px 26px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
+
+        {/* Tema */}
+        <div style={{marginBottom:18}}>
+          <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:8}}>Tema da redação <span style={{fontSize:10,color:C.textLight,fontWeight:400}}>(opcional)</span></div>
+          <input value={tema} onChange={e=>setTema(e.target.value)} placeholder="Ex: Desafios da educação pública no Brasil..."
+            style={{width:"100%",padding:"10px 14px",border:`1.5px solid ${C.border}`,borderRadius:10,fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:"'Sora',sans-serif"}}/>
+        </div>
+
+        {/* Upload da imagem */}
+        <div style={{marginBottom:18}}>
+          <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:8}}>Foto da redação *</div>
+          <input ref={fileRef} type="file" accept="image/*" capture="camera" onChange={handleImagem} style={{display:"none"}}/>
+
+          {!imagemPreview?(
+            <div onClick={()=>fileRef.current?.click()}
+              style={{border:`2px dashed ${C.border}`,borderRadius:14,padding:"40px 24px",textAlign:"center",cursor:"pointer",transition:"all 0.2s",background:C.bg}}
+              onMouseEnter={e=>e.currentTarget.style.borderColor=C.primary}
+              onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
+              <div style={{fontSize:40,marginBottom:12}}>📷</div>
+              <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:6}}>Toque para tirar foto ou escolher da galeria</div>
+              <div style={{fontSize:12,color:C.textMed}}>JPG, PNG ou HEIC · Máximo 10MB</div>
+              <div style={{marginTop:16,display:"inline-block",padding:"10px 22px",background:C.primary,color:"white",borderRadius:10,fontSize:13,fontWeight:700}}>
+                Selecionar imagem
+              </div>
+            </div>
+          ):(
+            <div style={{position:"relative"}}>
+              <img src={imagemPreview} alt="Redação" style={{width:"100%",maxHeight:400,objectFit:"contain",borderRadius:12,border:`1px solid ${C.border}`}}/>
+              <button onClick={()=>{setImagem(null);setImagemPreview(null);fileRef.current.value="";}}
+                style={{position:"absolute",top:10,right:10,width:32,height:32,background:"rgba(0,0,0,0.6)",color:"white",border:"none",borderRadius:"50%",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                ✕
+              </button>
+              <button onClick={()=>fileRef.current?.click()}
+                style={{position:"absolute",bottom:10,right:10,padding:"8px 14px",background:"rgba(0,0,0,0.6)",color:"white",border:"none",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:600}}>
+                Trocar foto
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Erro */}
+        {erro&&<div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:10,padding:"10px 14px",fontSize:12,color:"#991B1B",marginBottom:16}}>{erro}</div>}
+
+        {/* Botão corrigir */}
+        <button onClick={corrigir} disabled={!imagem}
+          style={{width:"100%",padding:"14px",background:imagem?`linear-gradient(135deg,${C.primary},${C.primaryLight})`:"#E5E7EB",color:imagem?"white":C.textLight,border:"none",borderRadius:12,fontSize:14,fontWeight:800,cursor:imagem?"pointer":"not-allowed",boxShadow:imagem?"0 4px 14px rgba(108,60,225,0.3)":"none",transition:"all 0.2s"}}>
+          {imagem?"🤖 Corrigir com IA agora":"Envie uma foto para continuar"}
+        </button>
+
+        <div style={{marginTop:12,fontSize:11,color:C.textLight,textAlign:"center"}}>
+          A IA lê sua caligrafia e avalia seguindo os critérios exatos da banca {banca}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── ABA EVOLUÇÃO ──────────────────────────────────────────── */
 /* ─── ABA EVOLUÇÃO ──────────────────────────────────────────── */
 /* ─── ABA EVOLUÇÃO ──────────────────────────────────────────── */
@@ -2706,11 +3113,7 @@ function Dashboard({user,onLogout}){
           <RevisaoTab user={user}/>
         )}
         {tab==="redacao"&&(
-          <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:400,gap:16}}>
-            <div style={{fontSize:48}}>✍️</div>
-            <h3 style={{fontFamily:"'Lora',serif",fontSize:22,color:C.text}}>Redação em breve</h3>
-            <p style={{fontSize:14,color:C.textMed,textAlign:"center",maxWidth:360}}>Envie sua redação manuscrita, receba correção com nota por critério e sugestões de evolução.</p>
-          </div>
+          <RedacaoTab user={user} plano={plan}/>
         )}
         {tab==="evolucao"&&(
           <EvolucaoTab userId={user?.id} plano={plan}/>
