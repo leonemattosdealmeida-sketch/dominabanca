@@ -2320,11 +2320,13 @@ function Dashboard({user,onLogout}){
     if(h>=12&&h<18) return "Boa tarde";
     return "Boa noite";
   };
+  const capitalize=(s)=>s?s.charAt(0).toUpperCase()+s.slice(1).toLowerCase():"";
   const getNomeAluno=()=>{
     const meta=user?.user_metadata;
-    if(meta?.nome) return meta.nome.split(" ")[0];
-    if(meta?.full_name) return meta.full_name.split(" ")[0];
-    return user?.email?.split("@")[0]||"Aluno";
+    if(meta?.nome) return capitalize(meta.nome.split(" ")[0]);
+    if(meta?.full_name) return capitalize(meta.full_name.split(" ")[0]);
+    const emailName=user?.email?.split("@")[0]||"Aluno";
+    return capitalize(emailName);
   };
   const PILL_COLORS=["#6C3CE1","#10B981","#F59E0B","#EF4444","#3B82F6","#8B5CF6","#EC4899","#14B8A6"];
   const grupoColor=(grupo)=>{
