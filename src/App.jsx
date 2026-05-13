@@ -2183,7 +2183,7 @@ Responda SOMENTE com um JSON válido, sem texto fora do JSON, no formato:
       <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:18,padding:"22px 26px",color:"white",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
         <div>
           <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,marginBottom:6}}>✍️ Redação</div>
-          <div style={{fontSize:13,color:"rgba(255,255,255,0.8)"}}>Envie uma foto da sua redação manuscrita e receba correção instantânea por IA no estilo {banca}.</div>
+          <div style={{fontSize:13,color:"rgba(255,255,255,0.8)"}}>Envie uma foto da sua redação manuscrita e receba correção instantânea no estilo da sua banca.</div>
         </div>
         <button onClick={loadHistorico} style={{padding:"9px 18px",background:"rgba(255,255,255,0.15)",color:"white",border:"1px solid rgba(255,255,255,0.3)",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer"}}>
           📋 Ver histórico
