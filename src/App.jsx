@@ -1525,7 +1525,7 @@ function AdminPanel({user,onBack}){
               </div>
             </div>
           )}
-        </div>
+        </>}
       </div>
     </div>
   );
