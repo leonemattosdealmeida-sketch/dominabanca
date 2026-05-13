@@ -3074,6 +3074,299 @@ Responda SOMENTE com um JSON válido, sem texto fora do JSON, no formato:
   );
 }
 
+/* ─── TELA DE PERFIL ─────────────────────────────────────────── */
+function PerfilTab({user,plano,onBack,onPlanUpdate}){
+  const [aba,setAba]=React.useState("dados");
+  const [dados,setDados]=React.useState({nome:"",telefone:""});
+  const [concurso,setConcurso]=React.useState({orgao:"",cargo:"",banca:"",data_prova:"",horas:14,total_questoes:400,tem_redacao:false,uf_prova:""});
+  const [senha,setSenha]=React.useState({nova:"",confirma:""});
+  const [loading,setLoading]=React.useState(true);
+  const [salvando,setSalvando]=React.useState(false);
+  const [msg,setMsg]=React.useState(null); // {tipo:"ok"|"erro", texto:""}
+
+  React.useEffect(()=>{
+    (async()=>{
+      const[{data:aluno},{data:ob}]=await Promise.all([
+        supabase.from("alunos").select("nome,telefone,plano,status_pagamento,data_assinatura,data_vencimento").eq("id",user.id).maybeSingle(),
+        supabase.from("onboarding").select("*").eq("user_id",user.id).maybeSingle()
+      ]);
+      if(aluno) setDados({nome:aluno.nome||"",telefone:aluno.telefone||"",plano:aluno.plano||"gratuito",status:aluno.status_pagamento||"trial",data_assinatura:aluno.data_assinatura,data_vencimento:aluno.data_vencimento});
+      if(ob) setConcurso({orgao:ob.orgao||"",cargo:ob.cargo||"",banca:ob.banca||"",data_prova:ob.data_prova||"",horas:ob.horas||14,total_questoes:ob.total_questoes||400,tem_redacao:ob.tem_redacao||false,uf_prova:ob.uf_prova||""});
+      setLoading(false);
+    })();
+  },[]);
+
+  const showMsg=(tipo,texto)=>{setMsg({tipo,texto});setTimeout(()=>setMsg(null),3500);};
+
+  const salvarDados=async()=>{
+    setSalvando(true);
+    await supabase.from("alunos").update({nome:dados.nome,telefone:dados.telefone}).eq("id",user.id);
+    // Atualiza metadata do auth
+    await supabase.auth.updateUser({data:{nome:dados.nome}});
+    showMsg("ok","Dados salvos com sucesso!");
+    setSalvando(false);
+  };
+
+  const salvarConcurso=async()=>{
+    setSalvando(true);
+    const metaDiaria=Math.min(80,Math.max(30,Math.round(((Number(concurso.horas)||14)/7)*18)));
+    const payload={orgao:concurso.orgao,cargo:concurso.cargo,banca:concurso.banca,data_prova:concurso.data_prova||null,horas:Number(concurso.horas),total_questoes:Number(concurso.total_questoes),tem_redacao:concurso.tem_redacao,uf_prova:concurso.uf_prova,meta_diaria:metaDiaria};
+    await supabase.from("onboarding").update(payload).eq("user_id",user.id);
+    onPlanUpdate({...plano,...payload});
+    showMsg("ok","Concurso atualizado!");
+    setSalvando(false);
+  };
+
+  const salvarSenha=async()=>{
+    if(senha.nova.length<6){showMsg("erro","A senha precisa ter pelo menos 6 caracteres.");return;}
+    if(senha.nova!==senha.confirma){showMsg("erro","As senhas não coincidem.");return;}
+    setSalvando(true);
+    const{error}=await supabase.auth.updateUser({password:senha.nova});
+    if(error) showMsg("erro","Erro ao alterar senha. Tente novamente.");
+    else{showMsg("ok","Senha alterada com sucesso!");setSenha({nova:"",confirma:""});}
+    setSalvando(false);
+  };
+
+  const D=(k,v)=>setDados(d=>({...d,[k]:v}));
+  const CO=(k,v)=>setConcurso(c=>({...c,[k]:v}));
+
+  const PLANOS={gratuito:{l:"Gratuito",c:"#6B7280",bg:"#F3F4F6"},o_mapa:{l:"O Mapa",c:"#6C3CE1",bg:"#EDE9FE"},o_sistema_pronto:{l:"Sistema Pronto",c:"#10B981",bg:"#D1FAE5"}};
+  const STATUS={trial:{l:"Trial",c:"#F59E0B"},ativo:{l:"Ativo",c:"#10B981"},inadimplente:{l:"Inadimplente",c:"#EF4444"},cancelado:{l:"Cancelado",c:"#6B7280"}};
+  const planoInfo=PLANOS[dados.plano]||PLANOS.gratuito;
+  const statusInfo=STATUS[dados.status]||STATUS.trial;
+
+  const ABAS=[{id:"dados",icon:"👤",l:"Dados pessoais"},{id:"concurso",icon:"🎯",l:"Meu concurso"},{id:"seguranca",icon:"🔒",l:"Segurança"},{id:"plano",icon:"💎",l:"Meu plano"}];
+
+  if(loading)return(
+    <div style={{height:"100vh",display:"flex",justifyContent:"center",alignItems:"center",background:C.bg}}>
+      <div style={{width:40,height:40,border:"4px solid #EDE9FE",borderTop:`4px solid ${C.primary}`,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+    </div>
+  );
+
+  return(
+    <div style={{fontFamily:"'Sora',sans-serif",minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column"}}>
+      {/* NAV */}
+      <nav style={{background:C.white,borderBottom:`1px solid ${C.border}`,padding:"0 24px",height:62,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100,boxShadow:"0 1px 8px rgba(0,0,0,0.04)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
+          <button onClick={onBack} style={{width:36,height:36,border:`1px solid ${C.border}`,borderRadius:10,background:"white",cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>←</button>
+          <div style={{fontFamily:"'Lora',serif",fontSize:16,fontWeight:700,color:C.text}}>Meu Perfil</div>
+        </div>
+        {/* Avatar */}
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:34,height:34,borderRadius:"50%",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontWeight:800,fontSize:14}}>
+            {(dados.nome||user?.email||"A").charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <div style={{fontSize:12,fontWeight:700,color:C.text}}>{dados.nome||"—"}</div>
+            <div style={{fontSize:10,color:C.textLight}}>{user?.email}</div>
+          </div>
+        </div>
+      </nav>
+
+      {/* CONTEÚDO */}
+      <div style={{maxWidth:760,width:"100%",margin:"0 auto",padding:"28px 20px",display:"flex",flexDirection:"column",gap:20}}>
+
+        {/* ABAS */}
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden",display:"flex",boxShadow:"0 2px 6px rgba(0,0,0,0.04)"}}>
+          {ABAS.map(a=>(
+            <button key={a.id} onClick={()=>setAba(a.id)} style={{flex:1,padding:"13px 8px",border:"none",borderBottom:`3px solid ${aba===a.id?C.primary:"transparent"}`,background:aba===a.id?C.primaryXLight:"white",color:aba===a.id?C.primary:C.textMed,fontSize:11,fontWeight:aba===a.id?700:500,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,transition:"all 0.15s"}}>
+              <span>{a.icon}</span><span className="tab-label">{a.l}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* MSG FEEDBACK */}
+        {msg&&(
+          <div style={{background:msg.tipo==="ok"?"#D1FAE5":"#FEE2E2",border:`1px solid ${msg.tipo==="ok"?"#A7F3D0":"#FECACA"}`,borderRadius:10,padding:"12px 16px",fontSize:13,fontWeight:600,color:msg.tipo==="ok"?"#065F46":"#991B1B",display:"flex",alignItems:"center",gap:8}}>
+            <span>{msg.tipo==="ok"?"✅":"❌"}</span>{msg.texto}
+          </div>
+        )}
+
+        {/* ── DADOS PESSOAIS ── */}
+        {aba==="dados"&&(
+          <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"28px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+            <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:20}}>👤 Dados pessoais</div>
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
+              <div>
+                <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>Nome completo</div>
+                <input value={dados.nome} onChange={e=>D("nome",e.target.value)} placeholder="Seu nome completo"
+                  style={{width:"100%",padding:"11px 14px",border:`1.5px solid ${C.border}`,borderRadius:10,fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:"'Sora',sans-serif"}}/>
+              </div>
+              <div>
+                <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>Telefone</div>
+                <input value={dados.telefone} onChange={e=>D("telefone",e.target.value)} placeholder="(11) 99999-9999"
+                  style={{width:"100%",padding:"11px 14px",border:`1.5px solid ${C.border}`,borderRadius:10,fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:"'Sora',sans-serif"}}/>
+              </div>
+              <div>
+                <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>Email <span style={{fontWeight:400}}>(não editável)</span></div>
+                <div style={{padding:"11px 14px",border:`1px solid ${C.border}`,borderRadius:10,fontSize:13,color:C.textMed,background:"#F9FAFB"}}>{user?.email}</div>
+              </div>
+              <button onClick={salvarDados} disabled={salvando}
+                style={{padding:"12px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 12px rgba(108,60,225,0.3)",opacity:salvando?0.7:1}}>
+                {salvando?"Salvando...":"Salvar dados"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── MEU CONCURSO ── */}
+        {aba==="concurso"&&(
+          <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"28px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+            <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:4}}>🎯 Meu concurso</div>
+            <div style={{fontSize:12,color:C.textMed,marginBottom:20}}>Alterar esses dados recalcula automaticamente seu cronograma.</div>
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}} className="evo-grid2-inner">
+                {[{k:"orgao",l:"Órgão",p:"Ex: Polícia Federal"},{k:"cargo",l:"Cargo",p:"Ex: Agente Administrativo"},{k:"banca",l:"Banca",p:"Ex: CESPE, FCC"},{k:"uf_prova",l:"UF da prova",p:"Ex: SP, RJ (opcional)"}].map(f=>(
+                  <div key={f.k}>
+                    <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>{f.l}</div>
+                    <input value={concurso[f.k]} onChange={e=>CO(f.k,e.target.value)} placeholder={f.p}
+                      style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${C.border}`,borderRadius:10,fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:"'Sora',sans-serif"}}/>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>Data da prova</div>
+                <input type="date" value={concurso.data_prova} onChange={e=>CO("data_prova",e.target.value)}
+                  style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${C.border}`,borderRadius:10,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}} className="evo-grid2-inner">
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>Horas de estudo por semana</div>
+                  <input type="number" min={1} max={80} value={concurso.horas} onChange={e=>CO("horas",e.target.value)}
+                    style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${C.border}`,borderRadius:10,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+                </div>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>Total de questões no edital</div>
+                  <input type="number" min={1} value={concurso.total_questoes} onChange={e=>CO("total_questoes",e.target.value)}
+                    style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${C.border}`,borderRadius:10,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+                </div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",background:C.bg,borderRadius:10}}>
+                <div onClick={()=>CO("tem_redacao",!concurso.tem_redacao)} style={{width:44,height:24,borderRadius:100,background:concurso.tem_redacao?C.primary:"#D1D5DB",cursor:"pointer",position:"relative",transition:"background 0.2s",flexShrink:0}}>
+                  <div style={{width:20,height:20,borderRadius:"50%",background:"white",position:"absolute",top:2,left:concurso.tem_redacao?22:2,transition:"left 0.2s"}}/>
+                </div>
+                <div>
+                  <div style={{fontSize:13,fontWeight:600,color:C.text}}>Prova tem redação / discursiva</div>
+                  <div style={{fontSize:11,color:C.textLight}}>Ativa a aba de Redação com correção por IA</div>
+                </div>
+              </div>
+              {/* Preview do recálculo */}
+              <div style={{background:C.primaryXLight,border:`1px solid ${C.borderPurple}`,borderRadius:12,padding:"14px 16px"}}>
+                <div style={{fontSize:11,fontWeight:700,color:C.primary,marginBottom:8}}>📊 Preview do recálculo</div>
+                <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
+                  {[
+                    {l:"Meta diária",v:`${Math.min(80,Math.max(30,Math.round(((Number(concurso.horas)||14)/7)*18)))}q`},
+                    {l:"Semanas para concluir",v:`${Math.ceil((Number(concurso.total_questoes)||400)/Math.min(80,Math.max(30,Math.round(((Number(concurso.horas)||14)/7)*18)))/7)} sem`},
+                  ].map(s=>(
+                    <div key={s.l}>
+                      <div style={{fontSize:10,color:C.primary}}>{s.l}</div>
+                      <div style={{fontSize:16,fontWeight:800,color:C.primary,fontFamily:"'Lora',serif"}}>{s.v}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <button onClick={salvarConcurso} disabled={salvando}
+                style={{padding:"12px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 12px rgba(108,60,225,0.3)",opacity:salvando?0.7:1}}>
+                {salvando?"Salvando...":"Salvar concurso"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── SEGURANÇA ── */}
+        {aba==="seguranca"&&(
+          <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"28px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+            <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:20}}>🔒 Segurança</div>
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
+              <div>
+                <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>Nova senha</div>
+                <input type="password" value={senha.nova} onChange={e=>setSenha(s=>({...s,nova:e.target.value}))} placeholder="Mínimo 6 caracteres"
+                  style={{width:"100%",padding:"11px 14px",border:`1.5px solid ${C.border}`,borderRadius:10,fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:"'Sora',sans-serif"}}/>
+              </div>
+              <div>
+                <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>Confirmar nova senha</div>
+                <input type="password" value={senha.confirma} onChange={e=>setSenha(s=>({...s,confirma:e.target.value}))} placeholder="Repita a nova senha"
+                  style={{width:"100%",padding:"11px 14px",border:`1.5px solid ${C.border}`,borderRadius:10,fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:"'Sora',sans-serif"}}/>
+              </div>
+              {senha.nova&&senha.confirma&&senha.nova!==senha.confirma&&(
+                <div style={{fontSize:12,color:"#EF4444",fontWeight:600}}>⚠️ As senhas não coincidem</div>
+              )}
+              <button onClick={salvarSenha} disabled={salvando||!senha.nova||!senha.confirma}
+                style={{padding:"12px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 12px rgba(108,60,225,0.3)",opacity:salvando||!senha.nova||!senha.confirma?0.7:1}}>
+                {salvando?"Alterando...":"Alterar senha"}
+              </button>
+              <div style={{padding:"14px 16px",background:"#FFF7ED",border:"1px solid #FED7AA",borderRadius:10}}>
+                <div style={{fontSize:11,fontWeight:700,color:"#92400E",marginBottom:4}}>💡 Dica de segurança</div>
+                <div style={{fontSize:12,color:"#78350F",lineHeight:1.6}}>Use uma senha com pelo menos 8 caracteres, incluindo letras, números e símbolos.</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── MEU PLANO ── */}
+        {aba==="plano"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:16}}>
+            {/* Card plano atual */}
+            <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:18,padding:"28px",color:"white",boxShadow:"0 4px 20px rgba(108,60,225,0.3)"}}>
+              <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:12}}>Plano atual</div>
+              <div style={{fontFamily:"'Lora',serif",fontSize:28,fontWeight:800,marginBottom:8}}>{planoInfo.l}</div>
+              <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+                <div style={{background:"rgba(255,255,255,0.15)",borderRadius:100,padding:"5px 14px",fontSize:12,fontWeight:700}}>
+                  {statusInfo.l}
+                </div>
+                {dados.data_vencimento&&(
+                  <div style={{background:"rgba(255,255,255,0.15)",borderRadius:100,padding:"5px 14px",fontSize:12}}>
+                    Vence: {new Date(dados.data_vencimento).toLocaleDateString("pt-BR")}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Planos disponíveis */}
+            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"24px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:16}}>Planos disponíveis</div>
+              <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                {[
+                  {id:"gratuito",l:"Gratuito",preco:"R$ 0",desc:"Acesso limitado ao cronograma e 10 questões/dia.",cor:"#6B7280"},
+                  {id:"o_mapa",l:"O Mapa",preco:"R$ 97/mês",desc:"Cronograma completo, questões ilimitadas e redação por IA.",cor:C.primary},
+                  {id:"o_sistema_pronto",l:"Sistema Pronto",preco:"R$ 197/mês",desc:"Tudo do Mapa + configuração personalizada + suporte prioritário.",cor:"#10B981"},
+                ].map(p=>{
+                  const ativo=dados.plano===p.id;
+                  return(
+                    <div key={p.id} style={{border:`2px solid ${ativo?p.cor:C.border}`,borderRadius:14,padding:"16px 20px",background:ativo?p.cor+"08":"white",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+                      <div style={{flex:1}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                          <div style={{fontSize:14,fontWeight:700,color:p.cor}}>{p.l}</div>
+                          {ativo&&<span style={{background:p.cor,color:"white",borderRadius:100,padding:"1px 8px",fontSize:9,fontWeight:700}}>ATUAL</span>}
+                        </div>
+                        <div style={{fontSize:12,color:C.textMed,lineHeight:1.5}}>{p.desc}</div>
+                      </div>
+                      <div style={{textAlign:"right",flexShrink:0}}>
+                        <div style={{fontFamily:"'Lora',serif",fontSize:18,fontWeight:800,color:p.cor}}>{p.preco}</div>
+                        {!ativo&&(
+                          <button style={{marginTop:6,padding:"7px 14px",background:p.cor,color:"white",border:"none",borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                            Assinar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Info adicional */}
+            <div style={{background:"#F0FDF4",border:"1px solid #A7F3D0",borderRadius:14,padding:"16px 20px"}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#065F46",marginBottom:6}}>💳 Como assinar</div>
+              <div style={{fontSize:12,color:"#065F46",lineHeight:1.6}}>Para contratar ou trocar de plano, entre em contato pelo WhatsApp ou email. Em breve o pagamento estará disponível diretamente na plataforma.</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ─── ABA EVOLUÇÃO ──────────────────────────────────────────── */
 /* ─── ABA EVOLUÇÃO ──────────────────────────────────────────── */
 /* ─── ABA EVOLUÇÃO ──────────────────────────────────────────── */
@@ -3642,6 +3935,7 @@ function Dashboard({user,onLogout}){
 
   if(subTela==="sessao") return <SessaoEstudos user={user} plano={plan} onConcluir={()=>setSubTela(null)} onVoltar={()=>setSubTela(null)}/>;
   if(subTela==="admin") return <AdminPanel user={user} onBack={()=>setSubTela(null)}/>;
+  if(subTela==="perfil") return <PerfilTab user={user} plano={plan} onBack={()=>setSubTela(null)} onPlanUpdate={(p)=>setPlan(p)}/>;
   if(subTela==="simulado_tela"&&simuladoAtivo&&inscricaoAtiva) return <SimuladoTela user={user} simulado={simuladoAtivo} inscricao={inscricaoAtiva} onVoltar={()=>setSubTela(null)} onConcluir={(res)=>{setResultadoSimulado(res);setSubTela("simulado_resultado");}}/>;
   if(subTela==="simulado_resultado"&&resultadoSimulado) return <SimuladoResultado resultado={resultadoSimulado} simulado={simuladoAtivo} onVoltar={()=>{setSubTela(null);setResultadoSimulado(null);}}/>;
 
@@ -3682,7 +3976,7 @@ function Dashboard({user,onLogout}){
                   </div>
                   {/* Itens */}
                   <div style={{padding:"6px"}}>
-                    <button onClick={()=>{setMenuAberto(false);/* perfil em breve */alert("Perfil em breve!");}}
+                    <button onClick={()=>{setMenuAberto(false);setSubTela("perfil");}}
                       style={{width:"100%",padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,textAlign:"left",fontSize:13,color:C.text,cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontWeight:500}}>
                       <span style={{fontSize:16}}>👤</span> Meu perfil
                     </button>
