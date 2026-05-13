@@ -2122,56 +2122,202 @@ Responda SOMENTE com um JSON válido, sem texto fora do JSON, no formato:
 
   /* ── TELA: HISTÓRICO ── */
   if(fase==="historico")return(
-    <div style={{display:"flex",flexDirection:"column",gap:16}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,color:C.text}}>📋 Histórico de redações</div>
-        <button onClick={novaredacao} style={{padding:"9px 18px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>+ Nova redação</button>
+    <div style={{display:"flex",flexDirection:"column",gap:20}}>
+
+      {/* Header com botão voltar */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <button onClick={()=>setFase("inicio")} style={{width:36,height:36,borderRadius:10,border:`1px solid ${C.border}`,background:C.white,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>←</button>
+          <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,color:C.text}}>📋 Histórico de redações</div>
+        </div>
+        <button onClick={novaredacao} style={{padding:"9px 18px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 12px rgba(108,60,225,0.3)"}}>+ Nova redação</button>
       </div>
+
       {loadingHist?(
-        <div style={{display:"flex",justifyContent:"center",padding:"48px"}}>
+        <div style={{display:"flex",justifyContent:"center",padding:"60px"}}>
           <div style={{width:36,height:36,border:"4px solid #EDE9FE",borderTop:`4px solid ${C.primary}`,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
         </div>
       ):historico.length===0?(
-        <div style={{textAlign:"center",padding:"48px",background:C.white,borderRadius:18,border:`1px solid ${C.border}`}}>
-          <div style={{fontSize:36,marginBottom:8}}>✍️</div>
-          <div style={{fontSize:14,fontWeight:600,color:C.text}}>Nenhuma redação ainda</div>
+        <div style={{textAlign:"center",padding:"60px",background:C.white,borderRadius:18,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:48,marginBottom:12}}>✍️</div>
+          <div style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:6}}>Nenhuma redação ainda</div>
+          <div style={{fontSize:13,color:C.textMed,marginBottom:20}}>Envie sua primeira redação para ver o histórico aqui.</div>
+          <button onClick={novaredacao} style={{padding:"11px 24px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>Enviar primeira redação</button>
         </div>
-      ):(
-        <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {historico.map((r,i)=>{
-            const pct=r.nota_total&&r.criterios?Math.round((r.nota_total/r.criterios.reduce((s,c)=>s+(c.nota_max||0),0))*100):0;
-            const cor=pct>=70?"#10B981":pct>=50?"#F59E0B":"#EF4444";
-            return(
-              <div key={r.id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:"16px 20px",boxShadow:"0 2px 6px rgba(0,0,0,0.04)"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10}}>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:4}}>{r.tema||"Sem tema"}</div>
-                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                      <span style={{background:C.primaryXLight,color:C.primary,borderRadius:100,padding:"2px 8px",fontSize:10,fontWeight:700}}>{r.banca}</span>
-                      <span style={{fontSize:10,color:C.textLight}}>{new Date(r.created_at).toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"})}</span>
-                    </div>
-                    {r.comentario_geral&&<div style={{fontSize:11,color:C.textMed,marginTop:8,lineHeight:1.5}}>{r.comentario_geral.substring(0,120)}...</div>}
-                  </div>
-                  <div style={{textAlign:"center",flexShrink:0}}>
-                    <div style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:800,color:cor}}>{r.nota_total||0}</div>
-                    <div style={{fontSize:10,color:C.textLight}}>pontos</div>
-                    <div style={{fontSize:11,fontWeight:700,color:cor}}>{pct}%</div>
-                  </div>
+      ):(()=>{
+        /* Cálculo do gráfico de evolução */
+        const histOrdenado=[...historico].reverse();
+        const maxNota=Math.max(...histOrdenado.map(r=>r.nota_total||0),1);
+        const notaMaxTotal=histOrdenado[0]?.criterios?.reduce((s,c)=>s+(c.nota_max||0),0)||1000;
+        const mediaGeral=Math.round(histOrdenado.reduce((s,r)=>s+(r.nota_total||0),0)/histOrdenado.length);
+        const pctMedia=Math.round((mediaGeral/notaMaxTotal)*100);
+        const melhor=histOrdenado.reduce((m,r)=>(r.nota_total||0)>(m.nota_total||0)?r:m,histOrdenado[0]);
+        const ultima=histOrdenado[histOrdenado.length-1];
+        const primeira=histOrdenado[0];
+        const evolucao=ultima&&primeira?(ultima.nota_total||0)-(primeira.nota_total||0):0;
+
+        return(
+          <>
+            {/* CARDS RESUMO */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14}} className="evo-grid2-inner">
+              {[
+                {icon:"📝",label:"Redações enviadas",val:historico.length,cor:C.primary},
+                {icon:"🎯",label:"Média geral",val:`${pctMedia}%`,cor:pctMedia>=70?"#10B981":pctMedia>=50?"#F59E0B":"#EF4444"},
+                {icon:"🏆",label:"Melhor nota",val:`${Math.round((melhor?.nota_total/notaMaxTotal)*100)||0}%`,cor:"#10B981"},
+              ].map(s=>(
+                <div key={s.label} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:"16px 18px",boxShadow:"0 2px 6px rgba(0,0,0,0.04)",textAlign:"center"}}>
+                  <div style={{fontSize:20,marginBottom:8}}>{s.icon}</div>
+                  <div style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:800,color:s.cor}}>{s.val}</div>
+                  <div style={{fontSize:10,color:C.textLight,marginTop:4}}>{s.label}</div>
                 </div>
-                {r.criterios&&(
-                  <div style={{marginTop:12,display:"flex",gap:6,flexWrap:"wrap"}}>
-                    {r.criterios.map((c,j)=>(
-                      <span key={j} style={{fontSize:9,fontWeight:700,background:corPorNota(c.nota,c.nota_max)+"22",color:corPorNota(c.nota,c.nota_max),borderRadius:100,padding:"2px 8px"}}>
-                        {c.nome.split(" ").slice(0,2).join(" ")} {c.nota}
-                      </span>
-                    ))}
+              ))}
+            </div>
+
+            {/* GRÁFICO DE EVOLUÇÃO */}
+            {histOrdenado.length>=2&&(
+              <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"22px 24px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,flexWrap:"wrap",gap:8}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:C.text}}>📈 Evolução da nota</div>
+                    <div style={{fontSize:11,color:C.textLight,marginTop:2}}>Sua progressão ao longo do tempo</div>
                   </div>
-                )}
+                  {evolucao!==0&&(
+                    <div style={{background:evolucao>0?"#D1FAE5":"#FEE2E2",border:`1px solid ${evolucao>0?"#A7F3D0":"#FECACA"}`,borderRadius:100,padding:"5px 12px",fontSize:12,fontWeight:700,color:evolucao>0?"#065F46":"#991B1B"}}>
+                      {evolucao>0?`▲ +${evolucao} pts desde a primeira`:`▼ ${evolucao} pts desde a primeira`}
+                    </div>
+                  )}
+                </div>
+                {/* Barras do gráfico */}
+                <div style={{display:"flex",alignItems:"flex-end",gap:8,height:120,marginTop:16,marginBottom:10}}>
+                  {histOrdenado.map((r,i)=>{
+                    const nota=r.nota_total||0;
+                    const h=Math.max(10,Math.round((nota/notaMaxTotal)*100));
+                    const pct=Math.round((nota/notaMaxTotal)*100);
+                    const cor=pct>=70?"#10B981":pct>=50?C.primary:"#F59E0B";
+                    const isLast=i===histOrdenado.length-1;
+                    const isMax=nota===melhor?.nota_total;
+                    return(
+                      <div key={r.id} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                        {isMax&&<div style={{fontSize:8,color:"#F59E0B",fontWeight:800}}>★</div>}
+                        {!isMax&&<div style={{fontSize:8,color:"transparent"}}>★</div>}
+                        <div style={{fontSize:9,fontWeight:700,color:isLast?cor:C.textLight}}>{pct}%</div>
+                        <div style={{width:"100%",height:`${h}%`,background:isLast?cor:isMax?"#F59E0B":cor+"77",borderRadius:"6px 6px 0 0",minHeight:10,boxShadow:isLast?`0 0 10px ${cor}44`:"none",transition:"height 0.6s ease"}}/>
+                        <div style={{fontSize:8,color:C.textLight,textAlign:"center",lineHeight:1.2}}>
+                          {new Date(r.created_at).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Linha de média */}
+                <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
+                  <div style={{width:16,height:2,background:C.primary,borderRadius:1}}/>
+                  <span style={{fontSize:10,color:C.textLight}}>Média: {pctMedia}% ({mediaGeral} pts)</span>
+                </div>
               </div>
-            );
-          })}
-        </div>
-      )}
+            )}
+
+            {/* AVALIAÇÕES COMPLETAS */}
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:14}}>Todas as avaliações</div>
+              <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                {[...historico].map((r,i)=>{
+                  const notaMaxR=r.criterios?.reduce((s,c)=>s+(c.nota_max||0),0)||notaMaxTotal;
+                  const pct=notaMaxR>0?Math.round(((r.nota_total||0)/notaMaxR)*100):0;
+                  const cor=pct>=70?"#10B981":pct>=50?"#F59E0B":"#EF4444";
+                  const bg=pct>=70?"#F0FDF4":pct>=50?"#FFFBEB":"#FFF1F1";
+                  const border=pct>=70?"#A7F3D0":pct>=50?"#FDE68A":"#FECACA";
+                  const [aberta,setAberta]=React.useState(i===0); // primeira aberta por padrão
+                  return(
+                    <div key={r.id} style={{background:C.white,border:`1.5px solid ${i===0?C.primary:C.border}`,borderRadius:16,overflow:"hidden",boxShadow:i===0?"0 4px 16px rgba(108,60,225,0.12)":"0 2px 6px rgba(0,0,0,0.04)"}}>
+                      {/* Cabeçalho clicável */}
+                      <div onClick={()=>setAberta(a=>!a)} style={{padding:"16px 20px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,background:i===0?C.primaryXLight:"white"}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                            {i===0&&<span style={{background:C.primary,color:"white",borderRadius:100,padding:"2px 8px",fontSize:9,fontWeight:700}}>MAIS RECENTE</span>}
+                            <span style={{background:C.primaryXLight,color:C.primary,borderRadius:100,padding:"2px 8px",fontSize:9,fontWeight:700}}>{r.banca}</span>
+                            <span style={{fontSize:10,color:C.textLight}}>{new Date(r.created_at).toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"})}</span>
+                          </div>
+                          <div style={{fontSize:13,fontWeight:700,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.tema||"Sem tema"}</div>
+                        </div>
+                        <div style={{display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+                          <div style={{textAlign:"center"}}>
+                            <div style={{fontFamily:"'Lora',serif",fontSize:22,fontWeight:800,color:cor,lineHeight:1}}>{r.nota_total||0}</div>
+                            <div style={{fontSize:9,color:C.textLight}}>/{notaMaxR}pts</div>
+                          </div>
+                          <div style={{width:40,height:40,borderRadius:"50%",background:bg,border:`2px solid ${border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:cor}}>{pct}%</div>
+                          <div style={{fontSize:16,color:C.textLight}}>{aberta?"▲":"▼"}</div>
+                        </div>
+                      </div>
+
+                      {/* Conteúdo expandido */}
+                      {aberta&&(
+                        <div style={{borderTop:`1px solid ${C.border}`,padding:"20px"}}>
+
+                          {/* Critérios com barras */}
+                          <div style={{marginBottom:16}}>
+                            <div style={{fontSize:11,fontWeight:700,color:C.textLight,letterSpacing:1,textTransform:"uppercase",marginBottom:12}}>Nota por critério</div>
+                            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                              {(r.criterios||[]).map((c,j)=>{
+                                const corC=corPorNota(c.nota,c.nota_max);
+                                const pctC=Math.round((c.nota/c.nota_max)*100);
+                                return(
+                                  <div key={j}>
+                                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                                      <span style={{fontSize:12,fontWeight:600,color:C.text}}>{c.nome}</span>
+                                      <span style={{fontSize:12,fontWeight:800,color:corC,background:corC+"15",borderRadius:100,padding:"2px 10px"}}>{c.nota}/{c.nota_max}</span>
+                                    </div>
+                                    <div style={{height:8,background:"#F3F4F6",borderRadius:100,marginBottom:5}}>
+                                      <div style={{height:"100%",width:`${pctC}%`,background:corC,borderRadius:100}}/>
+                                    </div>
+                                    <div style={{fontSize:11,color:C.textMed,lineHeight:1.6,paddingLeft:4}}>{c.feedback}</div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Avaliação geral */}
+                          {r.comentario_geral&&(
+                            <div style={{background:"#F8F9FA",borderRadius:12,padding:"14px 16px",marginBottom:12}}>
+                              <div style={{fontSize:11,fontWeight:700,color:C.text,marginBottom:6}}>💬 Avaliação geral</div>
+                              <div style={{fontSize:13,color:C.text,lineHeight:1.7}}>{r.comentario_geral}</div>
+                            </div>
+                          )}
+
+                          {/* Pontos fortes e melhora lado a lado */}
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}} className="evo-grid2-inner">
+                            {r.pontos_fortes&&(
+                              <div style={{background:"#F0FDF4",border:"1px solid #A7F3D0",borderRadius:12,padding:"12px 14px"}}>
+                                <div style={{fontSize:11,fontWeight:700,color:"#065F46",marginBottom:6}}>✅ Pontos fortes</div>
+                                <div style={{fontSize:12,color:"#065F46",lineHeight:1.6}}>{r.pontos_fortes}</div>
+                              </div>
+                            )}
+                            {r.pontos_melhora&&(
+                              <div style={{background:"#FFF7ED",border:"1px solid #FED7AA",borderRadius:12,padding:"12px 14px"}}>
+                                <div style={{fontSize:11,fontWeight:700,color:"#92400E",marginBottom:6}}>⚠️ O que melhorar</div>
+                                <div style={{fontSize:12,color:"#78350F",lineHeight:1.6}}>{r.pontos_melhora}</div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Transcrição */}
+                          {r.transcricao&&(
+                            <div style={{background:"#F8F9FA",borderRadius:12,padding:"12px 14px",borderLeft:`3px solid ${C.primary}`}}>
+                              <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>📄 Trecho transcrito pela IA</div>
+                              <div style={{fontSize:12,color:C.textMed,lineHeight:1.7,fontStyle:"italic"}}>"{r.transcricao}..."</div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 
