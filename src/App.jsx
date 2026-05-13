@@ -596,13 +596,635 @@ function CronogramaCalendario({plan,mats,meta,dias,totalQ,getPrevisoSemanas}){
   );
 }
 
+/* ─── ADMIN: SIMULADOS ──────────────────────────────────────── */
+function SimuladoAdmin({user}){
+  const [simulados,setSimulados]=React.useState([]);
+  const [loading,setLoading]=React.useState(true);
+  const [form,setForm]=React.useState(null); // null=lista, "novo"=criar, {id}=editar
+  const [questoesForm,setQuestoesForm]=React.useState([]); // questões do simulado sendo criado
+  const [abaForm,setAbaForm]=React.useState("info"); // info | questoes_banco | questoes_nova
+  const [bancoBusca,setBancoBusca]=React.useState({materia:"",topico:""});
+  const [bancoResultado,setBancoResultado]=React.useState([]);
+  const [buscandoBanco,setBuscandoBanco]=React.useState(false);
+  const [saving,setSaving]=React.useState(false);
+  const [novaQ,setNovaQ]=React.useState({enunciado:"",alternativas:{A:"",B:"",C:"",D:"",E:""},gabarito:"A",comentario:"",tipo:"multipla"});
+  const LETRAS=["A","B","C","D","E"];
+
+  React.useEffect(()=>{loadSimulados();},[]);
+
+  const loadSimulados=async()=>{
+    setLoading(true);
+    const{data}=await supabase.from("simulados").select("*").order("data_hora",{ascending:false});
+    setSimulados(data||[]);
+    setLoading(false);
+  };
+
+  const buscarBanco=async()=>{
+    setBuscandoBanco(true);
+    let q=supabase.from("questoes").select("*").eq("ativa",true);
+    if(bancoBusca.materia) q=q.ilike("materia",`%${bancoBusca.materia}%`);
+    if(bancoBusca.topico) q=q.ilike("topico",`%${bancoBusca.topico}%`);
+    const{data}=await q.limit(50);
+    setBancoResultado(data||[]);
+    setBuscandoBanco(false);
+  };
+
+  const addQuestaoDosBanco=(q)=>{
+    if(questoesForm.find(x=>x.id===q.id)) return;
+    setQuestoesForm(prev=>[...prev,q]);
+  };
+
+  const addQuestaoNova=()=>{
+    if(!novaQ.enunciado) return;
+    setQuestoesForm(prev=>[...prev,{...novaQ,id:`nova_${Date.now()}`,isNova:true}]);
+    setNovaQ({enunciado:"",alternativas:{A:"",B:"",C:"",D:"",E:""},gabarito:"A",comentario:"",tipo:"multipla"});
+  };
+
+  const removeQuestao=(id)=>setQuestoesForm(prev=>prev.filter(q=>q.id!==id));
+
+  const novoForm=()=>{
+    setForm({titulo:"",data_hora:"",duracao_minutos:180,ativo:false});
+    setQuestoesForm([]);
+    setAbaForm("info");
+  };
+
+  const salvarSimulado=async()=>{
+    if(!form.titulo||!form.data_hora){alert("Preencha o título e a data.");return;}
+    if(questoesForm.length===0){alert("Adicione pelo menos 1 questão.");return;}
+    setSaving(true);
+
+    // Salva questões novas no banco primeiro
+    const questoesFinal=[];
+    for(const q of questoesForm){
+      if(q.isNova){
+        const{data:saved}=await supabase.from("questoes").insert({
+          grupo:"Simulado",materia:"Simulado Coletivo",topico:form.titulo,
+          enunciado:q.enunciado,alternativas:q.alternativas,gabarito:q.gabarito,
+          comentario:q.comentario,tipo:q.tipo||"multipla",nivel:"medio"
+        }).select().single();
+        if(saved) questoesFinal.push(saved);
+      }else{
+        questoesFinal.push(q);
+      }
+    }
+
+    // Monta gabarito
+    const gabarito={};
+    questoesFinal.forEach(q=>{ gabarito[q.id]=q.gabarito; });
+
+    const payload={
+      titulo:form.titulo,
+      data_hora:form.data_hora,
+      duracao_minutos:Number(form.duracao_minutos)||180,
+      questoes:questoesFinal,
+      gabarito,
+      ativo:form.ativo||false
+    };
+
+    if(form.id){
+      await supabase.from("simulados").update(payload).eq("id",form.id);
+    }else{
+      await supabase.from("simulados").insert(payload);
+    }
+
+    setSaving(false);
+    setForm(null);
+    loadSimulados();
+  };
+
+  const toggleAtivo=async(sim)=>{
+    await supabase.from("simulados").update({ativo:!sim.ativo}).eq("id",sim.id);
+    setSimulados(prev=>prev.map(s=>s.id===sim.id?{...s,ativo:!s.ativo}:s));
+  };
+
+  const excluir=async(id)=>{
+    if(!confirm("Excluir este simulado?")) return;
+    await supabase.from("simulados").delete().eq("id",id);
+    loadSimulados();
+  };
+
+  const F=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const FQ=(k,v)=>setNovaQ(q=>({...q,[k]:v}));
+  const FQA=(l,v)=>setNovaQ(q=>({...q,alternativas:{...q.alternativas,[l]:v}}));
+
+  if(loading)return(
+    <div style={{flex:1,display:"flex",justifyContent:"center",padding:"60px"}}>
+      <div style={{width:36,height:36,border:"4px solid #EDE9FE",borderTop:`4px solid ${C.primary}`,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+    </div>
+  );
+
+  /* FORMULÁRIO */
+  if(form)return(
+    <div style={{flex:1,display:"flex",flexDirection:"column",gap:16}}>
+      {/* Header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <button onClick={()=>setForm(null)} style={{width:36,height:36,border:`1px solid ${C.border}`,borderRadius:8,background:"white",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>←</button>
+          <div style={{fontFamily:"'Lora',serif",fontSize:18,fontWeight:700,color:C.text}}>{form.id?"Editar simulado":"Novo simulado"}</div>
+        </div>
+        <button onClick={salvarSimulado} disabled={saving}
+          style={{padding:"9px 20px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",opacity:saving?0.7:1}}>
+          {saving?"Salvando...":"Salvar simulado"}
+        </button>
+      </div>
+
+      {/* Sub-abas do form */}
+      <div style={{display:"flex",gap:0,background:C.white,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
+        {[
+          {id:"info",l:"📋 Informações"},
+          {id:"questoes_banco",l:`📚 Do banco (${bancoResultado.filter(q=>questoesForm.find(x=>x.id===q.id)).length}/${bancoResultado.length})`},
+          {id:"questoes_nova",l:"✏️ Criar nova"},
+          {id:"preview",l:`👁 Preview (${questoesForm.length}q)`},
+        ].map(a=>(
+          <button key={a.id} onClick={()=>setAbaForm(a.id)} style={{flex:1,padding:"11px 8px",border:"none",borderRight:`1px solid ${C.border}`,background:abaForm===a.id?C.primary:"white",color:abaForm===a.id?"white":C.textMed,fontSize:11,fontWeight:abaForm===a.id?700:500,cursor:"pointer"}}>
+            {a.l}
+          </button>
+        ))}
+      </div>
+
+      {/* ABA: INFORMAÇÕES */}
+      {abaForm==="info"&&(
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"24px"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}} className="evo-grid2-inner">
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>Título do simulado *</div>
+              <input value={form.titulo} onChange={e=>F("titulo",e.target.value)} placeholder="Ex: Simulado Dominical #01"
+                style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${C.border}`,borderRadius:10,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+            </div>
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>Data e hora *</div>
+              <input type="datetime-local" value={form.data_hora} onChange={e=>F("data_hora",e.target.value)}
+                style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${C.border}`,borderRadius:10,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+            </div>
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>Duração (minutos)</div>
+              <input type="number" value={form.duracao_minutos} onChange={e=>F("duracao_minutos",e.target.value)}
+                style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${C.border}`,borderRadius:10,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:12,paddingTop:22}}>
+              <div onClick={()=>F("ativo",!form.ativo)} style={{width:44,height:24,borderRadius:100,background:form.ativo?C.primary:"#D1D5DB",cursor:"pointer",position:"relative",transition:"background 0.2s"}}>
+                <div style={{width:20,height:20,borderRadius:"50%",background:"white",position:"absolute",top:2,left:form.ativo?22:2,transition:"left 0.2s"}}/>
+              </div>
+              <span style={{fontSize:13,fontWeight:600,color:form.ativo?C.primary:C.textMed}}>{form.ativo?"Publicado (visível para alunos)":"Rascunho"}</span>
+            </div>
+          </div>
+          <div style={{padding:"14px 16px",background:C.bg,borderRadius:10,fontSize:12,color:C.textMed}}>
+            💡 Dica: Adicione as questões antes de publicar. O simulado fica em rascunho até você ativar.
+          </div>
+        </div>
+      )}
+
+      {/* ABA: DO BANCO */}
+      {abaForm==="questoes_banco"&&(
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"20px"}}>
+          <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+            <input value={bancoBusca.materia} onChange={e=>setBancoBusca(b=>({...b,materia:e.target.value}))} placeholder="Matéria (ex: Direito Constitucional)"
+              style={{flex:"1 1 180px",padding:"9px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,outline:"none"}}/>
+            <input value={bancoBusca.topico} onChange={e=>setBancoBusca(b=>({...b,topico:e.target.value}))} placeholder="Tópico (opcional)"
+              style={{flex:"1 1 140px",padding:"9px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,outline:"none"}}/>
+            <button onClick={buscarBanco} disabled={buscandoBanco}
+              style={{padding:"9px 18px",background:C.primary,color:"white",border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+              {buscandoBanco?"Buscando...":"Buscar"}
+            </button>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:"50vh",overflowY:"auto"}}>
+            {bancoResultado.map(q=>{
+              const adicionada=questoesForm.some(x=>x.id===q.id);
+              return(
+                <div key={q.id} style={{display:"flex",gap:12,alignItems:"flex-start",padding:"12px 14px",border:`1px solid ${adicionada?C.primary:C.border}`,borderRadius:10,background:adicionada?C.primaryXLight:"white"}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:11,color:adicionada?C.primary:C.textMed,fontWeight:700,marginBottom:4}}>{q.materia} · {q.topico}</div>
+                    <div style={{fontSize:12,color:C.text,lineHeight:1.5,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{q.enunciado}</div>
+                  </div>
+                  <button onClick={()=>adicionada?removeQuestao(q.id):addQuestaoDosBanco(q)}
+                    style={{padding:"6px 12px",background:adicionada?"#FEE2E2":C.primary,color:adicionada?"#EF4444":"white",border:"none",borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>
+                    {adicionada?"Remover":"+ Add"}
+                  </button>
+                </div>
+              );
+            })}
+            {bancoResultado.length===0&&<div style={{textAlign:"center",padding:"32px",color:C.textLight,fontSize:12}}>Busque uma matéria para ver as questões disponíveis.</div>}
+          </div>
+        </div>
+      )}
+
+      {/* ABA: NOVA QUESTÃO */}
+      {abaForm==="questoes_nova"&&(
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"20px"}}>
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>Tipo</div>
+            <select value={novaQ.tipo} onChange={e=>{FQ("tipo",e.target.value);FQ("gabarito",e.target.value==="certo_errado"?"C":"A");}}
+              style={{padding:"8px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,outline:"none"}}>
+              <option value="multipla">Múltipla escolha (A-E)</option>
+              <option value="certo_errado">Certo ou Errado</option>
+            </select>
+          </div>
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>Enunciado *</div>
+            <textarea value={novaQ.enunciado} onChange={e=>FQ("enunciado",e.target.value)} rows={3} placeholder="Digite o enunciado da questão..."
+              style={{width:"100%",padding:"10px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,resize:"vertical",boxSizing:"border-box",outline:"none"}}/>
+          </div>
+          {novaQ.tipo==="certo_errado"?(
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:8}}>Gabarito *</div>
+              <div style={{display:"flex",gap:12}}>
+                {[{v:"C",l:"✅ Certo"},{v:"E",l:"❌ Errado"}].map(opt=>(
+                  <button key={opt.v} onClick={()=>FQ("gabarito",opt.v)}
+                    style={{flex:1,padding:"12px",border:`2px solid ${novaQ.gabarito===opt.v?"#10B981":C.border}`,borderRadius:10,background:novaQ.gabarito===opt.v?"#D1FAE5":"white",fontSize:13,fontWeight:700,cursor:"pointer",color:novaQ.gabarito===opt.v?"#065F46":C.textMed}}>
+                    {opt.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ):(
+            <div style={{marginBottom:14}}>
+              <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:8}}>Alternativas *</div>
+              {LETRAS.map(l=>(
+                <div key={l} style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
+                  <div onClick={()=>FQ("gabarito",l)} style={{width:30,height:30,borderRadius:8,border:`2px solid ${novaQ.gabarito===l?C.primary:C.border}`,background:novaQ.gabarito===l?C.primary:"white",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:novaQ.gabarito===l?"white":C.textMed,cursor:"pointer",flexShrink:0}}>{l}</div>
+                  <input value={novaQ.alternativas[l]} onChange={e=>FQA(l,e.target.value)} placeholder={`Alternativa ${l}${l==="E"?" (opcional)":""}`}
+                    style={{flex:1,padding:"8px 10px",border:`1px solid ${novaQ.gabarito===l?C.primary:C.border}`,borderRadius:8,fontSize:12,outline:"none"}}/>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>Comentário do gabarito</div>
+            <textarea value={novaQ.comentario} onChange={e=>FQ("comentario",e.target.value)} rows={2} placeholder="Explique o gabarito..."
+              style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,resize:"vertical",boxSizing:"border-box",outline:"none"}}/>
+          </div>
+          <button onClick={addQuestaoNova} disabled={!novaQ.enunciado}
+            style={{padding:"10px 20px",background:novaQ.enunciado?C.primary:"#E5E7EB",color:novaQ.enunciado?"white":C.textLight,border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:novaQ.enunciado?"pointer":"not-allowed"}}>
+            + Adicionar ao simulado
+          </button>
+        </div>
+      )}
+
+      {/* ABA: PREVIEW */}
+      {abaForm==="preview"&&(
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"20px"}}>
+          <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:14}}>📋 Questões do simulado ({questoesForm.length})</div>
+          {questoesForm.length===0?(
+            <div style={{textAlign:"center",padding:"32px",color:C.textLight,fontSize:12}}>Nenhuma questão adicionada ainda.</div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {questoesForm.map((q,i)=>(
+                <div key={q.id} style={{display:"flex",gap:12,alignItems:"flex-start",padding:"12px 14px",border:`1px solid ${C.border}`,borderRadius:10,background:q.isNova?"#FFFBEB":"white"}}>
+                  <div style={{fontWeight:800,color:C.textMed,fontSize:13,flexShrink:0,width:22,textAlign:"right"}}>#{i+1}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    {q.isNova&&<span style={{fontSize:9,fontWeight:700,background:"#FEF3C7",color:"#92400E",borderRadius:100,padding:"1px 6px",marginBottom:4,display:"inline-block"}}>NOVA</span>}
+                    <div style={{fontSize:12,color:C.text,lineHeight:1.5}}>{q.enunciado.substring(0,120)}{q.enunciado.length>120?"...":""}</div>
+                    <div style={{fontSize:10,color:C.textMed,marginTop:3}}>Gabarito: <strong style={{color:C.primary}}>{q.gabarito}</strong></div>
+                  </div>
+                  <button onClick={()=>removeQuestao(q.id)} style={{padding:"4px 10px",background:"#FEE2E2",color:"#EF4444",border:"none",borderRadius:6,fontSize:11,cursor:"pointer",flexShrink:0}}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  /* LISTA DE SIMULADOS */
+  return(
+    <div style={{flex:1,display:"flex",flexDirection:"column",gap:16}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{fontFamily:"'Lora',serif",fontSize:18,fontWeight:700,color:C.text}}>🏆 Simulados coletivos</div>
+        <button onClick={novoForm} style={{padding:"9px 18px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>+ Novo simulado</button>
+      </div>
+      {simulados.length===0?(
+        <div style={{textAlign:"center",padding:"60px",background:C.white,borderRadius:16,border:`2px dashed ${C.border}`}}>
+          <div style={{fontSize:48,marginBottom:12}}>🏆</div>
+          <div style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:6}}>Nenhum simulado criado</div>
+          <div style={{fontSize:12,color:C.textMed,marginBottom:16}}>Crie o primeiro simulado coletivo!</div>
+          <button onClick={novoForm} style={{padding:"10px 24px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>+ Criar simulado</button>
+        </div>
+      ):(
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {simulados.map(s=>{
+            const q=s.questoes||[];
+            const dataStr=s.data_hora?new Date(s.data_hora).toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
+            return(
+              <div key={s.id} style={{background:C.white,border:`1.5px solid ${s.ativo?C.primary:C.border}`,borderRadius:14,padding:"18px 20px",boxShadow:"0 2px 6px rgba(0,0,0,0.04)"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+                  <div style={{flex:1}}>
+                    <div style={{display:"flex",gap:8,marginBottom:6}}>
+                      <span style={{background:s.ativo?"#D1FAE5":"#F3F4F6",color:s.ativo?"#065F46":C.textMed,borderRadius:100,padding:"2px 10px",fontSize:10,fontWeight:700}}>{s.ativo?"● Publicado":"● Rascunho"}</span>
+                      <span style={{background:C.primaryXLight,color:C.primary,borderRadius:100,padding:"2px 10px",fontSize:10,fontWeight:700}}>{q.length}q</span>
+                      <span style={{background:"#FEF3C7",color:"#92400E",borderRadius:100,padding:"2px 10px",fontSize:10,fontWeight:700}}>{s.duracao_minutos}min</span>
+                    </div>
+                    <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:4}}>{s.titulo}</div>
+                    <div style={{fontSize:12,color:C.textMed,textTransform:"capitalize"}}>{dataStr}</div>
+                  </div>
+                  <div style={{display:"flex",gap:8,flexShrink:0}}>
+                    <button onClick={()=>toggleAtivo(s)} style={{padding:"7px 14px",background:s.ativo?"#FEE2E2":C.primaryXLight,color:s.ativo?"#EF4444":C.primary,border:"none",borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                      {s.ativo?"Despublicar":"Publicar"}
+                    </button>
+                    <button onClick={()=>{setForm({...s,data_hora:s.data_hora?.slice(0,16)||""});setQuestoesForm(s.questoes||[]);setAbaForm("info");}}
+                      style={{padding:"7px 14px",background:C.primaryXLight,color:C.primary,border:"none",borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer"}}>Editar</button>
+                    <button onClick={()=>excluir(s.id)} style={{padding:"7px 12px",background:"#FEE2E2",color:"#EF4444",border:"none",borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer"}}>🗑️</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── TELA DO SIMULADO (ALUNO) ──────────────────────────────── */
+function SimuladoTela({user,simulado,inscricao,onConcluir,onVoltar}){
+  const questoes=simulado?.questoes||[];
+  const duracao=(simulado?.duracao_minutos||180)*60; // em segundos
+  const [idx,setIdx]=React.useState(0);
+  const [respostas,setRespostas]=React.useState({});
+  const [tempo,setTempo]=React.useState(duracao);
+  const [confirmando,setConfirmando]=React.useState(false);
+  const [salvando,setSalvando]=React.useState(false);
+  const LETRAS=["A","B","C","D","E"];
+
+  // Cronômetro regressivo
+  React.useEffect(()=>{
+    const t=setInterval(()=>{
+      setTempo(prev=>{
+        if(prev<=1){clearInterval(t);finalizarAuto();return 0;}
+        return prev-1;
+      });
+    },1000);
+    return()=>clearInterval(t);
+  },[]);
+
+  const finalizarAuto=()=>finalizar(true);
+
+  const finalizar=async(automatico=false)=>{
+    setSalvando(true);
+    const gabarito=simulado?.gabarito||{};
+    let acertos=0,erros=0;
+    const porMateria={};
+
+    questoes.forEach(q=>{
+      const resp=respostas[q.id];
+      const correta=resp===gabarito[q.id];
+      if(correta)acertos++;else if(resp)erros++;
+      const mat=q.materia||"Geral";
+      if(!porMateria[mat]) porMateria[mat]={acertos:0,total:0};
+      porMateria[mat].total++;
+      if(correta) porMateria[mat].acertos++;
+    });
+
+    const nota=questoes.length>0?Math.round((acertos/questoes.length)*100):0;
+
+    // Salva respostas no Supabase
+    await supabase.from("inscricoes_simulado").update({
+      respostas,nota,acertos,erros,por_materia:porMateria,
+      concluido:true,data_conclusao:new Date().toISOString()
+    }).eq("id",inscricao.id);
+
+    // Calcula ranking (anônimo)
+    const{data:todas}=await supabase.from("inscricoes_simulado")
+      .select("id,nota").eq("simulado_id",simulado.id).eq("concluido",true).order("nota",{ascending:false});
+    const pos=(todas||[]).findIndex(x=>x.id===inscricao.id)+1;
+    const total=(todas||[]).length;
+    await supabase.from("inscricoes_simulado").update({ranking_posicao:pos}).eq("id",inscricao.id);
+
+    // Atualiza evolução
+    const{data:ev}=await supabase.from("evolucao").select("simulados_realizados,media_simulados").eq("user_id",user.id).maybeSingle();
+    if(ev){
+      const n=(ev.simulados_realizados||0)+1;
+      const media=Math.round(((ev.media_simulados||0)*(n-1)+nota)/n);
+      await supabase.from("evolucao").update({simulados_realizados:n,media_simulados:media}).eq("user_id",user.id);
+    }
+
+    setSalvando(false);
+    onConcluir({nota,acertos,erros,total:questoes.length,ranking:pos,totalParticipantes:total,porMateria});
+  };
+
+  const tempoStr=()=>{
+    const m=Math.floor(tempo/60).toString().padStart(2,"0");
+    const s=(tempo%60).toString().padStart(2,"0");
+    return`${m}:${s}`;
+  };
+
+  const q=questoes[idx];
+  const respondidas=Object.keys(respostas).length;
+  const corLetra=(l)=>{
+    const sel=respostas[q?.id];
+    if(sel===l) return{bg:C.primaryXLight,border:C.primary,color:C.primary};
+    return{bg:"white",border:C.border,color:C.text};
+  };
+
+  if(salvando)return(
+    <div style={{height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,gap:20,color:"white"}}>
+      <div style={{width:48,height:48,border:"4px solid rgba(255,255,255,0.3)",borderTop:"4px solid white",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+      <div style={{fontSize:14,fontWeight:600}}>Calculando resultado e ranking...</div>
+    </div>
+  );
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column"}}>
+      {/* BARRA SUPERIOR */}
+      <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,padding:"14px 20px",position:"sticky",top:0,zIndex:100}}>
+        <div style={{maxWidth:720,margin:"0 auto"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",color:"white",marginBottom:10}}>
+            <div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",marginBottom:2}}>{simulado?.titulo}</div>
+              <div style={{fontSize:12,fontWeight:700}}>Questão {idx+1} de {questoes.length}</div>
+            </div>
+            <div style={{display:"flex",gap:16,alignItems:"center"}}>
+              <div style={{textAlign:"center"}}>
+                <div style={{fontSize:11,color:"rgba(255,255,255,0.7)"}}>Respondidas</div>
+                <div style={{fontSize:14,fontWeight:800}}>{respondidas}/{questoes.length}</div>
+              </div>
+              <div style={{textAlign:"center",background:tempo<300?"rgba(239,68,68,0.3)":"rgba(255,255,255,0.15)",borderRadius:10,padding:"6px 12px",border:tempo<300?"1px solid rgba(239,68,68,0.5)":"none"}}>
+                <div style={{fontSize:10,color:"rgba(255,255,255,0.7)"}}>Tempo</div>
+                <div style={{fontSize:16,fontWeight:800,color:tempo<300?"#FCA5A5":"white"}}>{tempoStr()}</div>
+              </div>
+            </div>
+          </div>
+          <div style={{height:4,background:"rgba(255,255,255,0.2)",borderRadius:100}}>
+            <div style={{height:"100%",width:`${((idx+1)/questoes.length)*100}%`,background:"white",borderRadius:100,transition:"width 0.3s"}}/>
+          </div>
+        </div>
+      </div>
+
+      {/* NAVEGAÇÃO DE QUESTÕES (mini mapa) */}
+      <div style={{background:C.white,borderBottom:`1px solid ${C.border}`,padding:"10px 20px",overflowX:"auto"}}>
+        <div style={{display:"flex",gap:5,maxWidth:720,margin:"0 auto"}}>
+          {questoes.map((q2,i)=>(
+            <button key={i} onClick={()=>setIdx(i)}
+              style={{width:28,height:28,borderRadius:6,border:`1.5px solid ${i===idx?C.primary:respostas[q2.id]?"#10B981":C.border}`,background:i===idx?C.primary:respostas[q2.id]?"#D1FAE5":"white",color:i===idx?"white":respostas[q2.id]?"#065F46":C.textMed,fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>
+              {i+1}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* QUESTÃO */}
+      <div style={{flex:1,maxWidth:720,width:"100%",margin:"0 auto",padding:"20px"}}>
+        {q&&(
+          <>
+            <div style={{background:C.white,borderRadius:16,padding:"24px",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",marginBottom:14}}>
+              <div style={{display:"flex",gap:8,marginBottom:14}}>
+                {q.banca&&<span style={{background:C.primaryXLight,color:C.primary,borderRadius:100,padding:"3px 10px",fontSize:10,fontWeight:700}}>{q.banca}</span>}
+                {q.tipo==="certo_errado"&&<span style={{background:"#FEF3C7",color:"#92400E",borderRadius:100,padding:"3px 10px",fontSize:10,fontWeight:700}}>CERTO/ERRADO</span>}
+              </div>
+              <div style={{fontSize:15,lineHeight:1.8,color:C.text,marginBottom:20}}>{q.enunciado}</div>
+
+              {q.tipo==="certo_errado"?(
+                <div style={{display:"flex",gap:12}}>
+                  {[{v:"C",l:"✅ Certo"},{v:"E",l:"❌ Errado"}].map(opt=>(
+                    <button key={opt.v} onClick={()=>setRespostas(r=>({...r,[q.id]:opt.v}))}
+                      style={{flex:1,padding:"20px",border:`2px solid ${respostas[q.id]===opt.v?C.primary:C.border}`,borderRadius:12,background:respostas[q.id]===opt.v?C.primaryXLight:"white",fontSize:16,fontWeight:800,cursor:"pointer",color:respostas[q.id]===opt.v?C.primary:C.textMed}}>
+                      {opt.l}
+                    </button>
+                  ))}
+                </div>
+              ):(
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {LETRAS.filter(l=>q.alternativas?.[l]).map(l=>{
+                    const c=corLetra(l);
+                    return(
+                      <button key={l} onClick={()=>setRespostas(r=>({...r,[q.id]:l}))}
+                        style={{display:"flex",gap:12,alignItems:"flex-start",padding:"12px 14px",border:`2px solid ${c.border}`,borderRadius:12,background:c.bg,cursor:"pointer",textAlign:"left",transition:"all 0.1s"}}>
+                        <span style={{width:28,height:28,borderRadius:8,border:`2px solid ${c.border}`,background:c.border===C.border?"transparent":c.border,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:c.color,flexShrink:0}}>{l}</span>
+                        <span style={{fontSize:13,lineHeight:1.6,color:c.color}}>{q.alternativas[l]}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Navegação */}
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>setIdx(i=>Math.max(0,i-1))} disabled={idx===0}
+                style={{padding:"12px 20px",border:`1px solid ${C.border}`,borderRadius:10,background:"white",fontSize:13,fontWeight:600,cursor:idx===0?"not-allowed":"pointer",color:idx===0?C.textLight:C.text,opacity:idx===0?0.5:1}}>
+                ← Anterior
+              </button>
+              {idx<questoes.length-1?(
+                <button onClick={()=>setIdx(i=>i+1)} style={{flex:1,padding:"12px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                  Próxima →
+                </button>
+              ):(
+                <button onClick={()=>setConfirmando(true)} style={{flex:1,padding:"12px",background:`linear-gradient(135deg,#10B981,#059669)`,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 14px rgba(16,185,129,0.4)"}}>
+                  Finalizar simulado ✓
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* MODAL CONFIRMAÇÃO */}
+      {confirmando&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:20}}>
+          <div style={{background:"white",borderRadius:20,padding:"32px",maxWidth:400,width:"100%",textAlign:"center"}}>
+            <div style={{fontSize:36,marginBottom:12}}>📋</div>
+            <div style={{fontFamily:"'Lora',serif",fontSize:18,fontWeight:700,color:C.text,marginBottom:8}}>Finalizar simulado?</div>
+            <div style={{fontSize:13,color:C.textMed,marginBottom:6}}>Você respondeu <strong>{respondidas}</strong> de <strong>{questoes.length}</strong> questões.</div>
+            {respondidas<questoes.length&&<div style={{fontSize:12,color:"#F59E0B",marginBottom:20,fontWeight:600}}>⚠️ {questoes.length-respondidas} questão(ões) sem resposta.</div>}
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>setConfirmando(false)} style={{flex:1,padding:"11px",border:`1px solid ${C.border}`,borderRadius:10,background:"white",fontSize:13,fontWeight:600,cursor:"pointer",color:C.text}}>Continuar</button>
+              <button onClick={()=>{setConfirmando(false);finalizar();}} style={{flex:1,padding:"11px",background:`linear-gradient(135deg,#10B981,#059669)`,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>Finalizar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── RESULTADO DO SIMULADO (ALUNO) ─────────────────────────── */
+function SimuladoResultado({resultado,simulado,onVoltar}){
+  const {nota,acertos,erros,total,ranking,totalParticipantes,porMateria}=resultado;
+  const cor=nota>=70?"#10B981":nota>=50?"#F59E0B":"#EF4444";
+  const bg=nota>=70?"#F0FDF4":nota>=50?"#FFFBEB":"#FFF1F1";
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"32px 20px"}}>
+      <div style={{maxWidth:600,width:"100%",display:"flex",flexDirection:"column",gap:16}}>
+
+        {/* Nota principal */}
+        <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:20,padding:"32px",textAlign:"center",color:"white"}}>
+          <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:8}}>{simulado?.titulo}</div>
+          <div style={{fontFamily:"'Lora',serif",fontSize:56,fontWeight:800,lineHeight:1}}>{nota}%</div>
+          <div style={{fontSize:13,color:"rgba(255,255,255,0.8)",marginTop:6}}>{acertos} acertos de {total} questões</div>
+          <div style={{marginTop:16,display:"flex",gap:12,justifyContent:"center"}}>
+            {[{l:"Acertos",v:acertos,c:"#A7F3D0"},{l:"Erros",v:erros,c:"#FCA5A5"},{l:"Sem resp.",v:total-acertos-erros,c:"rgba(255,255,255,0.4)"}].map(s=>(
+              <div key={s.l} style={{background:"rgba(255,255,255,0.1)",borderRadius:12,padding:"10px 16px",textAlign:"center"}}>
+                <div style={{fontFamily:"'Lora',serif",fontSize:22,fontWeight:800,color:s.c}}>{s.v}</div>
+                <div style={{fontSize:10,color:"rgba(255,255,255,0.6)",marginTop:2}}>{s.l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Ranking anônimo */}
+        {ranking&&(
+          <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"20px",boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:12}}>🏆 Ranking (anônimo)</div>
+            <div style={{display:"flex",alignItems:"center",gap:16}}>
+              <div style={{fontFamily:"'Lora',serif",fontSize:40,fontWeight:800,color:ranking<=3?"#F59E0B":C.primary}}>
+                #{ranking}
+              </div>
+              <div>
+                <div style={{fontSize:14,fontWeight:600,color:C.text}}>de {totalParticipantes} participantes</div>
+                <div style={{fontSize:12,color:C.textMed,marginTop:2}}>
+                  {ranking===1?"🥇 Você ficou em 1° lugar!":ranking<=3?`🥈 Top ${ranking}!`:ranking<=Math.ceil(totalParticipantes*0.1)?`Top 10% dos participantes!`:`Continue praticando para melhorar!`}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Por matéria */}
+        {porMateria&&Object.keys(porMateria).length>0&&(
+          <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"20px",boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:14}}>Desempenho por matéria</div>
+            {Object.entries(porMateria).map(([mat,d])=>{
+              const pct=d.total>0?Math.round((d.acertos/d.total)*100):0;
+              const c2=pct>=70?"#10B981":pct>=50?"#F59E0B":"#EF4444";
+              return(
+                <div key={mat} style={{marginBottom:12}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                    <span style={{fontSize:12,fontWeight:600,color:C.text}}>{mat}</span>
+                    <span style={{fontSize:12,fontWeight:700,color:c2}}>{d.acertos}/{d.total} ({pct}%)</span>
+                  </div>
+                  <div style={{height:7,background:"#F3F4F6",borderRadius:100}}>
+                    <div style={{height:"100%",width:`${pct}%`,background:c2,borderRadius:100}}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Feedback */}
+        <div style={{background:nota>=70?"#D1FAE5":nota>=50?"#FEF3C7":"#FEE2E2",border:`1px solid ${nota>=70?"#A7F3D0":nota>=50?"#FDE68A":"#FECACA"}`,borderRadius:14,padding:"16px 20px",textAlign:"center"}}>
+          <div style={{fontSize:14,fontWeight:700,color:nota>=70?"#065F46":nota>=50?"#92400E":"#991B1B"}}>
+            {nota>=70?"🎉 Excelente! Você foi muito bem neste simulado.":nota>=50?"📈 Bom resultado! Revise as matérias com aproveitamento abaixo de 70%.":"💪 Continue praticando! Use o caderno de erros para revisar as questões que errou."}
+          </div>
+        </div>
+
+        <button onClick={onVoltar} style={{padding:"14px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 14px rgba(108,60,225,0.3)"}}>
+          Voltar ao painel →
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ─── PAINEL ADMIN ──────────────────────────────────────────── */
 function AdminPanel({user,onBack}){
+  const [abaAdmin,setAbaAdmin]=React.useState("questoes");
   const [grupos,setGrupos]=React.useState([]);
-  const [selecionado,setSelecionado]=React.useState(null); // {grupo,materia,topico}
+  const [selecionado,setSelecionado]=React.useState(null);
   const [questoes,setQuestoes]=React.useState([]);
   const [loadingQ,setLoadingQ]=React.useState(false);
-  const [form,setForm]=React.useState(null); // null=lista, {}=novo, {id,...}=editar
+  const [form,setForm]=React.useState(null);
   const [saving,setSaving]=React.useState(false);
   const [busca,setBusca]=React.useState("");
   const [expandido,setExpandido]=React.useState({});
@@ -686,12 +1308,21 @@ function AdminPanel({user,onBack}){
       <nav style={{background:C.white,borderBottom:`1px solid ${C.border}`,padding:"0 24px",height:62,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100}}>
         <div style={{display:"flex",alignItems:"center",gap:16}}>
           <button onClick={onBack} style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,padding:"6px 14px",fontSize:12,fontWeight:600,color:C.textMed,cursor:"pointer"}}>← Dashboard</button>
-          <div style={{fontFamily:"'Lora',serif",fontSize:16,fontWeight:700,color:C.text}}>Painel Admin — Banco de Questões</div>
+          <div style={{fontFamily:"'Lora',serif",fontSize:16,fontWeight:700,color:C.text}}>Painel Admin</div>
         </div>
-        <button onClick={novaQuestao} style={{padding:"8px 18px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>+ Nova questão</button>
+        <div style={{display:"flex",gap:8}}>
+          {["questoes","simulados"].map(a=>(
+            <button key={a} onClick={()=>setAbaAdmin(a)} style={{padding:"8px 16px",background:abaAdmin===a?C.primary:"transparent",color:abaAdmin===a?"white":C.textMed,border:`1px solid ${abaAdmin===a?C.primary:C.border}`,borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+              {a==="questoes"?"📚 Questões":"🏆 Simulados"}
+            </button>
+          ))}
+        </div>
       </nav>
 
       <div style={{display:"flex",flex:1,maxWidth:1300,width:"100%",margin:"0 auto",padding:"24px",gap:20,alignItems:"start"}}>
+
+        {abaAdmin==="simulados"&&<SimuladoAdmin user={user}/>}
+        {abaAdmin==="questoes"&&<>
 
         {/* SIDEBAR — ÁRVORE */}
         <div style={{width:280,flexShrink:0,background:C.white,borderRadius:16,border:`1px solid ${C.border}`,padding:"16px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
@@ -2848,7 +3479,10 @@ function Dashboard({user,onLogout}){
   const [loading,setLoading]=React.useState(true);
   const [simuladoConfirmado,setSimuladoConfirmado]=React.useState(false);
   const [subTela,setSubTela]=React.useState(null);
-  const [menuAberto,setMenuAberto]=React.useState(false); // null | "sessao" | "admin" | "treino_sessao"
+  const [menuAberto,setMenuAberto]=React.useState(false);
+  const [simuladoAtivo,setSimuladoAtivo]=React.useState(null);
+  const [inscricaoAtiva,setInscricaoAtiva]=React.useState(null);
+  const [resultadoSimulado,setResultadoSimulado]=React.useState(null); // null | "sessao" | "admin" | "treino_sessao"
   const [treinoFiltro,setTreinoFiltro]=React.useState(null);
   const isAdmin=user?.email==='leonemattosdealmeida@gmail.com';
 
@@ -2866,6 +3500,17 @@ function Dashboard({user,onLogout}){
         if(!error && data) setPlan(data);
         // Atualiza último acesso (silenciosamente, sem travar se falhar)
         supabase.from("alunos").update({ultimo_acesso:new Date().toISOString()}).eq("id",user.id).then(()=>{});
+        // Verifica simulado ativo próximo (próximas 48h ou em andamento)
+        const agora=new Date();
+        const em48h=new Date(agora.getTime()+48*60*60*1000);
+        const{data:simAtivo}=await supabase.from("simulados").select("*").eq("ativo",true)
+          .lte("data_hora",em48h.toISOString()).order("data_hora",{ascending:true}).limit(1).maybeSingle();
+        if(simAtivo){
+          setSimuladoAtivo(simAtivo);
+          const{data:insc}=await supabase.from("inscricoes_simulado")
+            .select("*").eq("simulado_id",simAtivo.id).eq("user_id",user.id).maybeSingle();
+          setInscricaoAtiva(insc);
+        }
       }catch(e){}
       setLoading(false);
     })();
@@ -2996,6 +3641,8 @@ function Dashboard({user,onLogout}){
 
   if(subTela==="sessao") return <SessaoEstudos user={user} plano={plan} onConcluir={()=>setSubTela(null)} onVoltar={()=>setSubTela(null)}/>;
   if(subTela==="admin") return <AdminPanel user={user} onBack={()=>setSubTela(null)}/>;
+  if(subTela==="simulado_tela"&&simuladoAtivo&&inscricaoAtiva) return <SimuladoTela user={user} simulado={simuladoAtivo} inscricao={inscricaoAtiva} onVoltar={()=>setSubTela(null)} onConcluir={(res)=>{setResultadoSimulado(res);setSubTela("simulado_resultado");}}/>;
+  if(subTela==="simulado_resultado"&&resultadoSimulado) return <SimuladoResultado resultado={resultadoSimulado} simulado={simuladoAtivo} onVoltar={()=>{setSubTela(null);setResultadoSimulado(null);}}/>;
 
   return(
     <div style={{fontFamily:"'Sora',sans-serif",background:C.bg,minHeight:"100vh",display:"flex",flexDirection:"column"}}>
@@ -3157,24 +3804,59 @@ function Dashboard({user,onLogout}){
                   ))}
                 </div>
               </div>
-              {/* Card: Simulado Coletivo */}
-              <div style={{background:"linear-gradient(135deg,#78350F,#D97706)",borderRadius:16,padding:"20px 22px",boxShadow:"0 4px 16px rgba(217,119,6,0.3)",color:"white"}}>
-                <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.7)",letterSpacing:1.2,textTransform:"uppercase",marginBottom:10}}>🏆 Simulado Coletivo</div>
-                <div style={{marginBottom:10}}>
-                  <div style={{fontSize:13,fontWeight:700,color:"white",marginBottom:2}}>Próximo: Dom, {getProximoDomingo()}</div>
-                  <div style={{fontSize:10,color:"rgba(255,255,255,0.7)"}}>Com todos os alunos ao mesmo tempo</div>
-                </div>
-                {simuladoConfirmado?(
-                  <div style={{display:"flex",alignItems:"center",gap:6,padding:"7px 12px",background:"rgba(255,255,255,0.2)",borderRadius:8}}>
-                    <span style={{fontSize:12}}>✅</span>
-                    <span style={{fontSize:11,fontWeight:700}}>Participação confirmada!</span>
+              {/* Card: Simulado Coletivo — dinâmico */}
+              {(()=>{
+                const confirmarInscricao=async()=>{
+                  if(!simuladoAtivo) return;
+                  if(inscricaoAtiva){
+                    await supabase.from("inscricoes_simulado").update({confirmado:true,data_confirmacao:new Date().toISOString()}).eq("id",inscricaoAtiva.id);
+                    setInscricaoAtiva(i=>({...i,confirmado:true}));
+                  }else{
+                    const{data}=await supabase.from("inscricoes_simulado").insert({simulado_id:simuladoAtivo.id,user_id:user.id,confirmado:true,data_confirmacao:new Date().toISOString()}).select().single();
+                    setInscricaoAtiva(data);
+                  }
+                };
+                const agora=new Date();
+                const dataSimulado=simuladoAtivo?new Date(simuladoAtivo.data_hora):null;
+                const emAndamento=dataSimulado&&agora>=dataSimulado&&!inscricaoAtiva?.concluido;
+                const concluido=inscricaoAtiva?.concluido;
+                const confirmado=inscricaoAtiva?.confirmado;
+
+                if(!simuladoAtivo) return(
+                  <div style={{background:"linear-gradient(135deg,#78350F,#D97706)",borderRadius:16,padding:"20px 22px",boxShadow:"0 4px 16px rgba(217,119,6,0.3)",color:"white"}}>
+                    <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.7)",letterSpacing:1.2,textTransform:"uppercase",marginBottom:10}}>🏆 Simulado Coletivo</div>
+                    <div style={{fontSize:13,color:"rgba(255,255,255,0.8)"}}>Próximo: Dom, {getProximoDomingo()}</div>
+                    <div style={{fontSize:10,color:"rgba(255,255,255,0.6)",marginTop:4}}>Nenhum simulado agendado ainda</div>
                   </div>
-                ):(
-                  <button onClick={()=>setSimuladoConfirmado(true)} style={{width:"100%",padding:"8px",background:"rgba(255,255,255,0.2)",color:"white",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer"}}>
-                    Confirmar participação →
-                  </button>
-                )}
-              </div>
+                );
+
+                return(
+                  <div style={{background:emAndamento?"linear-gradient(135deg,#065F46,#10B981)":concluido?"linear-gradient(135deg,#1E1B4B,#6C3CE1)":"linear-gradient(135deg,#78350F,#D97706)",borderRadius:16,padding:"20px 22px",boxShadow:`0 4px 16px ${emAndamento?"rgba(16,185,129,0.3)":concluido?"rgba(108,60,225,0.3)":"rgba(217,119,6,0.3)"}`,color:"white"}}>
+                    <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.7)",letterSpacing:1.2,textTransform:"uppercase",marginBottom:8}}>🏆 {emAndamento?"Simulado em andamento!":concluido?"Simulado concluído":"Simulado Coletivo"}</div>
+                    <div style={{fontSize:13,fontWeight:700,marginBottom:2}}>{simuladoAtivo.titulo}</div>
+                    <div style={{fontSize:10,color:"rgba(255,255,255,0.7)",marginBottom:10}}>
+                      {dataSimulado?.toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})} · {simuladoAtivo.duracao_minutos}min
+                    </div>
+                    {emAndamento?(
+                      <button onClick={()=>setSubTela("simulado_tela")} style={{width:"100%",padding:"9px",background:"white",color:"#065F46",border:"none",borderRadius:8,fontSize:12,fontWeight:800,cursor:"pointer"}}>
+                        ▶ Entrar no simulado agora!
+                      </button>
+                    ):concluido?(
+                      <div style={{display:"flex",alignItems:"center",gap:6,padding:"7px 12px",background:"rgba(255,255,255,0.15)",borderRadius:8}}>
+                        <span>✅</span><span style={{fontSize:11,fontWeight:700}}>Você já realizou este simulado</span>
+                      </div>
+                    ):confirmado?(
+                      <div style={{display:"flex",alignItems:"center",gap:6,padding:"7px 12px",background:"rgba(255,255,255,0.15)",borderRadius:8}}>
+                        <span>✅</span><span style={{fontSize:11,fontWeight:700}}>Participação confirmada!</span>
+                      </div>
+                    ):(
+                      <button onClick={confirmarInscricao} style={{width:"100%",padding:"8px",background:"rgba(255,255,255,0.2)",color:"white",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                        Confirmar participação →
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* GRID PRINCIPAL */}
