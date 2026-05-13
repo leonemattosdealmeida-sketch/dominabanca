@@ -2261,9 +2261,17 @@ function Dashboard({user,onLogout}){
   const [plan,setPlan]=React.useState(null);
   const [loading,setLoading]=React.useState(true);
   const [simuladoConfirmado,setSimuladoConfirmado]=React.useState(false);
-  const [subTela,setSubTela]=React.useState(null); // null | "sessao" | "admin" | "treino_sessao"
+  const [subTela,setSubTela]=React.useState(null);
+  const [menuAberto,setMenuAberto]=React.useState(false); // null | "sessao" | "admin" | "treino_sessao"
   const [treinoFiltro,setTreinoFiltro]=React.useState(null);
   const isAdmin=user?.email==='leonemattosdealmeida@gmail.com';
+
+  React.useEffect(()=>{
+    if(!menuAberto) return;
+    const close=(e)=>{if(!e.target.closest('[data-menu]'))setMenuAberto(false);};
+    document.addEventListener("mousedown",close);
+    return()=>document.removeEventListener("mousedown",close);
+  },[menuAberto]);
 
   React.useEffect(()=>{
     (async()=>{
@@ -2407,8 +2415,12 @@ function Dashboard({user,onLogout}){
       {/* NAV */}
       <nav style={{background:C.white,borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,zIndex:100,boxShadow:"0 1px 8px rgba(0,0,0,0.04)"}}>
         <div style={{maxWidth:1200,margin:"0 auto",padding:"0 24px",height:62,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <LogoMark/>
-          <div style={{display:"flex",alignItems:"center",gap:14}}>
+          {/* Logo clicável → volta para Área do Aluno */}
+          <div onClick={()=>{setTab("cronograma");setSubTela(null);}} style={{cursor:"pointer"}}>
+            <LogoMark/>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:12,position:"relative"}}>
+            {/* Avatar + nome */}
             <div style={{textAlign:"right",display:"flex",flexDirection:"column"}}>
               <span style={{fontSize:12,fontWeight:700,color:C.text}}>{getNomeAluno()}</span>
               {plan?.cargo&&<span style={{fontSize:10,color:C.textLight}}>{plan.cargo}</span>}
@@ -2416,8 +2428,43 @@ function Dashboard({user,onLogout}){
             <div style={{width:34,height:34,borderRadius:"50%",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,display:"flex",alignItems:"center",justifyContent:"center",color:"white",fontWeight:800,fontSize:13}}>
               {getNomeAluno().charAt(0).toUpperCase()}
             </div>
-            {isAdmin&&<button onClick={()=>setSubTela("admin")} style={{fontSize:12,color:C.primary,background:C.primaryXLight,border:`1px solid ${C.borderPurple}`,borderRadius:8,padding:"6px 14px",cursor:"pointer",fontWeight:700}}>⚙️ Admin</button>}
-            <button onClick={onLogout} style={{fontSize:12,color:C.textLight,background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,padding:"6px 14px",cursor:"pointer",fontWeight:600}}>Sair</button>
+            {/* Hamburger menu */}
+            <div style={{position:"relative"}} data-menu="true">
+              <button onClick={()=>setMenuAberto(m=>!m)}
+                style={{width:38,height:38,borderRadius:10,border:`1px solid ${C.border}`,background:menuAberto?C.primaryXLight:"white",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,padding:"8px",transition:"all 0.15s"}}>
+                <div style={{width:16,height:2,borderRadius:1,background:menuAberto?C.primary:C.textMed,transition:"all 0.2s"}}/>
+                <div style={{width:16,height:2,borderRadius:1,background:menuAberto?C.primary:C.textMed,transition:"all 0.2s"}}/>
+                <div style={{width:16,height:2,borderRadius:1,background:menuAberto?C.primary:C.textMed,transition:"all 0.2s"}}/>
+              </button>
+              {/* Dropdown */}
+              {menuAberto&&(
+                <div style={{position:"absolute",top:46,right:0,background:C.white,border:`1px solid ${C.border}`,borderRadius:14,boxShadow:"0 8px 24px rgba(0,0,0,0.12)",minWidth:200,zIndex:200,overflow:"hidden"}}>
+                  {/* Header do menu */}
+                  <div style={{padding:"14px 16px",borderBottom:`1px solid ${C.border}`,background:C.bg}}>
+                    <div style={{fontSize:13,fontWeight:700,color:C.text}}>{getNomeAluno()}</div>
+                    <div style={{fontSize:11,color:C.textLight,marginTop:2}}>{user?.email}</div>
+                  </div>
+                  {/* Itens */}
+                  <div style={{padding:"6px"}}>
+                    <button onClick={()=>{setMenuAberto(false);/* perfil em breve */alert("Perfil em breve!");}}
+                      style={{width:"100%",padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,textAlign:"left",fontSize:13,color:C.text,cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontWeight:500}}>
+                      <span style={{fontSize:16}}>👤</span> Meu perfil
+                    </button>
+                    {isAdmin&&(
+                      <button onClick={()=>{setMenuAberto(false);setSubTela("admin");}}
+                        style={{width:"100%",padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,textAlign:"left",fontSize:13,color:C.primary,cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontWeight:700}}>
+                        <span style={{fontSize:16}}>⚙️</span> Painel Admin
+                      </button>
+                    )}
+                    <div style={{height:1,background:C.border,margin:"6px 0"}}/>
+                    <button onClick={()=>{setMenuAberto(false);onLogout();}}
+                      style={{width:"100%",padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,textAlign:"left",fontSize:13,color:"#EF4444",cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontWeight:600}}>
+                      <span style={{fontSize:16}}>🚪</span> Sair
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </nav>
