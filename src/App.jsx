@@ -1905,16 +1905,22 @@ function RedacaoTab({user,plano}){
   const notaMax=criterios.reduce((s,c)=>s+c.nota_max,0);
 
   /* Upload da imagem */
+  const [arquivoTipo,setArquivoTipo]=React.useState(null); // "image" | "pdf"
+  const [arquivoNome,setArquivoNome]=React.useState(null);
   const handleImagem=(e)=>{
     const file=e.target.files?.[0];
     if(!file) return;
-    if(file.size>10*1024*1024){setErro("Imagem muito grande. Use uma foto menor que 10MB.");return;}
+    if(file.size>15*1024*1024){setErro("Arquivo muito grande. Use um arquivo menor que 15MB.");return;}
     setErro(null);
+    const isPdf=file.type==="application/pdf";
+    setArquivoTipo(isPdf?"pdf":"image");
+    setArquivoNome(file.name);
     const reader=new FileReader();
     reader.onload=(ev)=>{
       const b64=ev.target.result;
       setImagem(b64);
-      setImagemPreview(b64);
+      if(!isPdf) setImagemPreview(b64);
+      else setImagemPreview(null);
     };
     reader.readAsDataURL(file);
   };
@@ -1947,6 +1953,12 @@ Responda SOMENTE com um JSON válido, sem texto fora do JSON, no formato:
       // Extrai base64 puro (sem o prefixo data:image/...)
       const b64puro=imagem.split(",")[1];
       const mimeType=imagem.split(";")[0].split(":")[1];
+      const isPdf=mimeType==="application/pdf";
+
+      // Monta o content conforme o tipo de arquivo
+      const contentMedia=isPdf
+        ?{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64puro}}
+        :{type:"image",source:{type:"base64",media_type:mimeType,data:b64puro}};
 
       const resp=await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",
@@ -1957,7 +1969,7 @@ Responda SOMENTE com um JSON válido, sem texto fora do JSON, no formato:
           messages:[{
             role:"user",
             content:[
-              {type:"image",source:{type:"base64",media_type:mimeType,data:b64puro}},
+              contentMedia,
               {type:"text",text:prompt}
             ]
           }]
@@ -2014,7 +2026,7 @@ Responda SOMENTE com um JSON válido, sem texto fora do JSON, no formato:
   };
 
   const novaredacao=()=>{
-    setImagem(null);setImagemPreview(null);setTema("");setResultado(null);setErro(null);setFase("inicio");
+    setImagem(null);setImagemPreview(null);setArquivoTipo(null);setArquivoNome(null);setTema("");setResultado(null);setErro(null);setFase("inicio");
   };
 
   const corPorNota=(nota,max)=>{
@@ -2363,30 +2375,51 @@ Responda SOMENTE com um JSON válido, sem texto fora do JSON, no formato:
         {/* Upload da imagem */}
         <div style={{marginBottom:18}}>
           <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:8}}>Foto da redação *</div>
-          <input ref={fileRef} type="file" accept="image/*" capture="camera" onChange={handleImagem} style={{display:"none"}}/>
+          <input ref={fileRef} type="file" accept="image/*,application/pdf" onChange={handleImagem} style={{display:"none"}}/>
 
-          {!imagemPreview?(
+          {!imagem?(
             <div onClick={()=>fileRef.current?.click()}
               style={{border:`2px dashed ${C.border}`,borderRadius:14,padding:"40px 24px",textAlign:"center",cursor:"pointer",transition:"all 0.2s",background:C.bg}}
               onMouseEnter={e=>e.currentTarget.style.borderColor=C.primary}
               onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
-              <div style={{fontSize:40,marginBottom:12}}>📷</div>
-              <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:6}}>Toque para tirar foto ou escolher da galeria</div>
-              <div style={{fontSize:12,color:C.textMed}}>JPG, PNG ou HEIC · Máximo 10MB</div>
-              <div style={{marginTop:16,display:"inline-block",padding:"10px 22px",background:C.primary,color:"white",borderRadius:10,fontSize:13,fontWeight:700}}>
-                Selecionar imagem
+              <div style={{fontSize:40,marginBottom:12}}>📎</div>
+              <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:8}}>Selecione sua redação</div>
+              <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap",marginBottom:16}}>
+                {["📷 Foto da câmera","🖼️ Imagem da galeria","📄 PDF"].map(op=>(
+                  <span key={op} style={{background:C.primaryXLight,color:C.primary,borderRadius:100,padding:"4px 12px",fontSize:11,fontWeight:600}}>{op}</span>
+                ))}
+              </div>
+              <div style={{fontSize:11,color:C.textLight,marginBottom:16}}>JPG, PNG, HEIC ou PDF · Máximo 15MB</div>
+              <div style={{display:"inline-block",padding:"10px 22px",background:C.primary,color:"white",borderRadius:10,fontSize:13,fontWeight:700}}>
+                Escolher arquivo
               </div>
             </div>
+          ):arquivoTipo==="pdf"?(
+            /* Preview PDF */
+            <div style={{border:`1.5px solid ${C.primary}`,borderRadius:12,padding:"20px",background:C.primaryXLight,display:"flex",alignItems:"center",justifyContent:"space-between",gap:16}}>
+              <div style={{display:"flex",alignItems:"center",gap:14}}>
+                <div style={{width:48,height:48,background:C.primary,borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>📄</div>
+                <div>
+                  <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:2}}>{arquivoNome}</div>
+                  <div style={{fontSize:11,color:C.primary,fontWeight:600}}>PDF pronto para correção</div>
+                </div>
+              </div>
+              <button onClick={()=>{setImagem(null);setImagemPreview(null);setArquivoTipo(null);setArquivoNome(null);fileRef.current.value="";}}
+                style={{width:32,height:32,background:"white",border:`1px solid ${C.border}`,borderRadius:"50%",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                ✕
+              </button>
+            </div>
           ):(
+            /* Preview imagem */
             <div style={{position:"relative"}}>
               <img src={imagemPreview} alt="Redação" style={{width:"100%",maxHeight:400,objectFit:"contain",borderRadius:12,border:`1px solid ${C.border}`}}/>
-              <button onClick={()=>{setImagem(null);setImagemPreview(null);fileRef.current.value="";}}
+              <button onClick={()=>{setImagem(null);setImagemPreview(null);setArquivoTipo(null);setArquivoNome(null);fileRef.current.value="";}}
                 style={{position:"absolute",top:10,right:10,width:32,height:32,background:"rgba(0,0,0,0.6)",color:"white",border:"none",borderRadius:"50%",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>
                 ✕
               </button>
               <button onClick={()=>fileRef.current?.click()}
                 style={{position:"absolute",bottom:10,right:10,padding:"8px 14px",background:"rgba(0,0,0,0.6)",color:"white",border:"none",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:600}}>
-                Trocar foto
+                Trocar arquivo
               </button>
             </div>
           )}
