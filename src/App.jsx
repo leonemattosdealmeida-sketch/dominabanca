@@ -66,6 +66,7 @@ const css = `
     .evo-grid{grid-template-columns:1fr 1fr!important;}
     .evo-grid2{grid-template-columns:1fr!important;}
     .evo-grid2-inner{grid-template-columns:1fr!important;}
+    .treino-grid{grid-template-columns:1fr!important;}
     .hero-section{grid-template-columns:1fr!important;padding:40px 16px 32px!important;}
     .redacao-grid{grid-template-columns:1fr!important;}
     .plans-grid{grid-template-columns:1fr!important;}
@@ -1240,6 +1241,621 @@ function SessaoEstudos({user,plano,onConcluir,onVoltar}){
   );
 }
 
+/* ─── ABA TREINO ─────────────────────────────────────────────── */
+function TreinoTab({user,plano,onIniciar}){
+  const [grupos,setGrupos]=React.useState([]);
+  const [grupoSel,setGrupoSel]=React.useState(null);
+  const [materiaSel,setMateriaSel]=React.useState(null);
+  const [topicoSel,setTopicoSel]=React.useState(null);
+  const [contagem,setContagem]=React.useState(0);
+  const [loading,setLoading]=React.useState(true);
+  const [buscando,setBuscando]=React.useState(false);
+
+  React.useEffect(()=>{
+    (async()=>{
+      const{data}=await supabase.from("questoes").select("grupo,materia,topico").eq("ativa",true);
+      if(!data){setLoading(false);return;}
+      const tree={};
+      data.forEach(q=>{
+        if(!tree[q.grupo]) tree[q.grupo]={};
+        if(!tree[q.grupo][q.materia]) tree[q.grupo][q.materia]=new Set();
+        tree[q.grupo][q.materia].add(q.topico);
+      });
+      const arr=Object.entries(tree).map(([g,mats])=>({
+        nome:g,
+        materias:Object.entries(mats).map(([m,tops])=>({
+          nome:m,topicos:[...tops]
+        }))
+      }));
+      setGrupos(arr);
+      setLoading(false);
+    })();
+  },[]);
+
+  const handleMateria=async(grupo,materia)=>{
+    setGrupoSel(grupo);
+    setMateriaSel(materia);
+    setTopicoSel(null);
+    setContagem(0);
+  };
+
+  const handleTopico=async(topico)=>{
+    setTopicoSel(topico);
+    setBuscando(true);
+    const q=supabase.from("questoes").select("id",{count:"exact"}).eq("ativa",true).eq("materia",materiaSel);
+    if(topico!=="todas") q.eq("topico",topico);
+    const{count}=await q;
+    setContagem(count||0);
+    setBuscando(false);
+  };
+
+  const grupoAtual=grupos.find(g=>g.nome===grupoSel);
+  const materiaAtual=grupoAtual?.materias.find(m=>m.nome===materiaSel);
+
+  const podeIniciar=materiaSel&&topicoSel&&contagem>0;
+
+  if(loading)return(
+    <div style={{display:"flex",justifyContent:"center",padding:"60px"}}>
+      <div style={{width:36,height:36,border:"4px solid #EDE9FE",borderTop:`4px solid ${C.primary}`,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+    </div>
+  );
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:20}}>
+
+      {/* HEADER */}
+      <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:18,padding:"22px 26px",color:"white"}}>
+        <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,marginBottom:6}}>🎯 Treino livre</div>
+        <div style={{fontSize:13,color:"rgba(255,255,255,0.8)"}}>Escolha a matéria e o tópico para treinar no seu ritmo, sem limite de questões.</div>
+      </div>
+
+      {grupos.length===0?(
+        <div style={{textAlign:"center",padding:"48px",background:C.white,borderRadius:18,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:48,marginBottom:12}}>📭</div>
+          <div style={{fontFamily:"'Lora',serif",fontSize:18,fontWeight:700,color:C.text,marginBottom:8}}>Banco de questões vazio</div>
+          <div style={{fontSize:13,color:C.textMed}}>As questões serão adicionadas pelo admin em breve.</div>
+        </div>
+      ):(
+        <div style={{display:"grid",gridTemplateColumns:"240px 1fr",gap:20,alignItems:"start"}} className="treino-grid">
+
+          {/* SIDEBAR — GRUPOS E MATÉRIAS */}
+          <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"16px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+            <div style={{fontSize:11,fontWeight:700,color:C.textLight,letterSpacing:1.2,textTransform:"uppercase",marginBottom:12}}>Matérias</div>
+            <div style={{display:"flex",flexDirection:"column",gap:2,maxHeight:"60vh",overflowY:"auto"}}>
+              {grupos.map(g=>(
+                <div key={g.nome}>
+                  <div style={{fontSize:11,fontWeight:800,color:C.textLight,padding:"6px 8px",letterSpacing:0.5,textTransform:"uppercase"}}>{g.nome}</div>
+                  {g.materias.map(m=>(
+                    <div key={m.nome} onClick={()=>handleMateria(g.nome,m.nome)}
+                      style={{padding:"8px 10px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:materiaSel===m.nome?700:500,
+                        background:materiaSel===m.nome?C.primaryXLight:"transparent",
+                        color:materiaSel===m.nome?C.primary:C.text,
+                        borderLeft:`3px solid ${materiaSel===m.nome?C.primary:"transparent"}`,
+                        transition:"all 0.15s"}}>
+                      {m.nome}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* CONTEÚDO PRINCIPAL */}
+          <div style={{display:"flex",flexDirection:"column",gap:16}}>
+            {!materiaSel?(
+              <div style={{textAlign:"center",padding:"48px",background:C.white,borderRadius:16,border:`1px solid ${C.border}`}}>
+                <div style={{fontSize:36,marginBottom:12}}>👈</div>
+                <div style={{fontSize:14,fontWeight:600,color:C.text,marginBottom:6}}>Selecione uma matéria</div>
+                <div style={{fontSize:12,color:C.textMed}}>Escolha ao lado para ver os tópicos disponíveis.</div>
+              </div>
+            ):(
+              <>
+                {/* TÓPICOS */}
+                <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"20px 22px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+                  <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:4}}>{materiaSel}</div>
+                  <div style={{fontSize:11,color:C.textLight,marginBottom:16}}>Escolha um tópico ou treine com todos</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                    {/* Opção: todas as questões da matéria */}
+                    <button onClick={()=>handleTopico("todas")}
+                      style={{padding:"8px 16px",border:`2px solid ${topicoSel==="todas"?C.primary:C.border}`,borderRadius:100,fontSize:12,fontWeight:topicoSel==="todas"?700:500,cursor:"pointer",background:topicoSel==="todas"?C.primary:"white",color:topicoSel==="todas"?"white":C.text,transition:"all 0.15s"}}>
+                      📚 Todos os tópicos
+                    </button>
+                    {materiaAtual?.topicos.map(t=>(
+                      <button key={t} onClick={()=>handleTopico(t)}
+                        style={{padding:"8px 16px",border:`2px solid ${topicoSel===t?C.primary:C.border}`,borderRadius:100,fontSize:12,fontWeight:topicoSel===t?700:500,cursor:"pointer",background:topicoSel===t?C.primary:"white",color:topicoSel===t?"white":C.text,transition:"all 0.15s"}}>
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* PAINEL DE INÍCIO */}
+                {topicoSel&&(
+                  <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"20px 22px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+                    {buscando?(
+                      <div style={{display:"flex",alignItems:"center",gap:10,color:C.textMed,fontSize:13}}>
+                        <div style={{width:16,height:16,border:`2px solid ${C.primary}`,borderTop:"2px solid transparent",borderRadius:"50%",animation:"spin 0.6s linear infinite"}}/>
+                        Contando questões...
+                      </div>
+                    ):(
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
+                        <div>
+                          <div style={{fontSize:11,color:C.textLight,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>Pronto para treinar</div>
+                          <div style={{fontFamily:"'Lora',serif",fontSize:18,fontWeight:700,color:C.text,marginBottom:4}}>
+                            {materiaSel} {topicoSel!=="todas"?`· ${topicoSel}`:"· Todos os tópicos"}
+                          </div>
+                          <div style={{display:"flex",alignItems:"center",gap:6}}>
+                            <span style={{fontSize:24,fontWeight:800,color:contagem>0?C.primary:"#EF4444",fontFamily:"'Lora',serif"}}>{contagem}</span>
+                            <span style={{fontSize:12,color:C.textMed}}>questões disponíveis</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={()=>podeIniciar&&onIniciar({grupo:grupoSel,materia:materiaSel,topico:topicoSel,total:contagem})}
+                          disabled={!podeIniciar}
+                          style={{padding:"14px 28px",background:podeIniciar?`linear-gradient(135deg,${C.primary},${C.primaryLight})`:"#E5E7EB",color:podeIniciar?"white":C.textLight,border:"none",borderRadius:12,fontSize:14,fontWeight:800,cursor:podeIniciar?"pointer":"not-allowed",boxShadow:podeIniciar?"0 4px 14px rgba(108,60,225,0.3)":"none",transition:"all 0.2s"}}>
+                          {contagem===0?"Sem questões":"Começar treino →"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── SESSÃO DE TREINO ───────────────────────────────────────── */
+function TreinoSessao({user,filtro,onVoltar}){
+  const [questoes,setQuestoes]=React.useState([]);
+  const [idx,setIdx]=React.useState(0);
+  const [selecionada,setSelecionada]=React.useState(null);
+  const [confirmada,setConfirmada]=React.useState(false);
+  const [noCaderno,setNoCaderno]=React.useState(null); // null=não decidiu, true=sim, false=não
+  const [loading,setLoading]=React.useState(true);
+  const [total,setTotal]=React.useState(0);
+  const [acertos,setAcertos]=React.useState(0);
+  const LETRAS=["A","B","C","D","E"];
+
+  React.useEffect(()=>{loadQuestoes();},[]);
+
+  const loadQuestoes=async()=>{
+    setLoading(true);
+    let q=supabase.from("questoes").select("*").eq("ativa",true).eq("materia",filtro.materia);
+    if(filtro.topico!=="todas") q=q.eq("topico",filtro.topico);
+    const{data}=await q.order("created_at",{ascending:false});
+    const shuffled=(data||[]).sort(()=>Math.random()-0.5);
+    setQuestoes(shuffled);
+    setTotal(shuffled.length);
+    setLoading(false);
+  };
+
+  const confirmar=async()=>{
+    if(!selecionada) return;
+    const q=questoes[idx];
+    const correta=selecionada===q.gabarito;
+    if(correta) setAcertos(a=>a+1);
+    setConfirmada(true);
+    setNoCaderno(null);
+  };
+
+  const adicionarCaderno=async()=>{
+    const q=questoes[idx];
+    if(!q.id) return;
+    const revisarEm=new Date();
+    revisarEm.setDate(revisarEm.getDate()+1);
+    await supabase.from("caderno_erros").upsert({
+      user_id:user.id,questao_id:q.id,materia:q.materia,topico:q.topico,
+      resposta_dada:selecionada,revisar_em:revisarEm.toISOString().split("T")[0]
+    },{onConflict:"user_id,questao_id"});
+    setNoCaderno(true);
+  };
+
+  const removerCaderno=async()=>{
+    const q=questoes[idx];
+    if(!q.id) return;
+    await supabase.from("caderno_erros").delete().eq("user_id",user.id).eq("questao_id",q.id);
+    setNoCaderno(false);
+  };
+
+  const proxima=()=>{
+    if(idx+1>=questoes.length){
+      setIdx(questoes.length); // fim
+    }else{
+      setIdx(i=>i+1);
+      setSelecionada(null);
+      setConfirmada(false);
+      setNoCaderno(null);
+    }
+  };
+
+  const corLetra=(l)=>{
+    const q=questoes[idx];
+    if(!confirmada) return selecionada===l?{bg:C.primaryXLight,border:C.primary,color:C.primary}:{bg:"white",border:C.border,color:C.text};
+    if(l===q?.gabarito) return{bg:"#D1FAE5",border:"#10B981",color:"#065F46"};
+    if(l===selecionada&&l!==q?.gabarito) return{bg:"#FEE2E2",border:"#EF4444",color:"#991B1B"};
+    return{bg:"#F9FAFB",border:C.border,color:C.textLight};
+  };
+
+  if(loading)return(
+    <div style={{height:"60vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
+      <div style={{width:40,height:40,border:"4px solid #EDE9FE",borderTop:`4px solid ${C.primary}`,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+      <div style={{fontSize:13,color:C.primary,fontWeight:600}}>Carregando questões...</div>
+    </div>
+  );
+
+  // Fim das questões
+  if(idx>=questoes.length){
+    const aprov=total>0?Math.round((acertos/total)*100):0;
+    const cor=aprov>=70?"#10B981":aprov>=50?"#F59E0B":"#EF4444";
+    return(
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"60vh",gap:20}}>
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:20,padding:"36px 40px",textAlign:"center",boxShadow:"0 4px 20px rgba(0,0,0,0.08)",maxWidth:420,width:"100%"}}>
+          <div style={{fontSize:48,marginBottom:12}}>{aprov>=70?"🏆":aprov>=50?"📈":"💪"}</div>
+          <div style={{fontFamily:"'Lora',serif",fontSize:28,fontWeight:800,color:cor}}>{aprov}%</div>
+          <div style={{fontSize:13,color:C.textMed,marginTop:4,marginBottom:20}}>aproveitamento no treino</div>
+          <div style={{display:"flex",gap:14,justifyContent:"center",marginBottom:24}}>
+            {[{l:"Questões",v:total,c:C.primary},{l:"Acertos",v:acertos,c:"#10B981"},{l:"Erros",v:total-acertos,c:"#EF4444"}].map(s=>(
+              <div key={s.l} style={{textAlign:"center"}}>
+                <div style={{fontFamily:"'Lora',serif",fontSize:22,fontWeight:800,color:s.c}}>{s.v}</div>
+                <div style={{fontSize:10,color:C.textLight,marginTop:2}}>{s.l}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <button onClick={()=>{setIdx(0);setSelecionada(null);setConfirmada(false);setNoCaderno(null);setAcertos(0);loadQuestoes();}}
+              style={{padding:"12px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>
+              Treinar novamente 🔄
+            </button>
+            <button onClick={onVoltar}
+              style={{padding:"12px",background:"white",color:C.primary,border:`1.5px solid ${C.primary}`,borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>
+              Voltar ao Treino
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const q=questoes[idx];
+  const correta=confirmada&&selecionada===q?.gabarito;
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:0}}>
+      {/* BARRA DE PROGRESSO */}
+      <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:16,padding:"14px 20px",marginBottom:16}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",color:"white",marginBottom:8}}>
+          <button onClick={onVoltar} style={{background:"rgba(255,255,255,0.15)",border:"none",color:"white",borderRadius:8,padding:"5px 12px",fontSize:12,cursor:"pointer"}}>← Sair</button>
+          <span style={{fontSize:12,fontWeight:700}}>{filtro.materia} {filtro.topico!=="todas"?`· ${filtro.topico}`:""}</span>
+          <span style={{fontSize:12,background:"rgba(255,255,255,0.2)",padding:"4px 10px",borderRadius:100}}>{idx+1}/{total}</span>
+        </div>
+        <div style={{height:5,background:"rgba(255,255,255,0.2)",borderRadius:100}}>
+          <div style={{height:"100%",width:`${((idx+1)/total)*100}%`,background:"white",borderRadius:100,transition:"width 0.4s ease"}}/>
+        </div>
+      </div>
+
+      {/* QUESTÃO */}
+      <div style={{background:C.white,borderRadius:16,padding:"24px",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",marginBottom:12}}>
+        {/* Badges */}
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
+          {q?.banca&&<span style={{background:C.primaryXLight,color:C.primary,borderRadius:100,padding:"3px 10px",fontSize:10,fontWeight:700}}>{q.banca}</span>}
+          {q?.fonte&&<span style={{background:"#F3F4F6",color:C.textMed,borderRadius:100,padding:"3px 10px",fontSize:10}}>{q.fonte}</span>}
+          {q?.tipo==="certo_errado"&&<span style={{background:"#FEF3C7",color:"#92400E",borderRadius:100,padding:"3px 10px",fontSize:10,fontWeight:700}}>CERTO/ERRADO</span>}
+          <span style={{background:q?.nivel==="facil"?"#D1FAE5":q?.nivel==="dificil"?"#FEE2E2":"#FEF3C7",color:q?.nivel==="facil"?"#065F46":q?.nivel==="dificil"?"#991B1B":"#92400E",borderRadius:100,padding:"3px 10px",fontSize:10,fontWeight:700}}>
+            {q?.nivel==="facil"?"🟢 Fácil":q?.nivel==="dificil"?"🔴 Difícil":"🟡 Médio"}
+          </span>
+        </div>
+
+        {/* Enunciado */}
+        <div style={{fontSize:15,lineHeight:1.8,color:C.text,marginBottom:20}}>{q?.enunciado}</div>
+
+        {/* Alternativas */}
+        {q?.tipo==="certo_errado"?(
+          <div style={{display:"flex",gap:12}}>
+            {[{v:"C",l:"✅ Certo"},{v:"E",l:"❌ Errado"}].map(opt=>{
+              const isGab=confirmada&&opt.v===q?.gabarito;
+              const isErro=confirmada&&selecionada===opt.v&&opt.v!==q?.gabarito;
+              const isSel=!confirmada&&selecionada===opt.v;
+              return(
+                <button key={opt.v} onClick={()=>!confirmada&&setSelecionada(opt.v)}
+                  style={{flex:1,padding:"20px",border:`2px solid ${isGab?"#10B981":isErro?"#EF4444":isSel?C.primary:C.border}`,borderRadius:12,background:isGab?"#D1FAE5":isErro?"#FEE2E2":isSel?C.primaryXLight:"white",fontSize:16,fontWeight:800,cursor:confirmada?"default":"pointer",color:isGab?"#065F46":isErro?"#991B1B":isSel?C.primary:C.textMed}}>
+                  {opt.l}
+                </button>
+              );
+            })}
+          </div>
+        ):(
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {LETRAS.filter(l=>q?.alternativas?.[l]).map(l=>{
+              const c=corLetra(l);
+              return(
+                <button key={l} onClick={()=>!confirmada&&setSelecionada(l)}
+                  style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 14px",border:`2px solid ${c.border}`,borderRadius:12,background:c.bg,cursor:confirmada?"default":"pointer",textAlign:"left",transition:"all 0.15s"}}>
+                  <span style={{width:28,height:28,borderRadius:8,border:`2px solid ${c.border}`,background:c.border===C.border?"transparent":c.border,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:c.color,flexShrink:0}}>{l}</span>
+                  <span style={{fontSize:13,lineHeight:1.6,color:c.color}}>{q?.alternativas?.[l]}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* GABARITO + COMENTÁRIO */}
+      {confirmada&&(
+        <div style={{background:C.white,borderRadius:16,padding:"20px 22px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)",marginBottom:12}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+            <div style={{fontSize:20}}>{correta?"✅":"❌"}</div>
+            <div style={{fontFamily:"'Lora',serif",fontSize:15,fontWeight:700,color:correta?"#065F46":"#991B1B"}}>
+              {correta?"Resposta correta!":"Resposta incorreta"}
+            </div>
+            {!correta&&<span style={{fontSize:12,color:C.textMed}}>Gabarito: <strong style={{color:C.primary}}>{q?.gabarito}</strong></span>}
+          </div>
+          {q?.comentario&&<div style={{fontSize:13,color:C.text,lineHeight:1.7,padding:"12px 14px",background:C.bg,borderRadius:10,marginBottom:12}}>{q.comentario}</div>}
+
+          {/* CONTROLE DO CADERNO */}
+          <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+            <span style={{fontSize:11,color:C.textLight,fontWeight:600}}>Caderno de erros:</span>
+            {noCaderno===null&&(
+              <>
+                <button onClick={adicionarCaderno}
+                  style={{padding:"7px 14px",background:"#FEF3C7",border:"1px solid #FDE68A",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",color:"#92400E"}}>
+                  📓 Adicionar ao caderno
+                </button>
+                <button onClick={()=>setNoCaderno(false)}
+                  style={{padding:"7px 14px",background:"#F3F4F6",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",color:C.textMed}}>
+                  Não adicionar
+                </button>
+              </>
+            )}
+            {noCaderno===true&&(
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:12,fontWeight:700,color:"#065F46",background:"#D1FAE5",border:"1px solid #A7F3D0",borderRadius:8,padding:"6px 12px"}}>✅ Adicionado ao caderno</span>
+                <button onClick={removerCaderno}
+                  style={{padding:"6px 10px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,fontSize:11,cursor:"pointer",color:C.textLight}}>
+                  Remover
+                </button>
+              </div>
+            )}
+            {noCaderno===false&&(
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:11,color:C.textLight}}>Não adicionado</span>
+                <button onClick={adicionarCaderno}
+                  style={{padding:"6px 10px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,fontSize:11,cursor:"pointer",color:C.primary}}>
+                  Adicionar
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* BOTÃO */}
+      <div>
+        {!confirmada?(
+          <button onClick={confirmar} disabled={!selecionada}
+            style={{width:"100%",padding:"14px",background:selecionada?`linear-gradient(135deg,${C.primary},${C.primaryLight})`:"#E5E7EB",color:selecionada?"white":C.textLight,border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:selecionada?"pointer":"not-allowed",boxShadow:selecionada?"0 4px 14px rgba(108,60,225,0.3)":"none"}}>
+            Confirmar resposta
+          </button>
+        ):(
+          <button onClick={proxima}
+            style={{width:"100%",padding:"14px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 14px rgba(108,60,225,0.3)"}}>
+            {idx+1>=total?"Ver resultado 🏆":"Próxima questão →"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── ABA REVISÃO ────────────────────────────────────────────── */
+function RevisaoTab({user}){
+  const [caderno,setCaderno]=React.useState([]);
+  const [loading,setLoading]=React.useState(true);
+  const [filtro,setFiltro]=React.useState("hoje"); // hoje | todas | dominadas
+  const [questaoAberta,setQuestaoAberta]=React.useState(null);
+
+  React.useEffect(()=>{loadCaderno();},[]);
+
+  const loadCaderno=async()=>{
+    setLoading(true);
+    const{data}=await supabase.from("caderno_erros")
+      .select("*,questoes(enunciado,alternativas,gabarito,comentario,tipo,banca,nivel)")
+      .eq("user_id",user.id)
+      .order("revisar_em",{ascending:true});
+    setCaderno(data||[]);
+    setLoading(false);
+  };
+
+  const hoje=new Date().toISOString().split("T")[0];
+
+  const paraHoje=caderno.filter(c=>!c.dominada&&c.revisar_em<=hoje);
+  const todas=caderno.filter(c=>!c.dominada);
+  const dominadas=caderno.filter(c=>c.dominada);
+
+  const listaAtual=filtro==="hoje"?paraHoje:filtro==="todas"?todas:dominadas;
+
+  const marcarDominada=async(id)=>{
+    await supabase.from("caderno_erros").update({dominada:true}).eq("id",id);
+    setCaderno(c=>c.map(x=>x.id===id?{...x,dominada:true}:x));
+  };
+
+  const removerDoCaderno=async(id)=>{
+    await supabase.from("caderno_erros").delete().eq("id",id);
+    setCaderno(c=>c.filter(x=>x.id!==id));
+    if(questaoAberta===id) setQuestaoAberta(null);
+  };
+
+  const proximaRevisao=(revisoes)=>{
+    const intervalos=[1,3,7,15,30];
+    return intervalos[Math.min(revisoes,intervalos.length-1)];
+  };
+
+  const marcarRevisada=async(item)=>{
+    const novasRevisoes=(item.revisoes||0)+1;
+    const dias=proximaRevisao(novasRevisoes);
+    const proximaData=new Date();
+    proximaData.setDate(proximaData.getDate()+dias);
+    await supabase.from("caderno_erros").update({
+      revisoes:novasRevisoes,
+      revisar_em:proximaData.toISOString().split("T")[0]
+    }).eq("id",item.id);
+    setCaderno(c=>c.map(x=>x.id===item.id?{...x,revisoes:novasRevisoes,revisar_em:proximaData.toISOString().split("T")[0]}:x));
+    setQuestaoAberta(null);
+  };
+
+  if(loading)return(
+    <div style={{display:"flex",justifyContent:"center",padding:"60px"}}>
+      <div style={{width:36,height:36,border:"4px solid #EDE9FE",borderTop:`4px solid ${C.primary}`,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+    </div>
+  );
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:20}}>
+
+      {/* HEADER */}
+      <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:18,padding:"22px 26px",color:"white",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
+        <div>
+          <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,marginBottom:4}}>📓 Caderno de erros</div>
+          <div style={{fontSize:13,color:"rgba(255,255,255,0.8)"}}>Revisão espaçada: 1 → 3 → 7 → 15 → 30 dias</div>
+        </div>
+        <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+          {[{v:"hoje",l:`Para hoje (${paraHoje.length})`},{v:"todas",l:`Todas (${todas.length})`},{v:"dominadas",l:`Dominadas (${dominadas.length})`}].map(f=>(
+            <button key={f.v} onClick={()=>setFiltro(f.v)}
+              style={{padding:"7px 14px",background:filtro===f.v?"white":"rgba(255,255,255,0.15)",color:filtro===f.v?C.primary:"white",border:"none",borderRadius:100,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+              {f.l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* STATS */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14}} className="evo-grid2-inner">
+        {[
+          {l:"Para revisar hoje",v:paraHoje.length,c:paraHoje.length>0?"#EF4444":C.primary,icon:"🔔"},
+          {l:"No caderno",v:todas.length,c:C.primary,icon:"📓"},
+          {l:"Dominadas",v:dominadas.length,c:"#10B981",icon:"✅"},
+        ].map(s=>(
+          <div key={s.l} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:"16px",textAlign:"center",boxShadow:"0 2px 6px rgba(0,0,0,0.04)"}}>
+            <div style={{fontSize:20,marginBottom:6}}>{s.icon}</div>
+            <div style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:800,color:s.c}}>{s.v}</div>
+            <div style={{fontSize:10,color:C.textLight,marginTop:4}}>{s.l}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* LISTA */}
+      {listaAtual.length===0?(
+        <div style={{textAlign:"center",padding:"48px",background:C.white,borderRadius:18,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:48,marginBottom:12}}>{filtro==="hoje"?"🎉":"📭"}</div>
+          <div style={{fontFamily:"'Lora',serif",fontSize:18,fontWeight:700,color:C.text,marginBottom:6}}>
+            {filtro==="hoje"?"Tudo em dia!":filtro==="todas"?"Caderno vazio":"Nenhuma dominada ainda"}
+          </div>
+          <div style={{fontSize:12,color:C.textMed}}>
+            {filtro==="hoje"?"Nenhuma questão para revisar hoje.":filtro==="todas"?"Adicione questões ao caderno durante os treinos.":"Continue revisando para dominar as questões."}
+          </div>
+        </div>
+      ):(
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {listaAtual.map(item=>{
+            const q=item.questoes;
+            const aberta=questaoAberta===item.id;
+            const atrasada=!item.dominada&&item.revisar_em<hoje;
+            const corNivel=q?.nivel==="facil"?"#10B981":q?.nivel==="dificil"?"#EF4444":"#F59E0B";
+            return(
+              <div key={item.id} style={{background:C.white,border:`1.5px solid ${atrasada?"#FCA5A5":item.dominada?"#A7F3D0":C.border}`,borderRadius:14,overflow:"hidden",boxShadow:"0 2px 6px rgba(0,0,0,0.04)"}}>
+                {/* Cabeçalho */}
+                <div onClick={()=>setQuestaoAberta(aberta?null:item.id)}
+                  style={{padding:"14px 18px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
+                      <span style={{background:C.primaryXLight,color:C.primary,borderRadius:100,padding:"2px 8px",fontSize:10,fontWeight:700}}>{item.materia}</span>
+                      {item.topico&&<span style={{background:"#F3F4F6",color:C.textMed,borderRadius:100,padding:"2px 8px",fontSize:10}}>{item.topico}</span>}
+                      {atrasada&&<span style={{background:"#FEE2E2",color:"#EF4444",borderRadius:100,padding:"2px 8px",fontSize:10,fontWeight:700}}>⏰ Atrasada</span>}
+                      {item.dominada&&<span style={{background:"#D1FAE5",color:"#065F46",borderRadius:100,padding:"2px 8px",fontSize:10,fontWeight:700}}>✅ Dominada</span>}
+                    </div>
+                    <div style={{fontSize:13,color:C.text,lineHeight:1.4,overflow:"hidden",textOverflow:"ellipsis",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>
+                      {q?.enunciado||"Questão removida"}
+                    </div>
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
+                    <div style={{fontSize:10,color:C.textLight}}>Revisão #{(item.revisoes||0)+1}</div>
+                    <div style={{fontSize:10,color:atrasada?"#EF4444":C.textMed,fontWeight:atrasada?700:400}}>
+                      {item.dominada?"—":item.revisar_em===hoje?"Hoje":new Date(item.revisar_em+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})}
+                    </div>
+                    <div style={{fontSize:14,color:C.textLight}}>{aberta?"▲":"▼"}</div>
+                  </div>
+                </div>
+
+                {/* Questão expandida */}
+                {aberta&&q&&(
+                  <div style={{borderTop:`1px solid ${C.border}`,padding:"16px 18px",background:"#FAFAFA"}}>
+                    <div style={{fontSize:14,lineHeight:1.8,color:C.text,marginBottom:16}}>{q.enunciado}</div>
+
+                    {/* Alternativas (só leitura) */}
+                    {q.tipo==="certo_errado"?(
+                      <div style={{display:"flex",gap:10,marginBottom:14}}>
+                        {[{v:"C",l:"✅ Certo"},{v:"E",l:"❌ Errado"}].map(opt=>(
+                          <div key={opt.v} style={{flex:1,padding:"10px",border:`2px solid ${opt.v===q.gabarito?"#10B981":C.border}`,borderRadius:10,textAlign:"center",fontSize:13,fontWeight:700,color:opt.v===q.gabarito?"#065F46":C.textLight,background:opt.v===q.gabarito?"#D1FAE5":"white"}}>
+                            {opt.l} {opt.v===q.gabarito?"✓":""}
+                          </div>
+                        ))}
+                      </div>
+                    ):(
+                      <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
+                        {["A","B","C","D","E"].filter(l=>q.alternativas?.[l]).map(l=>(
+                          <div key={l} style={{display:"flex",gap:10,padding:"8px 12px",border:`1.5px solid ${l===q.gabarito?"#10B981":l===item.resposta_dada?"#FCA5A5":C.border}`,borderRadius:10,background:l===q.gabarito?"#D1FAE5":l===item.resposta_dada?"#FEE2E2":"white",fontSize:12}}>
+                            <span style={{fontWeight:800,color:l===q.gabarito?"#065F46":l===item.resposta_dada?"#991B1B":C.textMed,flexShrink:0}}>{l}</span>
+                            <span style={{color:l===q.gabarito?"#065F46":l===item.resposta_dada?"#991B1B":C.text}}>{q.alternativas[l]}</span>
+                            {l===q.gabarito&&<span style={{marginLeft:"auto",flexShrink:0,fontSize:10,fontWeight:700,color:"#065F46"}}>✓ GABARITO</span>}
+                            {l===item.resposta_dada&&l!==q.gabarito&&<span style={{marginLeft:"auto",flexShrink:0,fontSize:10,fontWeight:700,color:"#991B1B"}}>✗ sua resposta</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {q.comentario&&(
+                      <div style={{fontSize:13,color:C.text,lineHeight:1.7,padding:"10px 14px",background:"white",border:`1px solid ${C.border}`,borderRadius:10,marginBottom:14}}>
+                        💡 {q.comentario}
+                      </div>
+                    )}
+
+                    {/* Ações */}
+                    {!item.dominada&&(
+                      <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+                        <button onClick={()=>marcarRevisada(item)}
+                          style={{padding:"9px 16px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                          ✓ Revisei — próxima em {proximaRevisao(item.revisoes||0)}d
+                        </button>
+                        <button onClick={()=>marcarDominada(item.id)}
+                          style={{padding:"9px 16px",background:"#D1FAE5",color:"#065F46",border:"1px solid #A7F3D0",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                          🏆 Dominei
+                        </button>
+                        <button onClick={()=>removerDoCaderno(item.id)}
+                          style={{padding:"9px 16px",background:"#FEE2E2",color:"#EF4444",border:"1px solid #FECACA",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                          🗑️ Remover
+                        </button>
+                      </div>
+                    )}
+                    {item.dominada&&(
+                      <button onClick={()=>removerDoCaderno(item.id)}
+                        style={{padding:"9px 16px",background:"#FEE2E2",color:"#EF4444",border:"1px solid #FECACA",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                        🗑️ Remover do caderno
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── ABA EVOLUÇÃO ──────────────────────────────────────────── */
 /* ─── ABA EVOLUÇÃO ──────────────────────────────────────────── */
 /* ─── ABA EVOLUÇÃO ──────────────────────────────────────────── */
@@ -1645,7 +2261,8 @@ function Dashboard({user,onLogout}){
   const [plan,setPlan]=React.useState(null);
   const [loading,setLoading]=React.useState(true);
   const [simuladoConfirmado,setSimuladoConfirmado]=React.useState(false);
-  const [subTela,setSubTela]=React.useState(null); // null | "sessao" | "admin"
+  const [subTela,setSubTela]=React.useState(null); // null | "sessao" | "admin" | "treino_sessao"
+  const [treinoFiltro,setTreinoFiltro]=React.useState(null);
   const isAdmin=user?.email==='leonemattosdealmeida@gmail.com';
 
   React.useEffect(()=>{
@@ -1767,6 +2384,7 @@ function Dashboard({user,onLogout}){
   const TABS=[
     {id:"cronograma",icon:"🏠",label:"Área do Aluno"},
     {id:"questoes",icon:"🎯",label:"Treino"},
+    {id:"revisao",icon:"📓",label:"Revisão"},
     {id:"redacao",icon:"✍️",label:"Redação"},
     {id:"evolucao",icon:"📊",label:"Evolução"},
   ];
@@ -2031,11 +2649,12 @@ function Dashboard({user,onLogout}){
         )}
 
         {tab==="questoes"&&(
-          <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:400,gap:16}}>
-            <div style={{fontSize:48}}>🎯</div>
-            <h3 style={{fontFamily:"'Lora',serif",fontSize:22,color:C.text}}>Treino em breve</h3>
-            <p style={{fontSize:14,color:C.textMed,textAlign:"center",maxWidth:400}}>Questões extras para treinar além do cronograma. Escolha matéria, dificuldade e treine no seu ritmo — sem limite.</p>
-          </div>
+          subTela==="treino_sessao"
+            ? <TreinoSessao user={user} filtro={treinoFiltro} onVoltar={()=>{setSubTela(null);setTreinoFiltro(null);}}/>
+            : <TreinoTab user={user} plano={plan} onIniciar={(f)=>{setTreinoFiltro(f);setSubTela("treino_sessao");}}/>
+        )}
+        {tab==="revisao"&&(
+          <RevisaoTab user={user}/>
         )}
         {tab==="redacao"&&(
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:400,gap:16}}>
