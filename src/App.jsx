@@ -32,6 +32,9 @@ const css = `
   @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
   @keyframes spin{to{transform:rotate(360deg)}}
+  .apoio-mobile{display:none;}
+  .apoio-desktop{display:grid;}
+  .tab-label{display:inline;}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
   @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
   @keyframes bounceIn{0%{transform:scale(0.85);opacity:0}60%{transform:scale(1.04)}100%{transform:scale(1);opacity:1}}
@@ -67,6 +70,8 @@ const css = `
     .evo-grid2{grid-template-columns:1fr!important;}
     .evo-grid2-inner{grid-template-columns:1fr!important;}
     .treino-grid{grid-template-columns:1fr!important;}
+    .apoio-desktop{display:none!important;}
+    .apoio-mobile{display:block!important;}
     .hero-section{grid-template-columns:1fr!important;padding:40px 16px 32px!important;}
     .redacao-grid{grid-template-columns:1fr!important;}
     .plans-grid{grid-template-columns:1fr!important;}
@@ -1226,6 +1231,9 @@ function AdminPanel({user,onBack}){
   const [loadingQ,setLoadingQ]=React.useState(false);
   const [form,setForm]=React.useState(null);
   const [saving,setSaving]=React.useState(false);
+  const [gerandoComentario,setGerandoComentario]=React.useState(false);
+  const [duplicata,setDuplicata]=React.useState(null); // questão similar encontrada
+  const [ignorarDuplicata,setIgnorarDuplicata]=React.useState(false);
   const [busca,setBusca]=React.useState("");
   const [expandido,setExpandido]=React.useState({});
 
@@ -1265,27 +1273,111 @@ function AdminPanel({user,onBack}){
     setLoadingQ(false);
   };
 
-  const novaQuestao=()=>setForm({
-    grupo:selecionado?.grupo||"",materia:selecionado?.materia||"",topico:selecionado?.topico||"",
-    banca:"",fonte:"",nivel:"medio",tipo:"multipla",enunciado:"",
-    alternativas:{A:"",B:"",C:"",D:"",E:""},gabarito:"A",comentario:""
-  });
+  const novaQuestao=()=>{
+    setDuplicata(null);setIgnorarDuplicata(false);
+    setForm({
+      grupo:selecionado?.grupo||"",materia:selecionado?.materia||"",topico:selecionado?.topico||"",
+      banca:"",fonte:"",nivel:"medio",tipo:"multipla",enunciado:"",
+      alternativas:{A:"",B:"",C:"",D:"",E:""},gabarito:"A",comentario:"",
+      texto_base:"",imagem_base:null
+    });
+  };
+
+  /* Detector de duplicatas — compara primeiros 120 chars */
+  const verificarDuplicata=async(enunciado)=>{
+    if(!enunciado||enunciado.length<20) return;
+    const prefixo=enunciado.substring(0,120).trim();
+    const{data}=await supabase.from("questoes").select("id,enunciado,materia,gabarito")
+      .eq("ativa",true).ilike("enunciado",`${prefixo.substring(0,60)}%`).limit(3);
+    if(data&&data.length>0){
+      // Verifica similaridade mais precisa: primeiros 100 chars em comum
+      const similar=data.find(q=>{
+        const a=q.enunciado.substring(0,100).toLowerCase().replace(/\s+/g," ");
+        const b=enunciado.substring(0,100).toLowerCase().replace(/\s+/g," ");
+        // Conta chars iguais
+        let iguais=0;
+        for(let i=0;i<Math.min(a.length,b.length);i++){if(a[i]===b[i])iguais++;}
+        return(iguais/Math.max(a.length,b.length))>0.75;
+      });
+      if(similar&&similar.id!==form?.id){
+        setDuplicata(similar);
+        return true;
+      }
+    }
+    setDuplicata(null);
+    return false;
+  };
+
+  /* Gerar comentário com IA — salvo fixo na questão */
+  const gerarComentario=async()=>{
+    if(!form.enunciado){alert("Preencha o enunciado primeiro.");return;}
+    setGerandoComentario(true);
+    try{
+      const altsStr=form.tipo==="certo_errado"
+        ?`Tipo: Certo ou Errado. Gabarito: ${form.gabarito==="C"?"CERTO":"ERRADO"}.`
+        :Object.entries(form.alternativas).filter(([,v])=>v).map(([k,v])=>`${k}) ${v}`).join("
+");
+      const textoBase=form.texto_base?`
+Texto de apoio:
+${form.texto_base}
+`:"";
+      const prompt=`Você é um professor especialista em concursos públicos, didático e preciso.
+${textoBase}
+Questão:
+${form.enunciado}
+
+${form.tipo!=="certo_errado"?`Alternativas:
+${altsStr}
+`:""}
+Gabarito correto: ${form.gabarito==="C"?"CERTO":form.gabarito==="E"?"ERRADO":`${form.gabarito}) ${form.alternativas[form.gabarito]||""}`}
+
+Escreva uma explicação completa como se fosse uma aula. A explicação deve:
+1. Confirmar e justificar o gabarito com base na lei, doutrina ou jurisprudência aplicável
+2. Explicar o conceito central envolvido de forma clara e didática
+3. Apontar o erro das alternativas incorretas (se houver) com justificativa
+4. Dar uma dica prática ou mnemônico para fixar o conteúdo
+
+Use linguagem direta, como um bom professor explicaria em sala de aula. Máximo 350 palavras.`;
+
+      const resp=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:800,messages:[{role:"user",content:prompt}]})
+      });
+      const d=await resp.json();
+      F("comentario",d.content?.[0]?.text||"");
+    }catch(e){alert("Erro ao gerar comentário. Tente novamente.");}
+    setGerandoComentario(false);
+  };
 
   const salvarQuestao=async()=>{
     if(!form.enunciado||!form.grupo||!form.materia||!form.topico) return alert("Preencha todos os campos obrigatórios.");
-    const alts=form.alternativas;
-    if(!alts.A||!alts.B||!alts.C||!alts.D) return alert("Preencha as alternativas A, B, C e D no mínimo.");
+    if(form.tipo!=="certo_errado"){
+      const alts=form.alternativas;
+      if(!alts.A||!alts.B||!alts.C||!alts.D) return alert("Preencha as alternativas A, B, C e D no mínimo.");
+    }
+    // Verifica duplicata antes de salvar
+    if(!ignorarDuplicata&&!form.id){
+      const isDup=await verificarDuplicata(form.enunciado);
+      if(isDup) return; // bloqueia e mostra aviso
+    }
     setSaving(true);
-    const payload={grupo:form.grupo,materia:form.materia,topico:form.topico,
-      banca:form.banca,fonte:form.fonte,nivel:form.nivel,tipo:form.tipo||"multipla",enunciado:form.enunciado,
+    const payload={
+      grupo:form.grupo,materia:form.materia,topico:form.topico,
+      banca:form.banca,fonte:form.fonte,nivel:form.nivel,tipo:form.tipo||"multipla",
+      enunciado:form.enunciado,
       alternativas:(form.tipo||"multipla")==="certo_errado"?{C:"Certo",E:"Errado"}:form.alternativas,
-      gabarito:form.gabarito,comentario:form.comentario};
+      gabarito:form.gabarito,comentario:form.comentario,
+      texto_base:form.texto_base||null,
+      imagem_base:form.imagem_base||null
+    };
     if(form.id){
       await supabase.from("questoes").update(payload).eq("id",form.id);
     }else{
       await supabase.from("questoes").insert(payload);
     }
     setSaving(false);
+    setDuplicata(null);setIgnorarDuplicata(false);
     setForm(null);
     if(selecionado) loadQuestoes(selecionado.grupo,selecionado.materia,selecionado.topico);
   };
@@ -1443,15 +1535,101 @@ function AdminPanel({user,onBack}){
                   </div>
                 )}
               </div>
-              {/* Comentário */}
-              <div style={{marginBottom:20}}>
-                <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>Comentário / Explicação do gabarito</div>
-                <textarea value={form.comentario} onChange={e=>F("comentario",e.target.value)} rows={3} placeholder="Explique por que o gabarito está correto..."
-                  style={{width:"100%",padding:"10px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,lineHeight:1.6,resize:"vertical",boxSizing:"border-box",outline:"none"}}/>
+              {/* Texto base / Imagem de apoio */}
+              <div style={{marginBottom:16}}>
+                <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:8}}>Texto base / Imagem de apoio <span style={{fontWeight:400,color:C.textLight}}>(opcional — para questões de interpretação)</span></div>
+                <div style={{display:"flex",gap:8,marginBottom:8}}>
+                  {["texto","imagem"].map(t=>(
+                    <button key={t} onClick={()=>F("apoio_tipo",t)}
+                      style={{padding:"6px 14px",border:`1.5px solid ${(form.apoio_tipo||"texto")===t?C.primary:C.border}`,borderRadius:100,fontSize:11,fontWeight:700,cursor:"pointer",background:(form.apoio_tipo||"texto")===t?C.primaryXLight:"white",color:(form.apoio_tipo||"texto")===t?C.primary:C.textMed}}>
+                      {t==="texto"?"📝 Texto":"🖼️ Imagem"}
+                    </button>
+                  ))}
+                  {(form.texto_base||form.imagem_base)&&(
+                    <button onClick={()=>{F("texto_base","");F("imagem_base",null);}}
+                      style={{padding:"6px 12px",border:`1px solid #FECACA`,borderRadius:100,fontSize:11,cursor:"pointer",background:"#FEE2E2",color:"#EF4444",fontWeight:600}}>
+                      ✕ Remover
+                    </button>
+                  )}
+                </div>
+                {(form.apoio_tipo||"texto")==="texto"?(
+                  <textarea value={form.texto_base||""} onChange={e=>F("texto_base",e.target.value)} rows={5}
+                    placeholder="Cole aqui o texto de apoio (crônica, notícia, trecho literário, lei, etc.)..."
+                    style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${form.texto_base?C.primary:C.border}`,borderRadius:8,fontSize:12,lineHeight:1.7,resize:"vertical",boxSizing:"border-box",outline:"none",fontFamily:"Georgia,serif"}}/>
+                ):(
+                  <div
+                    onPaste={(e)=>{
+                      const items=e.clipboardData?.items;
+                      if(!items) return;
+                      for(const item of items){
+                        if(item.type.startsWith("image/")){
+                          e.preventDefault();
+                          const file=item.getAsFile();
+                          const reader=new FileReader();
+                          reader.onload=(ev)=>F("imagem_base",ev.target.result);
+                          reader.readAsDataURL(file);
+                          return;
+                        }
+                      }
+                    }}
+                    style={{border:`2px dashed ${form.imagem_base?C.primary:C.border}`,borderRadius:10,padding:"20px",background:form.imagem_base?"white":C.bg,cursor:"default",minHeight:120,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8}}>
+                    {form.imagem_base?(
+                      <img src={form.imagem_base} alt="Imagem de apoio" style={{maxWidth:"100%",maxHeight:300,borderRadius:8,objectFit:"contain"}}/>
+                    ):(
+                      <>
+                        <div style={{fontSize:28}}>🖼️</div>
+                        <div style={{fontSize:13,fontWeight:600,color:C.text}}>Cole a imagem aqui</div>
+                        <div style={{fontSize:11,color:C.textMed}}>Copie uma imagem e pressione <strong>Ctrl+V</strong> nesta área</div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
+
+              {/* Comentário com botão IA */}
+              <div style={{marginBottom:20}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                  <div style={{fontSize:11,fontWeight:700,color:C.textLight}}>Comentário / Explicação do gabarito</div>
+                  <button onClick={gerarComentario} disabled={gerandoComentario||!form.enunciado}
+                    style={{display:"flex",alignItems:"center",gap:6,padding:"6px 14px",background:form.enunciado?`linear-gradient(135deg,${C.primary},${C.primaryLight})`:"#E5E7EB",color:form.enunciado?"white":C.textLight,border:"none",borderRadius:100,fontSize:11,fontWeight:700,cursor:form.enunciado?"pointer":"not-allowed",transition:"all 0.2s"}}>
+                    {gerandoComentario?(
+                      <><div style={{width:10,height:10,border:"2px solid rgba(255,255,255,0.3)",borderTop:"2px solid white",borderRadius:"50%",animation:"spin 0.6s linear infinite"}}/> Gerando...</>
+                    ):"🤖 Gerar com IA"}
+                  </button>
+                </div>
+                <textarea value={form.comentario} onChange={e=>F("comentario",e.target.value)} rows={form.comentario&&form.comentario.length>200?8:4}
+                  placeholder="Clique em 'Gerar com IA' ou escreva a explicação como uma aula..."
+                  style={{width:"100%",padding:"10px 12px",border:`1.5px solid ${form.comentario?C.primary:C.border}`,borderRadius:8,fontSize:12,lineHeight:1.7,resize:"vertical",boxSizing:"border-box",outline:"none"}}/>
+                {form.comentario&&<div style={{fontSize:10,color:C.textLight,marginTop:4}}>✅ Comentário salvo fixo — não muda para os alunos.</div>}
+              </div>
+
+              {/* Aviso de duplicata */}
+              {duplicata&&!ignorarDuplicata&&(
+                <div style={{background:"#FEF3C7",border:"2px solid #F59E0B",borderRadius:12,padding:"16px",marginBottom:16}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"#92400E",marginBottom:8}}>⚠️ Questão similar encontrada no banco!</div>
+                  <div style={{fontSize:11,color:"#78350F",lineHeight:1.6,marginBottom:4}}>
+                    <strong>Matéria:</strong> {duplicata.materia} · <strong>Gabarito:</strong> {duplicata.gabarito}
+                  </div>
+                  <div style={{fontSize:11,color:"#78350F",lineHeight:1.6,background:"rgba(0,0,0,0.05)",borderRadius:8,padding:"8px",marginBottom:12,fontStyle:"italic"}}>
+                    "{duplicata.enunciado.substring(0,180)}..."
+                  </div>
+                  <div style={{display:"flex",gap:10}}>
+                    <button onClick={()=>{setIgnorarDuplicata(true);setDuplicata(null);}}
+                      style={{padding:"8px 16px",background:"#D97706",color:"white",border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                      É diferente — salvar mesmo assim
+                    </button>
+                    <button onClick={()=>{setDuplicata(null);}}
+                      style={{padding:"8px 16px",background:"white",color:"#92400E",border:"1px solid #FDE68A",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div style={{display:"flex",gap:12,justifyContent:"flex-end"}}>
-                <button onClick={()=>setForm(null)} style={{padding:"10px 20px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer",color:C.textMed}}>Cancelar</button>
-                <button onClick={salvarQuestao} disabled={saving} style={{padding:"10px 24px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",opacity:saving?0.7:1}}>
+                <button onClick={()=>{setForm(null);setDuplicata(null);setIgnorarDuplicata(false);}} style={{padding:"10px 20px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer",color:C.textMed}}>Cancelar</button>
+                <button onClick={salvarQuestao} disabled={saving||(duplicata&&!ignorarDuplicata)}
+                  style={{padding:"10px 24px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",opacity:saving||(duplicata&&!ignorarDuplicata)?0.7:1}}>
                   {saving?"Salvando...":"Salvar questão"}
                 </button>
               </div>
@@ -1529,6 +1707,71 @@ function AdminPanel({user,onBack}){
         </>}
       </div>
     </div>
+  );
+}
+
+/* ─── COMPONENTE: APOIO LATERAL (texto/imagem) ──────────────── */
+function ApoioLateral({q,children}){
+  const temApoio=q?.texto_base||q?.imagem_base;
+  const [abaAtiva,setAbaAtiva]=React.useState("apoio"); // "apoio" | "questao" (mobile)
+  const [zoomImg,setZoomImg]=React.useState(false);
+
+  if(!temApoio) return <>{children}</>;
+
+  return(
+    <>
+      {/* MOBILE: abas */}
+      <div className="apoio-mobile">
+        <div style={{display:"flex",background:C.white,borderRadius:12,border:`1px solid ${C.border}`,overflow:"hidden",marginBottom:14}}>
+          {[{id:"apoio",l:q?.imagem_base?"🖼️ Imagem":"📄 Texto"},{id:"questao",l:"❓ Questão"}].map(a=>(
+            <button key={a.id} onClick={()=>setAbaAtiva(a.id)}
+              style={{flex:1,padding:"11px",border:"none",background:abaAtiva===a.id?C.primary:"white",color:abaAtiva===a.id?"white":C.textMed,fontSize:12,fontWeight:700,cursor:"pointer",transition:"all 0.15s"}}>
+              {a.l}
+            </button>
+          ))}
+        </div>
+        {abaAtiva==="apoio"&&(
+          <div style={{background:C.white,borderRadius:14,padding:"16px",border:`1px solid ${C.border}`,marginBottom:14,maxHeight:"45vh",overflowY:"auto"}}>
+            {q?.imagem_base?(
+              <div style={{textAlign:"center"}}>
+                <img src={q.imagem_base} alt="Apoio" onClick={()=>setZoomImg(true)} style={{maxWidth:"100%",borderRadius:8,cursor:"zoom-in"}}/>
+                <div style={{fontSize:10,color:C.textLight,marginTop:6}}>Toque para ampliar</div>
+              </div>
+            ):(
+              <div style={{fontSize:13,lineHeight:1.9,color:C.text,whiteSpace:"pre-wrap"}}>{q?.texto_base}</div>
+            )}
+          </div>
+        )}
+        {abaAtiva==="questao"&&children}
+      </div>
+
+      {/* DESKTOP: dois painéis */}
+      <div className="apoio-desktop" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"start"}}>
+        {/* Painel esquerdo: texto/imagem */}
+        <div style={{background:C.white,borderRadius:16,border:`1px solid ${C.border}`,padding:"20px",position:"sticky",top:140,maxHeight:"70vh",overflowY:"auto",boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>
+          <div style={{fontSize:11,fontWeight:700,color:C.textLight,letterSpacing:1,textTransform:"uppercase",marginBottom:12}}>
+            {q?.imagem_base?"🖼️ Imagem de apoio":"📄 Texto de apoio"}
+          </div>
+          {q?.imagem_base?(
+            <div style={{textAlign:"center"}}>
+              <img src={q.imagem_base} alt="Apoio" onClick={()=>setZoomImg(true)} style={{maxWidth:"100%",borderRadius:8,cursor:"zoom-in",boxShadow:"0 2px 8px rgba(0,0,0,0.1)"}}/>
+              <div style={{fontSize:10,color:C.textLight,marginTop:6}}>Clique para ampliar</div>
+            </div>
+          ):(
+            <div style={{fontSize:13,lineHeight:1.9,color:C.text,whiteSpace:"pre-wrap"}}>{q?.texto_base}</div>
+          )}
+        </div>
+        {/* Painel direito: questão */}
+        <div>{children}</div>
+      </div>
+
+      {/* Modal zoom imagem */}
+      {zoomImg&&(
+        <div onClick={()=>setZoomImg(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,padding:20,cursor:"zoom-out"}}>
+          <img src={q?.imagem_base} alt="Zoom" style={{maxWidth:"95vw",maxHeight:"90vh",borderRadius:8,objectFit:"contain"}}/>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -1793,8 +2036,9 @@ function SessaoEstudos({user,plano,onConcluir,onVoltar}){
       </div>
 
       {/* QUESTÃO */}
-      <div style={{flex:1,maxWidth:720,width:"100%",margin:"0 auto",padding:"28px 20px"}}>
-        <div style={{background:"white",borderRadius:20,padding:"28px 28px",boxShadow:"0 4px 20px rgba(0,0,0,0.08)",marginBottom:16}}>
+      <div style={{flex:1,maxWidth:960,width:"100%",margin:"0 auto",padding:"20px"}}>
+        <ApoioLateral q={q}>
+        <div style={{background:"white",borderRadius:20,padding:"24px",boxShadow:"0 4px 20px rgba(0,0,0,0.08)",marginBottom:16}}>
           <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
             {q?.banca&&<span style={{background:C.primaryXLight,color:C.primary,borderRadius:100,padding:"3px 10px",fontSize:10,fontWeight:700}}>{q.banca}</span>}
             {q?.fonte&&<span style={{background:"#F3F4F6",color:C.textMed,borderRadius:100,padding:"3px 10px",fontSize:10}}>{q.fonte}</span>}
@@ -1868,6 +2112,7 @@ function SessaoEstudos({user,plano,onConcluir,onVoltar}){
             </button>
           )}
         </div>
+        </ApoioLateral>
       </div>
     </div>
   );
@@ -2158,7 +2403,7 @@ function TreinoSessao({user,filtro,onVoltar}){
   return(
     <div style={{display:"flex",flexDirection:"column",gap:0}}>
       {/* BARRA DE PROGRESSO */}
-      <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:16,padding:"14px 20px",marginBottom:16}}>
+      <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:16,padding:"14px 20px",marginBottom:16,maxWidth:960,width:"100%",margin:"0 auto 16px"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",color:"white",marginBottom:8}}>
           <button onClick={onVoltar} style={{background:"rgba(255,255,255,0.15)",border:"none",color:"white",borderRadius:8,padding:"5px 12px",fontSize:12,cursor:"pointer"}}>← Sair</button>
           <span style={{fontSize:12,fontWeight:700}}>{filtro.materia} {filtro.topico!=="todas"?`· ${filtro.topico}`:""}</span>
@@ -2170,6 +2415,8 @@ function TreinoSessao({user,filtro,onVoltar}){
       </div>
 
       {/* QUESTÃO */}
+      <div style={{maxWidth:960,width:"100%",margin:"0 auto"}}>
+      <ApoioLateral q={q}>
       <div style={{background:C.white,borderRadius:16,padding:"24px",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",marginBottom:12}}>
         {/* Badges */}
         <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
@@ -2277,6 +2524,8 @@ function TreinoSessao({user,filtro,onVoltar}){
             {idx+1>=total?"Ver resultado 🏆":"Próxima questão →"}
           </button>
         )}
+      </div>
+      </ApoioLateral>
       </div>
     </div>
   );
