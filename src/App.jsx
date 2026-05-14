@@ -1315,12 +1315,8 @@ function AdminPanel({user,onBack}){
     try{
       const altsStr=form.tipo==="certo_errado"
         ?`Tipo: Certo ou Errado. Gabarito: ${form.gabarito==="C"?"CERTO":"ERRADO"}.`
-        :Object.entries(form.alternativas).filter(([,v])=>v).map(([k,v])=>`${k}) ${v}`).join("
-");
-      const textoBase=form.texto_base?`
-Texto de apoio:
-${form.texto_base}
-`:"";
+        :Object.entries(form.alternativas).filter(([,v])=>v).map(([k,v])=>`${k}) ${v}`).join("\n");
+      const textoBase=form.texto_base?`\nTexto de apoio:\n${form.texto_base}\n`:"";
       const prompt=`Você é um professor especialista em concursos públicos, didático e preciso.
 ${textoBase}
 Questão:
