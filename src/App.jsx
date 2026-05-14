@@ -1404,6 +1404,7 @@ Use linguagem direta, como um bom professor explicaria em sala de aula. Máximo 
               {a==="questoes"?"📚 Questões":"🏆 Simulados"}
             </button>
           ))}
+          {abaAdmin==="questoes"&&<button onClick={novaQuestao} style={{padding:"8px 16px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer",boxShadow:"0 2px 8px rgba(108,60,225,0.3)"}}>+ Nova questão</button>}
         </div>
       </nav>
 
