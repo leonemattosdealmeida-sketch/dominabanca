@@ -70,6 +70,9 @@ const css = `
     .evo-grid2{grid-template-columns:1fr!important;}
     .evo-grid2-inner{grid-template-columns:1fr!important;}
     .treino-grid{grid-template-columns:1fr!important;}
+    .form-grid-3{grid-template-columns:1fr!important;}
+    .admin-layout{flex-direction:column!important;}
+    .admin-sidebar{width:100%!important;max-height:200px!important;}
     .apoio-desktop{display:none!important;}
     .apoio-mobile{display:block!important;}
     .hero-section{grid-template-columns:1fr!important;padding:40px 16px 32px!important;}
@@ -797,7 +800,7 @@ function SimuladoAdmin({user}){
               const adicionada=questoesForm.some(x=>x.id===q.id);
               return(
                 <div key={q.id} style={{display:"flex",gap:12,alignItems:"flex-start",padding:"12px 14px",border:`1px solid ${adicionada?C.primary:C.border}`,borderRadius:10,background:adicionada?C.primaryXLight:"white"}}>
-                  <div style={{flex:1,minWidth:0}}>
+                  <div style={{flex:1,minWidth:0,width:"100%"}} className="admin-content">
                     <div style={{fontSize:11,color:adicionada?C.primary:C.textMed,fontWeight:700,marginBottom:4}}>{q.materia} · {q.topico}</div>
                     <div style={{fontSize:12,color:C.text,lineHeight:1.5,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{q.enunciado}</div>
                   </div>
@@ -1398,7 +1401,7 @@ Use linguagem direta, como um bom professor explicaria em sala de aula. Máximo 
           <button onClick={onBack} style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,padding:"6px 14px",fontSize:12,fontWeight:600,color:C.textMed,cursor:"pointer"}}>← Dashboard</button>
           <div style={{fontFamily:"'Lora',serif",fontSize:16,fontWeight:700,color:C.text}}>Painel Admin</div>
         </div>
-        <div style={{display:"flex",gap:8}}>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           {["questoes","simulados"].map(a=>(
             <button key={a} onClick={()=>setAbaAdmin(a)} style={{padding:"8px 16px",background:abaAdmin===a?C.primary:"transparent",color:abaAdmin===a?"white":C.textMed,border:`1px solid ${abaAdmin===a?C.primary:C.border}`,borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer"}}>
               {a==="questoes"?"📚 Questões":"🏆 Simulados"}
@@ -1408,13 +1411,13 @@ Use linguagem direta, como um bom professor explicaria em sala de aula. Máximo 
         </div>
       </nav>
 
-      <div style={{display:"flex",flex:1,maxWidth:1300,width:"100%",margin:"0 auto",padding:"24px",gap:20,alignItems:"start"}}>
+      <div style={{display:"flex",flex:1,maxWidth:1300,width:"100%",margin:"0 auto",padding:"16px",gap:16,alignItems:"start",flexWrap:"wrap"}} className="admin-layout">
 
         {abaAdmin==="simulados"&&<SimuladoAdmin user={user}/>}
         {abaAdmin==="questoes"&&<>
 
         {/* SIDEBAR — ÁRVORE */}
-        <div style={{width:280,flexShrink:0,background:C.white,borderRadius:16,border:`1px solid ${C.border}`,padding:"16px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+        <div style={{width:280,flexShrink:0,background:C.white,borderRadius:16,border:`1px solid ${C.border}`,padding:"16px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}} className="admin-sidebar">
           <div style={{fontSize:11,fontWeight:700,color:C.textLight,letterSpacing:1.2,textTransform:"uppercase",marginBottom:12}}>Banco de questões</div>
           <input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Buscar matéria..." style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,marginBottom:12,boxSizing:"border-box",outline:"none"}}/>
           <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:"calc(100vh - 240px)",overflowY:"auto"}}>
@@ -1459,7 +1462,7 @@ Use linguagem direta, como um bom professor explicaria em sala de aula. Máximo 
                 <button onClick={()=>setForm(null)} style={{background:"transparent",border:"none",fontSize:18,cursor:"pointer",color:C.textLight}}>✕</button>
               </div>
               {/* Classificação */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:16}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:16}} className="form-grid-3">
                 {[["grupo","Grupo *","Ex: Direito Público"],["materia","Matéria *","Ex: Direito Constitucional"],["topico","Tópico *","Ex: Princípios Fundamentais"]].map(([k,l,p])=>(
                   <div key={k}>
                     <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>{l}</div>
@@ -1468,7 +1471,7 @@ Use linguagem direta, como um bom professor explicaria em sala de aula. Máximo 
                   </div>
                 ))}
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:16}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:16}} className="form-grid-3">
                 <div>
                   <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>Banca</div>
                   <input value={form.banca} onChange={e=>F("banca",e.target.value)} placeholder="Ex: CESPE"
@@ -1672,9 +1675,9 @@ Use linguagem direta, como um bom professor explicaria em sala de aula. Máximo 
                             <div style={{fontSize:13,color:C.text,lineHeight:1.6,marginBottom:8}}>{q.enunciado.substring(0,200)}{q.enunciado.length>200?"...":""}</div>
                             <div style={{fontSize:11,color:C.textMed}}>Gabarito: <strong style={{color:C.primary}}>{q.gabarito}</strong></div>
                           </div>
-                          <div style={{display:"flex",gap:8,flexShrink:0}}>
-                            <button onClick={()=>setForm({...q})} style={{padding:"6px 12px",background:C.primaryXLight,color:C.primary,border:"none",borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer"}}>Editar</button>
-                            <button onClick={()=>excluirQuestao(q.id)} style={{padding:"6px 12px",background:"#FEE2E2",color:"#EF4444",border:"none",borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer"}}>Excluir</button>
+                          <div style={{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap"}}>
+                            <button onClick={()=>setForm({...q})} style={{padding:"6px 10px",background:C.primaryXLight,color:C.primary,border:"none",borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer"}}>✏️</button>
+                            <button onClick={()=>excluirQuestao(q.id)} style={{padding:"6px 10px",background:"#FEE2E2",color:"#EF4444",border:"none",borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer"}}>🗑️</button>
                           </div>
                         </div>
                       </div>
@@ -1966,7 +1969,7 @@ function SessaoEstudos({user,plano,onConcluir,onVoltar}){
             <div style={{fontFamily:"'Lora',serif",fontSize:26,fontWeight:800,color:cor}}>{aprov}%</div>
             <div style={{fontSize:13,color:C.textMed,marginTop:4}}>de aproveitamento</div>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:24}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:24}} className="form-grid-3">
             {[{l:"Questões",v:total,c:C.primary},{l:"Acertos",v:acertos,c:"#10B981"},{l:"Tempo",v:`${duracao}min`,c:C.textMed}].map(s=>(
               <div key={s.l} style={{background:C.bg,borderRadius:12,padding:"14px",textAlign:"center"}}>
                 <div style={{fontFamily:"'Lora',serif",fontSize:22,fontWeight:800,color:s.c}}>{s.v}</div>
