@@ -618,7 +618,12 @@ function SimuladoAdmin({user}){
   const [novaQ,setNovaQ]=React.useState({enunciado:"",alternativas:{A:"",B:"",C:"",D:"",E:""},gabarito:"A",comentario:"",tipo:"multipla"});
   const LETRAS=["A","B","C","D","E"];
 
-  React.useEffect(()=>{loadSimulados();},[]);
+  React.useEffect(()=>{
+    loadSimulados();
+    const handler=()=>novoForm();
+    document.addEventListener('novoSimulado',handler);
+    return()=>document.removeEventListener('novoSimulado',handler);
+  },[]);
 
   const loadSimulados=async()=>{
     setLoading(true);
@@ -1396,18 +1401,36 @@ Use linguagem direta, como um bom professor explicaria em sala de aula. Máximo 
   return(
     <div style={{fontFamily:"'Sora',sans-serif",minHeight:"100vh",background:"#F8F7FF",display:"flex",flexDirection:"column"}}>
       {/* NAV */}
-      <nav style={{background:C.white,borderBottom:`1px solid ${C.border}`,padding:"0 24px",height:62,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100}}>
-        <div style={{display:"flex",alignItems:"center",gap:16}}>
-          <button onClick={onBack} style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,padding:"6px 14px",fontSize:12,fontWeight:600,color:C.textMed,cursor:"pointer"}}>← Dashboard</button>
-          <div style={{fontFamily:"'Lora',serif",fontSize:16,fontWeight:700,color:C.text}}>Painel Admin</div>
-        </div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          {["questoes","simulados"].map(a=>(
-            <button key={a} onClick={()=>setAbaAdmin(a)} style={{padding:"8px 16px",background:abaAdmin===a?C.primary:"transparent",color:abaAdmin===a?"white":C.textMed,border:`1px solid ${abaAdmin===a?C.primary:C.border}`,borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer"}}>
-              {a==="questoes"?"📚 Questões":"🏆 Simulados"}
+      <nav style={{background:C.white,borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,zIndex:100,boxShadow:"0 1px 6px rgba(0,0,0,0.06)"}}>
+        {/* Linha 1: voltar + título + botão ação */}
+        <div style={{padding:"0 20px",height:56,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <button onClick={onBack} style={{width:34,height:34,border:`1px solid ${C.border}`,borderRadius:8,background:"white",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>←</button>
+            <div style={{fontFamily:"'Lora',serif",fontSize:15,fontWeight:700,color:C.text}}>Painel Admin</div>
+          </div>
+          {abaAdmin==="questoes"&&(
+            <button onClick={novaQuestao} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 16px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer",boxShadow:"0 2px 8px rgba(108,60,225,0.3)",whiteSpace:"nowrap"}}>
+              <span style={{fontSize:16,lineHeight:1}}>+</span> Nova questão
             </button>
+          )}
+          {abaAdmin==="simulados"&&(
+            <button onClick={()=>document.dispatchEvent(new CustomEvent('novoSimulado'))} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 16px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer",boxShadow:"0 2px 8px rgba(108,60,225,0.3)",whiteSpace:"nowrap"}}>
+              <span style={{fontSize:16,lineHeight:1}}>+</span> Novo simulado
+            </button>
+          )}
+        </div>
+        {/* Linha 2: tabs */}
+        <div style={{display:"flex",borderTop:`1px solid ${C.border}`,padding:"0 20px"}}>
+          {[{id:"questoes",icon:"📚",l:"Questões"},{id:"simulados",icon:"🏆",l:"Simulados"}].map(a=>(
+            <button key={a.id} onClick={()=>setAbaAdmin(a.id)} style={{
+              padding:"10px 20px",background:"transparent",border:"none",
+              borderBottom:`3px solid ${abaAdmin===a.id?C.primary:"transparent"}`,
+              color:abaAdmin===a.id?C.primary:C.textMed,
+              fontSize:13,fontWeight:abaAdmin===a.id?700:500,
+              cursor:"pointer",display:"flex",alignItems:"center",gap:6,
+              transition:"all 0.15s",whiteSpace:"nowrap"
+            }}>{a.icon} {a.l}</button>
           ))}
-          {abaAdmin==="questoes"&&<button onClick={novaQuestao} style={{padding:"8px 16px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer",boxShadow:"0 2px 8px rgba(108,60,225,0.3)"}}>+ Nova questão</button>}
         </div>
       </nav>
 
