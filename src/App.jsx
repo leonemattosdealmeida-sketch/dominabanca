@@ -1491,7 +1491,7 @@ Use linguagem direta, como um bom professor explicaria em sala de aula. Máximo 
                     <select value={form.grupo} onChange={e=>F("grupo",e.target.value)}
                       style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,boxSizing:"border-box",outline:"none"}}>
                       <option value="">Selecione a carreira...</option>
-                      {["Previdenciária", "Fiscal", "Policial", "Tribunais", "Agências Reguladoras", "Financeira", "Diplomacia", "Administrativa / Gestão Pública", "Saúde", "Educação"]}.map(c=><option key={c} value={c}>{c}</option>)
+                      {["Previdenciária","Fiscal","Policial","Tribunais","Agências Reguladoras","Financeira","Diplomacia","Administrativa / Gestão Pública","Saúde","Educação"].map(c=><option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                   <div>
