@@ -1330,30 +1330,24 @@ ${textoBase}
 Questão:
 ${form.enunciado}
 
-${form.tipo!=="certo_errado"?`Alternativas:
-${altsStr}
-`:""}
+${form.tipo!=="certo_errado"?`Alternativas:\n${altsStr}\n`:""}
 Gabarito correto: ${form.gabarito==="C"?"CERTO":form.gabarito==="E"?"ERRADO":`${form.gabarito}) ${form.alternativas[form.gabarito]||""}`}
 
-Escreva uma explicação completa como se fosse uma aula. A explicação deve:
-1. Confirmar e justificar o gabarito com base na lei, doutrina ou jurisprudência aplicável
-2. Explicar o conceito central envolvido de forma clara e didática
-3. Apontar o erro das alternativas incorretas (se houver) com justificativa
-4. Dar uma dica prática ou mnemônico para fixar o conteúdo
-
-Use linguagem direta, como um bom professor explicaria em sala de aula. Máximo 350 palavras.`;
+Responda SOMENTE com JSON válido (sem texto fora do JSON):
+{"nivel":<1 a 5: 1=muito fácil 2=fácil 3=médio 4=difícil 5=muito difícil>,"comentario":"<explicação como aula: justifique o gabarito com lei/doutrina/jurisprudência, explique o conceito, aponte erros das alternativas, dê dica ou mnemônico. Máximo 350 palavras>"}`;
 
       const resp=await fetch("https://api.anthropic.com/v1/messages",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:800,messages:[{role:"user",content:prompt}]})
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:900,messages:[{role:"user",content:prompt}]})
       });
       const d=await resp.json();
-      F("comentario",d.content?.[0]?.text||"");
+      const text=d.content?.[0]?.text||"{}";
+      const clean=text.replace(/```json|```/g,"").trim();
+      try{const p=JSON.parse(clean);F("comentario",p.comentario||"");if(p.nivel)F("nivel",String(p.nivel));}
+      catch(e){F("comentario",text);}
     }catch(e){alert("Erro ao gerar comentário. Tente novamente.");}
     setGerandoComentario(false);
   };
-
   const salvarQuestao=async()=>{
     if(!form.enunciado||!form.grupo||!form.materia||!form.topico) return alert("Preencha todos os campos obrigatórios.");
     if(form.tipo!=="certo_errado"){
@@ -1521,13 +1515,7 @@ Use linguagem direta, como um bom professor explicaria em sala de aula. Máximo 
                   <input value={form.ano||""} onChange={e=>F("ano",e.target.value)} placeholder="Ex: 2024"
                     style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,boxSizing:"border-box",outline:"none"}}/>
                 </div>
-                <div>
-                  <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>Nível</div>
-                  <select value={form.nivel} onChange={e=>F("nivel",e.target.value)}
-                    style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,boxSizing:"border-box",outline:"none"}}>
-                    {NIVEIS.map(n=><option key={n.v} value={n.v}>{n.l}</option>)}
-                  </select>
-                </div>
+
                 <div>
                   <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>Tipo</div>
                   <select value={form.tipo||"multipla"} onChange={e=>{F("tipo",e.target.value);F("gabarito",e.target.value==="certo_errado"?"C":"A");}}
@@ -1705,8 +1693,9 @@ Use linguagem direta, como um bom professor explicaria em sala de aula. Máximo 
                       <div key={q.id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
                           <div style={{flex:1,minWidth:0}}>
-                            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
-                              <span style={{background:corNivel+"22",color:corNivel,borderRadius:100,padding:"2px 8px",fontSize:10,fontWeight:700}}>{q.nivel}</span>
+                            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8,alignItems:"center"}}>
+                              {/* Estrelas */}
+                              {(()=>{const n=parseInt(q.nivel)||0;const cores=["","#10B981","#84CC16","#F59E0B","#EF4444","#991B1B"];const cor=cores[Math.min(n,5)]||C.textLight;return(<div style={{display:"flex",gap:2}}>{[1,2,3,4,5].map(i=>(<svg key={i} width="10" height="10" viewBox="0 0 24 24" fill={i<=n?cor:"#E5E7EB"} xmlns="http://www.w3.org/2000/svg"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>))}</div>);})()}
                               {q.banca&&<span style={{background:C.primaryXLight,color:C.primary,borderRadius:100,padding:"2px 8px",fontSize:10,fontWeight:700}}>{q.banca}</span>}
                               {q.fonte&&<span style={{background:"#F3F4F6",color:C.textMed,borderRadius:100,padding:"2px 8px",fontSize:10}}>{q.fonte}</span>}
                               {q.gerada_ia&&<span style={{background:"#EFF6FF",color:"#3B82F6",borderRadius:100,padding:"2px 8px",fontSize:10,fontWeight:700}}>🤖 IA</span>}
@@ -1823,13 +1812,31 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
 
   return(
     <div>
-      {/* Número + badges */}
-      {numQ&&<div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
-        <span style={{background:C.primaryXLight,color:C.primary,borderRadius:100,padding:'3px 10px',fontSize:11,fontWeight:800}}>{numQ}</span>
-        {q?.banca&&<span style={{background:'#F3F4F6',color:C.textMed,borderRadius:100,padding:'3px 10px',fontSize:10}}>{q.banca}</span>}
-        {q?.fonte&&<span style={{background:'#F3F4F6',color:C.textMed,borderRadius:100,padding:'3px 10px',fontSize:10}}>{q.fonte}</span>}
-        {q?.tipo==='certo_errado'&&<span style={{background:'#FEF3C7',color:'#92400E',borderRadius:100,padding:'3px 10px',fontSize:10,fontWeight:700}}>CERTO/ERRADO</span>}
-      </div>}
+      {/* Número + badges + estrelas */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8,marginBottom:12}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+          {numQ&&<span style={{background:C.primaryXLight,color:C.primary,borderRadius:100,padding:'3px 10px',fontSize:11,fontWeight:800}}>{numQ}</span>}
+          {q?.banca&&<span style={{background:'#F3F4F6',color:C.textMed,borderRadius:100,padding:'3px 10px',fontSize:10}}>{q.banca}</span>}
+          {q?.fonte&&<span style={{background:'#F3F4F6',color:C.textMed,borderRadius:100,padding:'3px 10px',fontSize:10}}>{q.fonte}</span>}
+          {q?.ano&&<span style={{background:'#F3F4F6',color:C.textMed,borderRadius:100,padding:'3px 10px',fontSize:10}}>{q.ano}</span>}
+          {q?.tipo==='certo_errado'&&<span style={{background:'#FEF3C7',color:'#92400E',borderRadius:100,padding:'3px 10px',fontSize:10,fontWeight:700}}>CERTO/ERRADO</span>}
+        </div>
+        {/* Estrelas de dificuldade */}
+        {q?.nivel&&(()=>{
+          const n=parseInt(q.nivel)||0;
+          const cores=['','#10B981','#84CC16','#F59E0B','#EF4444','#991B1B'];
+          const cor=cores[Math.min(n,5)]||C.textLight;
+          return(
+            <div style={{display:'flex',alignItems:'center',gap:3}}>
+              {[1,2,3,4,5].map(i=>(
+                <svg key={i} width="12" height="12" viewBox="0 0 24 24" fill={i<=n?cor:'#E5E7EB'} xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </svg>
+              ))}
+            </div>
+          );
+        })()}
+      </div>
       {/* Sub-abas */}
       <div style={{display:'flex',background:'#F3F4F6',borderRadius:10,padding:2,marginBottom:16,overflowX:'auto',gap:2}}>
         {ABAS_Q.map(a=>(
