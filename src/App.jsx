@@ -793,7 +793,7 @@ function SimuladoAdmin({user}){
           <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
             <input value={bancoBusca.materia} onChange={e=>setBancoBusca(b=>({...b,materia:e.target.value}))} placeholder="Matéria (ex: Direito Constitucional)"
               style={{flex:"1 1 180px",padding:"9px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,outline:"none"}}/>
-            <input value={bancoBusca.topico} onChange={e=>setBancoBusca(b=>({...b,topico:e.target.value}))} placeholder="Tópico (opcional)"
+            <input value={bancoBusca.topico} onChange={e=>setBancoBusca(b=>({...b,topico:e.target.value}))} placeholder="Assunto (opcional)"
               style={{flex:"1 1 140px",padding:"9px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,outline:"none"}}/>
             <button onClick={buscarBanco} disabled={buscandoBanco}
               style={{padding:"9px 18px",background:C.primary,color:"white",border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>
@@ -1285,7 +1285,7 @@ function AdminPanel({user,onBack}){
     setDuplicata(null);setIgnorarDuplicata(false);
     setForm({
       grupo:selecionado?.grupo||"",materia:selecionado?.materia||"",topico:selecionado?.topico||"",
-      banca:"",fonte:"",nivel:"medio",tipo:"multipla",enunciado:"",
+      banca:"",fonte:"",ano:"",nivel:"medio",tipo:"multipla",enunciado:"",
       alternativas:{A:"",B:"",C:"",D:"",E:""},gabarito:"A",comentario:"",
       texto_base:"",imagem_base:null
     });
@@ -1368,7 +1368,7 @@ Use linguagem direta, como um bom professor explicaria em sala de aula. Máximo 
     setSaving(true);
     const payload={
       grupo:form.grupo,materia:form.materia,topico:form.topico,
-      banca:form.banca,fonte:form.fonte,nivel:form.nivel,tipo:form.tipo||"multipla",
+      banca:form.banca,fonte:form.fonte,ano:form.ano||null,nivel:form.nivel,tipo:form.tipo||"multipla",
       enunciado:form.enunciado,
       alternativas:(form.tipo||"multipla")==="certo_errado"?{C:"Certo",E:"Errado"}:form.alternativas,
       gabarito:form.gabarito,comentario:form.comentario,
@@ -1442,7 +1442,7 @@ Use linguagem direta, como um bom professor explicaria em sala de aula. Máximo 
         {/* SIDEBAR — ÁRVORE */}
         <div style={{width:280,flexShrink:0,background:C.white,borderRadius:16,border:`1px solid ${C.border}`,padding:"16px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}} className="admin-sidebar">
           <div style={{fontSize:11,fontWeight:700,color:C.textLight,letterSpacing:1.2,textTransform:"uppercase",marginBottom:12}}>Banco de questões</div>
-          <input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Buscar matéria..." style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,marginBottom:12,boxSizing:"border-box",outline:"none"}}/>
+          <input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Buscar carreira ou matéria..." style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,marginBottom:12,boxSizing:"border-box",outline:"none"}}/>
           <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:"calc(100vh - 240px)",overflowY:"auto"}}>
             {grupos.filter(g=>!busca||g.nome.toLowerCase().includes(busca.toLowerCase())||
               g.materias.some(m=>m.nome.toLowerCase().includes(busca.toLowerCase()))).map(g=>(
@@ -1486,23 +1486,39 @@ Use linguagem direta, como um bom professor explicaria em sala de aula. Máximo 
               </div>
               {/* Classificação */}
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:16}} className="form-grid-3">
-                {[["grupo","Grupo *","Ex: Direito Público"],["materia","Matéria *","Ex: Direito Constitucional"],["topico","Tópico *","Ex: Princípios Fundamentais"]].map(([k,l,p])=>(
-                  <div key={k}>
-                    <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>{l}</div>
-                    <input value={form[k]} onChange={e=>F(k,e.target.value)} placeholder={p}
+                <div>
+                    <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>Carreira *</div>
+                    <select value={form.grupo} onChange={e=>F("grupo",e.target.value)}
+                      style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,boxSizing:"border-box",outline:"none"}}>
+                      <option value="">Selecione a carreira...</option>
+                      {["Previdenciária", "Fiscal", "Policial", "Tribunais", "Agências Reguladoras", "Financeira", "Diplomacia", "Administrativa / Gestão Pública", "Saúde", "Educação"]}.map(c=><option key={c} value={c}>{c}</option>)
+                    </select>
+                  </div>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>Matéria *</div>
+                    <input value={form.materia} onChange={e=>F("materia",e.target.value)} placeholder="Ex: Administração de Recursos Materiais"
                       style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,boxSizing:"border-box",outline:"none"}}/>
                   </div>
-                ))}
+                  <div>
+                    <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>Assunto *</div>
+                    <input value={form.topico} onChange={e=>F("topico",e.target.value)} placeholder="Ex: Noções de Administração de Materiais"
+                      style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,boxSizing:"border-box",outline:"none"}}/>
+                  </div>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:16}} className="form-grid-3">
                 <div>
                   <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>Banca</div>
-                  <input value={form.banca} onChange={e=>F("banca",e.target.value)} placeholder="Ex: CESPE"
+                  <input value={form.banca} onChange={e=>F("banca",e.target.value)} placeholder="Ex: IBFC, CESPE, FCC"
                     style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,boxSizing:"border-box",outline:"none"}}/>
                 </div>
                 <div>
-                  <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>Fonte</div>
-                  <input value={form.fonte} onChange={e=>F("fonte",e.target.value)} placeholder="Ex: TRF 2023"
+                  <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>Concurso / Fonte</div>
+                  <input value={form.fonte} onChange={e=>F("fonte",e.target.value)} placeholder="Ex: AMPASS - Analista de Previdência"
+                    style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,boxSizing:"border-box",outline:"none"}}/>
+                </div>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>Ano</div>
+                  <input value={form.ano||""} onChange={e=>F("ano",e.target.value)} placeholder="Ex: 2024"
                     style={{width:"100%",padding:"8px 12px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,boxSizing:"border-box",outline:"none"}}/>
                 </div>
                 <div>
