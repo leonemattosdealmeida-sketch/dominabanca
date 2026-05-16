@@ -1733,6 +1733,258 @@ Use linguagem direta, como um bom professor explicaria em sala de aula. Máximo 
   );
 }
 
+/* ─── COMPONENTE: QUESTÃO COM COMENTÁRIOS E REPORT ─────────── */
+function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,onProxima,isLast}){
+  const RESEND_KEY='re_UWuwWkB8_MoceFPVRfdmkRHXa3sBuSGqn';
+  const FROM_EMAIL='questoes@dominabanca.com.br';
+  const ADMIN_EMAIL='leonemattosdealmeida@gmail.com';
+  const [abaQ,setAbaQ]=React.useState('questao');
+  const [comentarios,setComentarios]=React.useState([]);
+  const [loadingC,setLoadingC]=React.useState(false);
+  const [novoComentario,setNovoComentario]=React.useState('');
+  const [enviandoC,setEnviandoC]=React.useState(false);
+  const [report,setReport]=React.useState({tipo:'',observacao:'',email:user?.email||''});
+  const [enviandoR,setEnviandoR]=React.useState(false);
+  const [reportEnviado,setReportEnviado]=React.useState(false);
+  const LETRAS=['A','B','C','D','E'];
+
+  React.useEffect(()=>{if(abaQ==='comentarios') loadComentarios();},[abaQ,q?.id]);
+
+  const numQ=q?.numero?`Q-${String(q.numero).padStart(4,'0')}`:null;
+
+  const loadComentarios=async()=>{
+    if(!q?.id) return;
+    setLoadingC(true);
+    const{data}=await supabase.from('comentarios_questao').select('*').eq('questao_id',q.id).eq('ativo',true).order('created_at',{ascending:true});
+    setComentarios(data||[]);setLoadingC(false);
+  };
+
+  const enviarComentario=async()=>{
+    if(!novoComentario.trim()||!q?.id) return;
+    const palavroes=['puta','merda','idiota','burro','imbecil','corno','viado','lixo'];
+    if(palavroes.some(p=>novoComentario.toLowerCase().includes(p))){alert('Comentário contém linguagem inadequada.');return;}
+    setEnviandoC(true);
+    const nome=(user?.user_metadata?.nome||user?.email||'Aluno').split(' ')[0];
+    const nomeCapit=nome.charAt(0).toUpperCase()+nome.slice(1).toLowerCase();
+    await supabase.from('comentarios_questao').insert({questao_id:q.id,user_id:user.id,nome:nomeCapit,texto:novoComentario.trim()});
+    setNovoComentario('');await loadComentarios();setEnviandoC(false);
+  };
+
+  const excluirComentario=async(id)=>{
+    await supabase.from('comentarios_questao').update({ativo:false}).eq('id',id);
+    setComentarios(c=>c.filter(x=>x.id!==id));
+  };
+
+  const enviarReport=async()=>{
+    if(!report.tipo||!report.observacao||!report.email) return;
+    setEnviandoR(true);
+    const nQ=numQ||'S/N';
+    const tipoLabel={pergunta:'Erro na pergunta',comentario:'Erro no comentário da plataforma',anulada:'Questão anulada pela banca'}[report.tipo];
+    await supabase.from('reports_questao').insert({questao_id:q.id,questao_num:q?.numero||null,user_id:user.id,email:report.email,tipo:report.tipo,observacao:report.observacao});
+    // Email para admin
+    await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${RESEND_KEY}`,'Content-Type':'application/json'},
+      body:JSON.stringify({from:`DominaBanca <${FROM_EMAIL}>`,to:[ADMIN_EMAIL],
+        subject:`[Report] ${nQ} — ${tipoLabel}`,
+        html:`<div style='font-family:sans-serif;max-width:600px'><h2 style='color:#6C3CE1'>📋 Report — DominaBanca</h2><p><b>Questão:</b> ${nQ}</p><p><b>Tipo:</b> ${tipoLabel}</p><p><b>Aluno:</b> ${report.email}</p><p><b>Observação:</b> ${report.observacao}</p></div>`
+      })});
+    // Email de confirmação para o aluno
+    await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${RESEND_KEY}`,'Content-Type':'application/json'},
+      body:JSON.stringify({from:`DominaBanca <${FROM_EMAIL}>`,to:[report.email],
+        subject:`✅ Report recebido — ${nQ}`,
+        html:`<div style='font-family:sans-serif;max-width:600px'><h2 style='color:#6C3CE1'>✅ Report recebido!</h2><p>Recebemos seu report sobre a questão <b>${nQ}</b>.</p><p><b>Tipo:</b> ${tipoLabel}</p><p><b>Observação:</b> ${report.observacao}</p><p>Analisaremos e retornaremos em breve. Obrigado por contribuir! 🙏</p><hr/><p style='color:#999;font-size:12px'>DominaBanca — Estudos para concursos públicos</p></div>`
+      })});
+    setEnviandoR(false);setReportEnviado(true);
+  };
+
+  const corLetra=(l)=>{
+    if(!confirmada) return selecionada===l?{bg:C.primaryXLight,border:C.primary,color:C.primary}:{bg:'white',border:C.border,color:C.text};
+    if(l===q?.gabarito) return{bg:'#D1FAE5',border:'#10B981',color:'#065F46'};
+    if(l===selecionada&&l!==q?.gabarito) return{bg:'#FEE2E2',border:'#EF4444',color:'#991B1B'};
+    return{bg:'#F9FAFB',border:C.border,color:C.textLight};
+  };
+
+  const ABAS_Q=[{id:'questao',l:'❓ Questão'},{id:'comentario_plataforma',l:'💡 Explicação'},{id:'comentarios',l:`💬 Debate (${comentarios.length})`},{id:'report',l:'🚩 Reportar'}];
+
+  return(
+    <div>
+      {/* Número + badges */}
+      {numQ&&<div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+        <span style={{background:C.primaryXLight,color:C.primary,borderRadius:100,padding:'3px 10px',fontSize:11,fontWeight:800}}>{numQ}</span>
+        {q?.banca&&<span style={{background:'#F3F4F6',color:C.textMed,borderRadius:100,padding:'3px 10px',fontSize:10}}>{q.banca}</span>}
+        {q?.fonte&&<span style={{background:'#F3F4F6',color:C.textMed,borderRadius:100,padding:'3px 10px',fontSize:10}}>{q.fonte}</span>}
+        {q?.tipo==='certo_errado'&&<span style={{background:'#FEF3C7',color:'#92400E',borderRadius:100,padding:'3px 10px',fontSize:10,fontWeight:700}}>CERTO/ERRADO</span>}
+      </div>}
+      {/* Sub-abas */}
+      <div style={{display:'flex',background:'#F3F4F6',borderRadius:10,padding:2,marginBottom:16,overflowX:'auto',gap:2}}>
+        {ABAS_Q.map(a=>(
+          <button key={a.id} onClick={()=>setAbaQ(a.id)}
+            style={{flex:1,padding:'8px 6px',border:'none',borderRadius:8,background:abaQ===a.id?'white':'transparent',
+              color:abaQ===a.id?C.primary:C.textMed,fontSize:10,fontWeight:abaQ===a.id?700:500,
+              cursor:'pointer',whiteSpace:'nowrap',boxShadow:abaQ===a.id?'0 1px 4px rgba(0,0,0,0.1)':'none'}}>
+            {a.l}
+          </button>
+        ))}
+      </div>
+      {/* QUESTÃO */}
+      {abaQ==='questao'&&(
+        <div>
+          <div style={{fontSize:15,lineHeight:1.8,color:C.text,marginBottom:20}}>{q?.enunciado}</div>
+          {q?.tipo==='certo_errado'?(
+            <div style={{display:'flex',gap:12,marginBottom:16}}>
+              {[{v:'C',l:'✅ Certo'},{v:'E',l:'❌ Errado'}].map(opt=>{
+                const isGab=confirmada&&opt.v===q?.gabarito;
+                const isErro=confirmada&&selecionada===opt.v&&opt.v!==q?.gabarito;
+                const isSel=!confirmada&&selecionada===opt.v;
+                return(<button key={opt.v} onClick={()=>!confirmada&&onSelect(opt.v)}
+                  style={{flex:1,padding:'18px',border:`2px solid ${isGab?'#10B981':isErro?'#EF4444':isSel?C.primary:C.border}`,
+                    borderRadius:12,background:isGab?'#D1FAE5':isErro?'#FEE2E2':isSel?C.primaryXLight:'white',
+                    fontSize:15,fontWeight:800,cursor:confirmada?'default':'pointer',
+                    color:isGab?'#065F46':isErro?'#991B1B':isSel?C.primary:C.textMed}}>{opt.l}</button>);
+              })}
+            </div>
+          ):(
+            <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:16}}>
+              {LETRAS.filter(l=>q?.alternativas?.[l]).map(l=>{
+                const c=corLetra(l);
+                return(<button key={l} onClick={()=>!confirmada&&onSelect(l)}
+                  style={{display:'flex',alignItems:'flex-start',gap:12,padding:'11px 14px',
+                    border:`2px solid ${c.border}`,borderRadius:12,background:c.bg,
+                    cursor:confirmada?'default':'pointer',textAlign:'left',transition:'all 0.15s'}}>
+                  <span style={{width:28,height:28,borderRadius:8,border:`2px solid ${c.border}`,
+                    background:c.border===C.border?'transparent':c.border,display:'flex',alignItems:'center',
+                    justifyContent:'center',fontSize:12,fontWeight:800,color:c.color,flexShrink:0}}>{l}</span>
+                  <span style={{fontSize:13,lineHeight:1.6,color:c.color}}>{q?.alternativas?.[l]}</span>
+                </button>);
+              })}
+            </div>
+          )}
+          {!confirmada?(
+            <button onClick={onConfirmar} disabled={!selecionada}
+              style={{width:'100%',padding:'13px',background:selecionada?`linear-gradient(135deg,${C.primary},${C.primaryLight})`:'#E5E7EB',
+                color:selecionada?'white':C.textLight,border:'none',borderRadius:12,fontSize:14,fontWeight:700,
+                cursor:selecionada?'pointer':'not-allowed',boxShadow:selecionada?'0 4px 14px rgba(108,60,225,0.3)':'none'}}>
+              Confirmar resposta
+            </button>
+          ):(
+            <div style={{marginTop:8}}>
+              {/* Gabarito resultado */}
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12,padding:'10px 14px',
+                background:selecionada===q?.gabarito?'#D1FAE5':'#FEE2E2',borderRadius:10}}>
+                <span style={{fontSize:18}}>{selecionada===q?.gabarito?'✅':'❌'}</span>
+                <span style={{fontSize:13,fontWeight:700,color:selecionada===q?.gabarito?'#065F46':'#991B1B'}}>
+                  {selecionada===q?.gabarito?'Resposta correta!':`Incorreto. Gabarito: ${q?.gabarito}`}
+                </span>
+              </div>
+              <button onClick={onProxima}
+                style={{width:'100%',padding:'13px',background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,
+                  color:'white',border:'none',borderRadius:12,fontSize:14,fontWeight:700,cursor:'pointer',
+                  boxShadow:'0 4px 14px rgba(108,60,225,0.3)'}}>
+                {isLast?'Ver resultado 🏆':'Próxima →'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      {/* EXPLICAÇÃO DA PLATAFORMA */}
+      {abaQ==='comentario_plataforma'&&(
+        <div>
+          {q?.comentario?(
+            <div>
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}>
+                <div style={{width:36,height:36,borderRadius:'50%',background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>🤖</div>
+                <div><div style={{fontSize:12,fontWeight:700,color:C.text}}>Explicação oficial</div><div style={{fontSize:10,color:C.textLight}}>Gerada pela IA do DominaBanca</div></div>
+              </div>
+              <div style={{fontSize:13,lineHeight:1.9,color:C.text,background:C.bg,borderRadius:12,padding:'16px',borderLeft:`4px solid ${C.primary}`}}>{q.comentario}</div>
+            </div>
+          ):(
+            <div style={{textAlign:'center',padding:'32px',color:C.textLight}}>
+              <div style={{fontSize:32,marginBottom:8}}>📝</div>
+              <div style={{fontSize:13}}>Ainda não há explicação para esta questão.</div>
+            </div>
+          )}
+        </div>
+      )}
+      {/* COMENTÁRIOS DOS ALUNOS */}
+      {abaQ==='comentarios'&&(
+        <div>
+          <div style={{marginBottom:14}}>
+            <textarea value={novoComentario} onChange={e=>setNovoComentario(e.target.value)}
+              placeholder='Compartilhe sua dúvida ou contribuição...'
+              rows={3} style={{width:'100%',padding:'10px 12px',border:`1.5px solid ${C.border}`,borderRadius:10,
+                fontSize:12,resize:'none',boxSizing:'border-box',outline:'none',fontFamily:"'Sora',sans-serif",lineHeight:1.6}}/>
+            <button onClick={enviarComentario} disabled={!novoComentario.trim()||enviandoC}
+              style={{marginTop:8,padding:'9px 18px',background:novoComentario.trim()?C.primary:'#E5E7EB',
+                color:novoComentario.trim()?'white':C.textLight,border:'none',borderRadius:8,fontSize:12,fontWeight:700,cursor:novoComentario.trim()?'pointer':'not-allowed'}}>
+              {enviandoC?'Enviando...':'Comentar'}
+            </button>
+          </div>
+          {loadingC?(<div style={{display:'flex',justifyContent:'center',padding:'20px'}}><div style={{width:24,height:24,border:'3px solid #EDE9FE',borderTop:`3px solid ${C.primary}`,borderRadius:'50%',animation:'spin 0.6s linear infinite'}}/></div>)
+          :comentarios.length===0?(<div style={{textAlign:'center',padding:'24px',color:C.textLight,fontSize:12}}>Seja o primeiro a comentar!</div>)
+          :(<div style={{display:'flex',flexDirection:'column',gap:10}}>
+            {comentarios.map(c=>(
+              <div key={c.id} style={{background:C.bg,borderRadius:10,padding:'12px 14px'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <div style={{width:26,height:26,borderRadius:'50%',background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:11,fontWeight:800}}>
+                      {c.nome.charAt(0).toUpperCase()}
+                    </div>
+                    <span style={{fontSize:12,fontWeight:700,color:C.text}}>{c.nome}</span>
+                    <span style={{fontSize:10,color:C.textLight}}>{new Date(c.created_at).toLocaleDateString('pt-BR')}</span>
+                  </div>
+                  {(c.user_id===user?.id||user?.email==='leonemattosdealmeida@gmail.com')&&(
+                    <button onClick={()=>excluirComentario(c.id)} style={{background:'transparent',border:'none',color:C.textLight,cursor:'pointer',fontSize:12}}>🗑️</button>
+                  )}
+                </div>
+                <div style={{fontSize:13,color:C.text,lineHeight:1.6}}>{c.texto}</div>
+              </div>
+            ))}
+          </div>)}
+        </div>
+      )}
+      {/* REPORT */}
+      {abaQ==='report'&&(reportEnviado?(
+        <div style={{textAlign:'center',padding:'32px'}}>
+          <div style={{fontSize:40,marginBottom:12}}>✅</div>
+          <div style={{fontFamily:"'Lora',serif",fontSize:18,fontWeight:700,color:C.text,marginBottom:8}}>Report enviado!</div>
+          <div style={{fontSize:13,color:C.textMed,marginBottom:16}}>Você receberá um email de confirmação. Obrigado! 🙏</div>
+          <button onClick={()=>{setReportEnviado(false);setReport({tipo:'',observacao:'',email:user?.email||''});setAbaQ('questao');}} style={{padding:'10px 20px',background:C.primary,color:'white',border:'none',borderRadius:10,fontSize:13,fontWeight:700,cursor:'pointer'}}>Voltar</button>
+        </div>
+      ):(
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+          <div style={{fontSize:12,color:C.textMed}}>Encontrou um problema nesta questão? {numQ&&<span style={{fontWeight:700,color:C.primary}}>{numQ}</span>}</div>
+          <div>
+            <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:8}}>Tipo do problema *</div>
+            {[{v:'pergunta',l:'❓ Erro na pergunta',d:'Enunciado incorreto ou mal formulado'},{v:'comentario',l:'💡 Erro no comentário',d:'Explicação incorreta ou incompleta'},{v:'anulada',l:'🚫 Questão anulada',d:'A banca oficial anulou esta questão'}].map(t=>(
+              <div key={t.v} onClick={()=>setReport(r=>({...r,tipo:t.v}))}
+                style={{border:`2px solid ${report.tipo===t.v?C.primary:C.border}`,borderRadius:10,padding:'10px 14px',marginBottom:8,cursor:'pointer',background:report.tipo===t.v?C.primaryXLight:'white'}}>
+                <div style={{fontSize:12,fontWeight:700,color:report.tipo===t.v?C.primary:C.text}}>{t.l}</div>
+                <div style={{fontSize:11,color:C.textLight,marginTop:2}}>{t.d}</div>
+              </div>
+            ))}
+          </div>
+          <div>
+            <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>Sua observação *</div>
+            <textarea value={report.observacao} onChange={e=>setReport(r=>({...r,observacao:e.target.value}))} rows={3}
+              placeholder='Descreva o problema encontrado...'
+              style={{width:'100%',padding:'10px 12px',border:`1.5px solid ${C.border}`,borderRadius:10,fontSize:12,resize:'none',boxSizing:'border-box',outline:'none',fontFamily:"'Sora',sans-serif"}}/>
+          </div>
+          <div>
+            <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>Seu email *</div>
+            <input value={report.email} onChange={e=>setReport(r=>({...r,email:e.target.value}))} type='email' placeholder='email@exemplo.com'
+              style={{width:'100%',padding:'10px 12px',border:`1.5px solid ${C.border}`,borderRadius:10,fontSize:12,outline:'none',boxSizing:'border-box'}}/>
+            <div style={{fontSize:10,color:C.textLight,marginTop:4}}>Você receberá uma confirmação neste email</div>
+          </div>
+          <button onClick={enviarReport} disabled={!report.tipo||!report.observacao||!report.email||enviandoR}
+            style={{padding:'12px',background:report.tipo&&report.observacao&&report.email?`linear-gradient(135deg,${C.primary},${C.primaryLight})`:'#E5E7EB',
+              color:report.tipo&&report.observacao&&report.email?'white':C.textLight,border:'none',borderRadius:10,fontSize:13,fontWeight:700,
+              cursor:report.tipo&&report.observacao&&report.email?'pointer':'not-allowed',opacity:enviandoR?0.7:1}}>
+            {enviandoR?'Enviando...':'Enviar report'}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
 /* ─── COMPONENTE: APOIO LATERAL (texto/imagem) ──────────────── */
 function ApoioLateral({q,children}){
   const temApoio=q?.texto_base||q?.imagem_base;
@@ -2061,81 +2313,12 @@ function SessaoEstudos({user,plano,onConcluir,onVoltar}){
       {/* QUESTÃO */}
       <div style={{flex:1,maxWidth:960,width:"100%",margin:"0 auto",padding:"20px"}}>
         <ApoioLateral q={q}>
-        <div style={{background:"white",borderRadius:20,padding:"24px",boxShadow:"0 4px 20px rgba(0,0,0,0.08)",marginBottom:16}}>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
-            {q?.banca&&<span style={{background:C.primaryXLight,color:C.primary,borderRadius:100,padding:"3px 10px",fontSize:10,fontWeight:700}}>{q.banca}</span>}
-            {q?.fonte&&<span style={{background:"#F3F4F6",color:C.textMed,borderRadius:100,padding:"3px 10px",fontSize:10}}>{q.fonte}</span>}
-            {q?.gerada_ia&&<span style={{background:"#EFF6FF",color:"#3B82F6",borderRadius:100,padding:"3px 10px",fontSize:10,fontWeight:700}}>🤖 IA</span>}
-            <span style={{background:q?.nivel==="facil"?"#D1FAE5":q?.nivel==="dificil"?"#FEE2E2":"#FEF3C7",color:q?.nivel==="facil"?"#065F46":q?.nivel==="dificil"?"#991B1B":"#92400E",borderRadius:100,padding:"3px 10px",fontSize:10,fontWeight:700}}>
-              {q?.nivel==="facil"?"🟢 Fácil":q?.nivel==="dificil"?"🔴 Difícil":"🟡 Médio"}
-            </span>
-          </div>
-          <div style={{fontSize:15,lineHeight:1.8,color:C.text,marginBottom:24}}>{q?.enunciado}</div>
-          {(q?.tipo||"multipla")==="certo_errado"?(
-            <div style={{display:"flex",gap:12}}>
-              {[{v:"C",l:"✅ Certo"},{v:"E",l:"❌ Errado"}].map(opt=>{
-                const isGab=confirmada&&opt.v===q?.gabarito;
-                const isErro=confirmada&&selecionada===opt.v&&opt.v!==q?.gabarito;
-                const isSel=!confirmada&&selecionada===opt.v;
-                return(
-                  <button key={opt.v} onClick={()=>!confirmada&&setSelecionada(opt.v)}
-                    style={{flex:1,padding:"24px 16px",border:`2px solid ${isGab?"#10B981":isErro?"#EF4444":isSel?C.primary:C.border}`,borderRadius:14,background:isGab?"#D1FAE5":isErro?"#FEE2E2":isSel?C.primaryXLight:"white",fontSize:18,fontWeight:800,cursor:confirmada?"default":"pointer",color:isGab?"#065F46":isErro?"#991B1B":isSel?C.primary:C.textMed,transition:"all 0.15s"}}>
-                    {opt.l}
-                  </button>
-                );
-              })}
-            </div>
-          ):(
-            <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {LETRAS.filter(l=>q?.alternativas?.[l]).map(l=>{
-                const c=corLetra(l);
-                return(
-                  <button key={l} onClick={()=>!confirmada&&setSelecionada(l)}
-                    style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 16px",border:`2px solid ${c.border}`,borderRadius:12,background:c.bg,cursor:confirmada?"default":"pointer",textAlign:"left",transition:"all 0.15s"}}>
-                    <span style={{width:28,height:28,borderRadius:8,border:`2px solid ${c.border}`,background:c.border===C.border?"transparent":c.border,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:c.color,flexShrink:0}}>{l}</span>
-                    <span style={{fontSize:13,lineHeight:1.6,color:c.color}}>{q?.alternativas?.[l]}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* GABARITO + COMENTÁRIO */}
-        {confirmada&&(
-          <div style={{background:"white",borderRadius:16,padding:"20px 24px",boxShadow:"0 4px 16px rgba(0,0,0,0.06)",marginBottom:16,animation:"bounceIn 0.3s ease"}}>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-              <div style={{fontSize:20}}>{selecionada===q?.gabarito?"✅":"❌"}</div>
-              <div style={{fontFamily:"'Lora',serif",fontSize:16,fontWeight:700,color:selecionada===q?.gabarito?"#065F46":"#991B1B"}}>
-                {selecionada===q?.gabarito?"Resposta correta!":"Resposta incorreta"}
-              </div>
-              {selecionada!==q?.gabarito&&<span style={{fontSize:12,color:C.textMed}}>Gabarito: <strong style={{color:C.primary}}>{q?.gabarito}</strong></span>}
-            </div>
-            {q?.comentario&&<div style={{fontSize:13,color:C.text,lineHeight:1.7,padding:"12px 14px",background:C.bg,borderRadius:10,marginBottom:12}}>{q.comentario}</div>}
-            {selecionada!==q?.gabarito&&(
-              <button onClick={salvarNoCaderno} disabled={noCaderno||salvandoCaderno}
-                style={{display:"flex",alignItems:"center",gap:8,padding:"8px 14px",background:noCaderno?"#D1FAE5":"#FEF3C7",border:`1px solid ${noCaderno?"#10B981":"#FDE68A"}`,borderRadius:10,fontSize:12,fontWeight:700,cursor:noCaderno?"default":"pointer",color:noCaderno?"#065F46":"#92400E"}}>
-                {noCaderno?"✅ Salvo no caderno de erros":"📓 Salvar no caderno de erros"}
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* BOTÕES */}
-        <div style={{display:"flex",gap:12,justifyContent:"space-between"}}>
-          {!confirmada?(
-            <button onClick={confirmarResposta} disabled={!selecionada}
-              style={{flex:1,padding:"14px",background:selecionada?`linear-gradient(135deg,${C.primary},${C.primaryLight})`:"#E5E7EB",color:selecionada?"white":C.textLight,border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:selecionada?"pointer":"not-allowed",boxShadow:selecionada?"0 4px 14px rgba(108,60,225,0.3)":"none"}}>
-              Confirmar resposta
-            </button>
-          ):(
-            <button onClick={proxima}
-              style={{flex:1,padding:"14px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 14px rgba(108,60,225,0.3)"}}>
-              {idx+1>=questoes.length?"Ver resultado 🏆":"Próxima →"}
-            </button>
-          )}
-        </div>
+          <QuestaoInterativa user={user} q={q} selecionada={selecionada} confirmada={confirmada}
+            onSelect={(v)=>{if(!confirmada)setSelecionada(v);}}
+            onConfirmar={confirmarResposta} onProxima={proxima} isLast={idx+1>=questoes.length}/>
         </ApoioLateral>
+        {false&&<div style={{display:"none"}}>
+        </div>}
       </div>
     </div>
   );
@@ -2440,114 +2623,9 @@ function TreinoSessao({user,filtro,onVoltar}){
       {/* QUESTÃO */}
       <div style={{maxWidth:960,width:"100%",margin:"0 auto"}}>
       <ApoioLateral q={q}>
-      <div style={{background:C.white,borderRadius:16,padding:"24px",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",marginBottom:12}}>
-        {/* Badges */}
-        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
-          {q?.banca&&<span style={{background:C.primaryXLight,color:C.primary,borderRadius:100,padding:"3px 10px",fontSize:10,fontWeight:700}}>{q.banca}</span>}
-          {q?.fonte&&<span style={{background:"#F3F4F6",color:C.textMed,borderRadius:100,padding:"3px 10px",fontSize:10}}>{q.fonte}</span>}
-          {q?.tipo==="certo_errado"&&<span style={{background:"#FEF3C7",color:"#92400E",borderRadius:100,padding:"3px 10px",fontSize:10,fontWeight:700}}>CERTO/ERRADO</span>}
-          <span style={{background:q?.nivel==="facil"?"#D1FAE5":q?.nivel==="dificil"?"#FEE2E2":"#FEF3C7",color:q?.nivel==="facil"?"#065F46":q?.nivel==="dificil"?"#991B1B":"#92400E",borderRadius:100,padding:"3px 10px",fontSize:10,fontWeight:700}}>
-            {q?.nivel==="facil"?"🟢 Fácil":q?.nivel==="dificil"?"🔴 Difícil":"🟡 Médio"}
-          </span>
-        </div>
-
-        {/* Enunciado */}
-        <div style={{fontSize:15,lineHeight:1.8,color:C.text,marginBottom:20}}>{q?.enunciado}</div>
-
-        {/* Alternativas */}
-        {q?.tipo==="certo_errado"?(
-          <div style={{display:"flex",gap:12}}>
-            {[{v:"C",l:"✅ Certo"},{v:"E",l:"❌ Errado"}].map(opt=>{
-              const isGab=confirmada&&opt.v===q?.gabarito;
-              const isErro=confirmada&&selecionada===opt.v&&opt.v!==q?.gabarito;
-              const isSel=!confirmada&&selecionada===opt.v;
-              return(
-                <button key={opt.v} onClick={()=>!confirmada&&setSelecionada(opt.v)}
-                  style={{flex:1,padding:"20px",border:`2px solid ${isGab?"#10B981":isErro?"#EF4444":isSel?C.primary:C.border}`,borderRadius:12,background:isGab?"#D1FAE5":isErro?"#FEE2E2":isSel?C.primaryXLight:"white",fontSize:16,fontWeight:800,cursor:confirmada?"default":"pointer",color:isGab?"#065F46":isErro?"#991B1B":isSel?C.primary:C.textMed}}>
-                  {opt.l}
-                </button>
-              );
-            })}
-          </div>
-        ):(
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {LETRAS.filter(l=>q?.alternativas?.[l]).map(l=>{
-              const c=corLetra(l);
-              return(
-                <button key={l} onClick={()=>!confirmada&&setSelecionada(l)}
-                  style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 14px",border:`2px solid ${c.border}`,borderRadius:12,background:c.bg,cursor:confirmada?"default":"pointer",textAlign:"left",transition:"all 0.15s"}}>
-                  <span style={{width:28,height:28,borderRadius:8,border:`2px solid ${c.border}`,background:c.border===C.border?"transparent":c.border,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:c.color,flexShrink:0}}>{l}</span>
-                  <span style={{fontSize:13,lineHeight:1.6,color:c.color}}>{q?.alternativas?.[l]}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* GABARITO + COMENTÁRIO */}
-      {confirmada&&(
-        <div style={{background:C.white,borderRadius:16,padding:"20px 22px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)",marginBottom:12}}>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-            <div style={{fontSize:20}}>{correta?"✅":"❌"}</div>
-            <div style={{fontFamily:"'Lora',serif",fontSize:15,fontWeight:700,color:correta?"#065F46":"#991B1B"}}>
-              {correta?"Resposta correta!":"Resposta incorreta"}
-            </div>
-            {!correta&&<span style={{fontSize:12,color:C.textMed}}>Gabarito: <strong style={{color:C.primary}}>{q?.gabarito}</strong></span>}
-          </div>
-          {q?.comentario&&<div style={{fontSize:13,color:C.text,lineHeight:1.7,padding:"12px 14px",background:C.bg,borderRadius:10,marginBottom:12}}>{q.comentario}</div>}
-
-          {/* CONTROLE DO CADERNO */}
-          <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-            <span style={{fontSize:11,color:C.textLight,fontWeight:600}}>Caderno de erros:</span>
-            {noCaderno===null&&(
-              <>
-                <button onClick={adicionarCaderno}
-                  style={{padding:"7px 14px",background:"#FEF3C7",border:"1px solid #FDE68A",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",color:"#92400E"}}>
-                  📓 Adicionar ao caderno
-                </button>
-                <button onClick={()=>setNoCaderno(false)}
-                  style={{padding:"7px 14px",background:"#F3F4F6",border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",color:C.textMed}}>
-                  Não adicionar
-                </button>
-              </>
-            )}
-            {noCaderno===true&&(
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:12,fontWeight:700,color:"#065F46",background:"#D1FAE5",border:"1px solid #A7F3D0",borderRadius:8,padding:"6px 12px"}}>✅ Adicionado ao caderno</span>
-                <button onClick={removerCaderno}
-                  style={{padding:"6px 10px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,fontSize:11,cursor:"pointer",color:C.textLight}}>
-                  Remover
-                </button>
-              </div>
-            )}
-            {noCaderno===false&&(
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:11,color:C.textLight}}>Não adicionado</span>
-                <button onClick={adicionarCaderno}
-                  style={{padding:"6px 10px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,fontSize:11,cursor:"pointer",color:C.primary}}>
-                  Adicionar
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* BOTÃO */}
-      <div>
-        {!confirmada?(
-          <button onClick={confirmar} disabled={!selecionada}
-            style={{width:"100%",padding:"14px",background:selecionada?`linear-gradient(135deg,${C.primary},${C.primaryLight})`:"#E5E7EB",color:selecionada?"white":C.textLight,border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:selecionada?"pointer":"not-allowed",boxShadow:selecionada?"0 4px 14px rgba(108,60,225,0.3)":"none"}}>
-            Confirmar resposta
-          </button>
-        ):(
-          <button onClick={proxima}
-            style={{width:"100%",padding:"14px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 14px rgba(108,60,225,0.3)"}}>
-            {idx+1>=total?"Ver resultado 🏆":"Próxima questão →"}
-          </button>
-        )}
-      </div>
+        <QuestaoInterativa user={user} q={q} selecionada={selecionada} confirmada={confirmada}
+          onSelect={(v)=>{if(!confirmada)setSelecionada(v);}}
+          onConfirmar={confirmar} onProxima={proxima} isLast={idx+1>=total}/>
       </ApoioLateral>
       </div>
     </div>
