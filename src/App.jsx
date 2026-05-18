@@ -1336,9 +1336,14 @@ Gabarito correto: ${form.gabarito==="C"?"CERTO":form.gabarito==="E"?"ERRADO":`${
 Responda SOMENTE com JSON válido (sem texto fora do JSON):
 {"nivel":<1 a 5: 1=muito fácil 2=fácil 3=médio 4=difícil 5=muito difícil>,"comentario":"<explicação como aula: justifique o gabarito com lei/doutrina/jurisprudência, explique o conceito, aponte erros das alternativas, dê dica ou mnemônico. Máximo 350 palavras>"}`;
 
-      const resp=await fetch("https://api.anthropic.com/v1/messages",{
+      const resp=await fetch("/api/index",{
         method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:900,messages:[{role:"user",content:prompt}]})
+        body:JSON.stringify({
+          model:"gpt-4o-mini",
+          max_tokens:900,
+          system:"Você é um professor especialista em concursos públicos. Retorne APENAS JSON válido sem texto adicional.",
+          messages:[{role:"user",content:prompt}]
+        })
       });
       const d=await resp.json();
       const text=d.content?.[0]?.text||"{}";
@@ -1367,7 +1372,8 @@ Responda SOMENTE com JSON válido (sem texto fora do JSON):
       alternativas:(form.tipo||"multipla")==="certo_errado"?{C:"Certo",E:"Errado"}:form.alternativas,
       gabarito:form.gabarito,comentario:form.comentario,
       texto_base:form.texto_base||null,
-      imagem_base:form.imagem_base||null
+      imagem_base:form.imagem_base||null,
+      ativa:true
     };
     if(form.id){
       await supabase.from("questoes").update(payload).eq("id",form.id);
@@ -2960,24 +2966,19 @@ Responda SOMENTE com um JSON válido, sem texto fora do JSON, no formato:
       const mimeType=imagem.split(";")[0].split(":")[1];
       const isPdf=mimeType==="application/pdf";
 
-      // Monta o content conforme o tipo de arquivo
+      // Monta o content conforme o tipo de arquivo (OpenAI format)
       const contentMedia=isPdf
         ?{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64puro}}
-        :{type:"image",source:{type:"base64",media_type:mimeType,data:b64puro}};
+        :{type:"image_url",image_url:{url:`data:${mimeType};base64,${b64puro}`}};
 
-      const resp=await fetch("https://api.anthropic.com/v1/messages",{
+      const resp=await fetch("/api/index",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
-          model:"claude-sonnet-4-20250514",
+          model:"gpt-4o-mini",
           max_tokens:1500,
-          messages:[{
-            role:"user",
-            content:[
-              contentMedia,
-              {type:"text",text:prompt}
-            ]
-          }]
+          system:"Você é um corretor especialista em redações de concursos públicos brasileiros. Retorne APENAS JSON válido sem texto adicional.",
+          messages:[{role:"user",content:[contentMedia,{type:"text",text:prompt}]}]
         })
       });
 
