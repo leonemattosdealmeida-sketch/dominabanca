@@ -1740,9 +1740,7 @@ Responda SOMENTE com JSON válido (sem texto fora do JSON):
 
 /* ─── COMPONENTE: QUESTÃO COM COMENTÁRIOS E REPORT ─────────── */
 function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,onProxima,isLast}){
-  const RESEND_KEY='re_UWuwWkB8_MoceFPVRfdmkRHXa3sBuSGqn';
-  const FROM_EMAIL='questoes@dominabanca.com.br';
-  const ADMIN_EMAIL='leonemattosdealmeida@gmail.com';
+  const ADMIN_EMAIL=import.meta.env.VITE_ADMIN_EMAIL||'';
   const [abaQ,setAbaQ]=React.useState('questao');
   const [comentarios,setComentarios]=React.useState([]);
   const [loadingC,setLoadingC]=React.useState(false);
@@ -1786,17 +1784,14 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
     const nQ=numQ||'S/N';
     const tipoLabel={pergunta:'Erro na pergunta',comentario:'Erro no comentário da plataforma',anulada:'Questão anulada pela banca'}[report.tipo];
     await supabase.from('reports_questao').insert({questao_id:q.id,questao_num:q?.numero||null,user_id:user.id,email:report.email,tipo:report.tipo,observacao:report.observacao});
-    // Email para admin
-    await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${RESEND_KEY}`,'Content-Type':'application/json'},
-      body:JSON.stringify({from:`DominaBanca <${FROM_EMAIL}>`,to:[ADMIN_EMAIL],
-        subject:`[Report] ${nQ} — ${tipoLabel}`,
-        html:`<div style='font-family:sans-serif;max-width:600px'><h2 style='color:#6C3CE1'>📋 Report — DominaBanca</h2><p><b>Questão:</b> ${nQ}</p><p><b>Tipo:</b> ${tipoLabel}</p><p><b>Aluno:</b> ${report.email}</p><p><b>Observação:</b> ${report.observacao}</p></div>`
-      })});
-    // Email de confirmação para o aluno
-    await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${RESEND_KEY}`,'Content-Type':'application/json'},
-      body:JSON.stringify({from:`DominaBanca <${FROM_EMAIL}>`,to:[report.email],
-        subject:`✅ Report recebido — ${nQ}`,
-        html:`<div style='font-family:sans-serif;max-width:600px'><h2 style='color:#6C3CE1'>✅ Report recebido!</h2><p>Recebemos seu report sobre a questão <b>${nQ}</b>.</p><p><b>Tipo:</b> ${tipoLabel}</p><p><b>Observação:</b> ${report.observacao}</p><p>Analisaremos e retornaremos em breve. Obrigado por contribuir! 🙏</p><hr/><p style='color:#999;font-size:12px'>DominaBanca — Estudos para concursos públicos</p></div>`
+    // Envia emails via API server-side (chaves seguras no servidor)
+    await fetch('/api/send-email',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        tipo:'report',
+        questaoNum:nQ,
+        tipoLabel,
+        alunoEmail:report.email,
+        observacao:report.observacao
       })});
     setEnviandoR(false);setReportEnviado(true);
   };
@@ -1954,7 +1949,7 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
                     <span style={{fontSize:12,fontWeight:700,color:C.text}}>{c.nome}</span>
                     <span style={{fontSize:10,color:C.textLight}}>{new Date(c.created_at).toLocaleDateString('pt-BR')}</span>
                   </div>
-                  {(c.user_id===user?.id||user?.email==='leonemattosdealmeida@gmail.com')&&(
+                  {(c.user_id===user?.id||user?.email===(import.meta.env.VITE_ADMIN_EMAIL||''))&&(
                     <button onClick={()=>excluirComentario(c.id)} style={{background:'transparent',border:'none',color:C.textLight,cursor:'pointer',fontSize:12}}>🗑️</button>
                   )}
                 </div>
@@ -4146,7 +4141,7 @@ function Dashboard({user,onLogout}){
   const [inscricaoAtiva,setInscricaoAtiva]=React.useState(null);
   const [resultadoSimulado,setResultadoSimulado]=React.useState(null); // null | "sessao" | "admin" | "treino_sessao"
   const [treinoFiltro,setTreinoFiltro]=React.useState(null);
-  const isAdmin=user?.email==='leonemattosdealmeida@gmail.com';
+  const isAdmin=user?.email===(import.meta.env.VITE_ADMIN_EMAIL||'');
 
   React.useEffect(()=>{
     if(!menuAberto) return;
