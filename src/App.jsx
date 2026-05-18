@@ -1246,30 +1246,29 @@ function AdminPanel({user,onBack}){
   const [expandido,setExpandido]=React.useState({});
 
   // Carrega árvore de grupos/matérias/tópicos com contagem
-  React.useEffect(()=>{
-    (async()=>{
-      const{data}=await supabase.from("questoes").select("grupo,materia,topico").eq("ativa",true);
-      if(!data) return;
-      const tree={};
-      data.forEach(q=>{
-        if(!tree[q.grupo]) tree[q.grupo]={};
-        if(!tree[q.grupo][q.materia]) tree[q.grupo][q.materia]={};
-        if(!tree[q.grupo][q.materia][q.topico]) tree[q.grupo][q.materia][q.topico]=0;
-        tree[q.grupo][q.materia][q.topico]++;
-      });
-      // Converte para array
-      const arr=Object.entries(tree).map(([g,mats])=>({
-        nome:g,
-        total:Object.values(mats).reduce((s,ts)=>s+Object.values(ts).reduce((a,b)=>a+b,0),0),
-        materias:Object.entries(mats).map(([m,tops])=>({
-          nome:m,
-          total:Object.values(tops).reduce((a,b)=>a+b,0),
-          topicos:Object.entries(tops).map(([t,c])=>({nome:t,total:c}))
-        }))
-      }));
-      setGrupos(arr);
-    })();
-  },[saving]);
+  const loadGrupos=React.useCallback(async()=>{
+    const{data}=await supabase.from("questoes").select("grupo,materia,topico").eq("ativa",true);
+    if(!data) return;
+    const tree={};
+    data.forEach(q=>{
+      if(!tree[q.grupo]) tree[q.grupo]={};
+      if(!tree[q.grupo][q.materia]) tree[q.grupo][q.materia]={};
+      if(!tree[q.grupo][q.materia][q.topico]) tree[q.grupo][q.materia][q.topico]=0;
+      tree[q.grupo][q.materia][q.topico]++;
+    });
+    const arr=Object.entries(tree).map(([g,mats])=>({
+      nome:g,
+      total:Object.values(mats).reduce((s,ts)=>s+Object.values(ts).reduce((a,b)=>a+b,0),0),
+      materias:Object.entries(mats).map(([m,tops])=>({
+        nome:m,
+        total:Object.values(tops).reduce((a,b)=>a+b,0),
+        topicos:Object.entries(tops).map(([t,c])=>({nome:t,total:c}))
+      }))
+    }));
+    setGrupos(arr);
+  },[]);
+
+  React.useEffect(()=>{loadGrupos();},[loadGrupos]);
 
   const loadQuestoes=async(g,m,t)=>{
     setLoadingQ(true);
@@ -1383,6 +1382,7 @@ Responda SOMENTE com JSON válido (sem texto fora do JSON):
     setSaving(false);
     setDuplicata(null);setIgnorarDuplicata(false);
     setForm(null);
+    await loadGrupos();
     if(selecionado) loadQuestoes(selecionado.grupo,selecionado.materia,selecionado.topico);
   };
 
