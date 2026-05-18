@@ -1240,8 +1240,7 @@ function AdminPanel({user,onBack}){
   const [form,setForm]=React.useState(null);
   const [saving,setSaving]=React.useState(false);
   const [gerandoComentario,setGerandoComentario]=React.useState(false);
-  const [duplicata,setDuplicata]=React.useState(null); // questão similar encontrada
-  const [ignorarDuplicata,setIgnorarDuplicata]=React.useState(false);
+  const [duplicata,setDuplicata]=React.useState(null);
   const [busca,setBusca]=React.useState("");
   const [expandido,setExpandido]=React.useState({});
 
@@ -1281,7 +1280,7 @@ function AdminPanel({user,onBack}){
   };
 
   const novaQuestao=()=>{
-    setDuplicata(null);setIgnorarDuplicata(false);
+    setDuplicata(null);
     setForm({
       grupo:selecionado?.grupo||"",materia:selecionado?.materia||"",topico:selecionado?.topico||"",
       banca:"",fonte:"",ano:"",nivel:"medio",tipo:"multipla",enunciado:"",
@@ -1293,18 +1292,16 @@ function AdminPanel({user,onBack}){
   /* Detector de duplicatas — compara primeiros 120 chars */
   const verificarDuplicata=async(enunciado)=>{
     if(!enunciado||enunciado.length<20) return;
-    const prefixo=enunciado.substring(0,120).trim();
+    const prefixo=enunciado.substring(0,150).trim();
     const{data}=await supabase.from("questoes").select("id,enunciado,materia,gabarito")
-      .eq("ativa",true).ilike("enunciado",`${prefixo.substring(0,60)}%`).limit(3);
+      .eq("ativa",true).ilike("enunciado",`${prefixo.substring(0,80)}%`).limit(5);
     if(data&&data.length>0){
-      // Verifica similaridade mais precisa: primeiros 100 chars em comum
       const similar=data.find(q=>{
-        const a=q.enunciado.substring(0,100).toLowerCase().replace(/\s+/g," ");
-        const b=enunciado.substring(0,100).toLowerCase().replace(/\s+/g," ");
-        // Conta chars iguais
+        const a=q.enunciado.substring(0,150).toLowerCase().replace(/\s+/g," ").trim();
+        const b=enunciado.substring(0,150).toLowerCase().replace(/\s+/g," ").trim();
         let iguais=0;
         for(let i=0;i<Math.min(a.length,b.length);i++){if(a[i]===b[i])iguais++;}
-        return(iguais/Math.max(a.length,b.length))>0.75;
+        return(iguais/Math.max(a.length,b.length))>0.80;
       });
       if(similar&&similar.id!==form?.id){
         setDuplicata(similar);
@@ -1358,10 +1355,10 @@ Responda SOMENTE com JSON válido (sem texto fora do JSON):
       const alts=form.alternativas;
       if(!alts.A||!alts.B||!alts.C||!alts.D) return alert("Preencha as alternativas A, B, C e D no mínimo.");
     }
-    // Verifica duplicata antes de salvar
-    if(!ignorarDuplicata&&!form.id){
+    // Verifica duplicata antes de salvar — bloqueio absoluto
+    if(!form.id){
       const isDup=await verificarDuplicata(form.enunciado);
-      if(isDup) return; // bloqueia e mostra aviso
+      if(isDup) return;
     }
     setSaving(true);
     const payload={
@@ -1380,7 +1377,7 @@ Responda SOMENTE com JSON válido (sem texto fora do JSON):
       await supabase.from("questoes").insert(payload);
     }
     setSaving(false);
-    setDuplicata(null);setIgnorarDuplicata(false);
+    setDuplicata(null);
     setForm(null);
     await loadGrupos();
     if(selecionado) loadQuestoes(selecionado.grupo,selecionado.materia,selecionado.topico);
@@ -1636,33 +1633,30 @@ Responda SOMENTE com JSON válido (sem texto fora do JSON):
                 {form.comentario&&<div style={{fontSize:10,color:C.textLight,marginTop:4}}>✅ Comentário salvo fixo — não muda para os alunos.</div>}
               </div>
 
-              {/* Aviso de duplicata */}
-              {duplicata&&!ignorarDuplicata&&(
-                <div style={{background:"#FEF3C7",border:"2px solid #F59E0B",borderRadius:12,padding:"16px",marginBottom:16}}>
-                  <div style={{fontSize:12,fontWeight:700,color:"#92400E",marginBottom:8}}>⚠️ Questão similar encontrada no banco!</div>
-                  <div style={{fontSize:11,color:"#78350F",lineHeight:1.6,marginBottom:4}}>
+              {/* Aviso de duplicata — bloqueio absoluto */}
+              {duplicata&&(
+                <div style={{background:"#FEE2E2",border:"2px solid #EF4444",borderRadius:12,padding:"16px",marginBottom:16}}>
+                  <div style={{fontSize:13,fontWeight:800,color:"#991B1B",marginBottom:8}}>🚫 Questão já existe no banco — salvamento bloqueado!</div>
+                  <div style={{fontSize:11,color:"#7F1D1D",lineHeight:1.6,marginBottom:6}}>
                     <strong>Matéria:</strong> {duplicata.materia} · <strong>Gabarito:</strong> {duplicata.gabarito}
                   </div>
-                  <div style={{fontSize:11,color:"#78350F",lineHeight:1.6,background:"rgba(0,0,0,0.05)",borderRadius:8,padding:"8px",marginBottom:12,fontStyle:"italic"}}>
-                    "{duplicata.enunciado.substring(0,180)}..."
+                  <div style={{fontSize:11,color:"#7F1D1D",lineHeight:1.7,background:"rgba(0,0,0,0.06)",borderRadius:8,padding:"10px",marginBottom:12,fontStyle:"italic"}}>
+                    "{duplicata.enunciado.substring(0,220)}..."
                   </div>
-                  <div style={{display:"flex",gap:10}}>
-                    <button onClick={()=>{setIgnorarDuplicata(true);setDuplicata(null);}}
-                      style={{padding:"8px 16px",background:"#D97706",color:"white",border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>
-                      É diferente — salvar mesmo assim
-                    </button>
-                    <button onClick={()=>{setDuplicata(null);}}
-                      style={{padding:"8px 16px",background:"white",color:"#92400E",border:"1px solid #FDE68A",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>
-                      Cancelar
-                    </button>
+                  <div style={{fontSize:11,color:"#991B1B",fontWeight:600}}>
+                    Não é permitido cadastrar questões repetidas. Verifique se é realmente uma questão diferente e ajuste o enunciado.
                   </div>
+                  <button onClick={()=>setDuplicata(null)}
+                    style={{marginTop:12,padding:"8px 16px",background:"white",color:"#991B1B",border:"1px solid #FECACA",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                    ← Voltar e editar
+                  </button>
                 </div>
               )}
 
               <div style={{display:"flex",gap:12,justifyContent:"flex-end"}}>
-                <button onClick={()=>{setForm(null);setDuplicata(null);setIgnorarDuplicata(false);}} style={{padding:"10px 20px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer",color:C.textMed}}>Cancelar</button>
-                <button onClick={salvarQuestao} disabled={saving||(duplicata&&!ignorarDuplicata)}
-                  style={{padding:"10px 24px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",opacity:saving||(duplicata&&!ignorarDuplicata)?0.7:1}}>
+                <button onClick={()=>{setForm(null);setDuplicata(null);}} style={{padding:"10px 20px",background:"transparent",border:`1px solid ${C.border}`,borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer",color:C.textMed}}>Cancelar</button>
+                <button onClick={salvarQuestao} disabled={saving||!!duplicata}
+                  style={{padding:"10px 24px",background:duplicata?"#D1D5DB":C.primary,color:duplicata?C.textLight:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:duplicata?"not-allowed":"pointer",opacity:saving?0.7:1}}>
                   {saving?"Salvando...":"Salvar questão"}
                 </button>
               </div>
