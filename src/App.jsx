@@ -6,6 +6,21 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 );
 
+/* ── Helper: executa query Supabase com tratamento de erro centralizado ── */
+async function db(queryFn, fallback=null) {
+  try {
+    const result = await queryFn();
+    if (result?.error) {
+      console.error('[Supabase Error]', result.error.message, result.error);
+      return fallback;
+    }
+    return result?.data ?? fallback;
+  } catch(e) {
+    console.error('[Supabase Exception]', e.message);
+    return fallback;
+  }
+}
+
 const C = {
   primary: "#6C3CE1",
   primaryLight: "#8B5CF6",
@@ -1246,8 +1261,8 @@ function AdminPanel({user,onBack}){
 
   // Carrega árvore de grupos/matérias/tópicos com contagem
   const loadGrupos=React.useCallback(async()=>{
-    const{data}=await supabase.from("questoes").select("grupo,materia,topico").eq("ativa",true);
-    if(!data) return;
+    const data=await db(()=>supabase.from("questoes").select("grupo,materia,topico").eq("ativa",true),[]);
+    if(!data||!data.length) return;
     const tree={};
     data.forEach(q=>{
       if(!tree[q.grupo]) tree[q.grupo]={};
@@ -1273,7 +1288,7 @@ function AdminPanel({user,onBack}){
     setLoadingQ(true);
     setSelecionado({grupo:g,materia:m,topico:t});
     setForm(null);
-    const{data}=await supabase.from("questoes").select("*")
+    const data=await db(()=>supabase.from("questoes").select("*")
       .eq("grupo",g).eq("materia",m).eq("topico",t).eq("ativa",true).order("created_at",{ascending:false});
     setQuestoes(data||[]);
     setLoadingQ(false);
@@ -1304,8 +1319,8 @@ function AdminPanel({user,onBack}){
   const verificarDuplicata=async(enunciado)=>{
     if(!enunciado||enunciado.length<20) return;
     const prefixo=enunciado.substring(0,150).trim();
-    const{data}=await supabase.from("questoes").select("id,enunciado,materia,gabarito")
-      .eq("ativa",true).ilike("enunciado",`${prefixo.substring(0,80)}%`).limit(5);
+    const data=await db(()=>supabase.from("questoes").select("id,enunciado,materia,gabarito")
+      .eq("ativa",true).ilike("enunciado",`${prefixo.substring(0,80)}%`).limit(5),[]);
     if(data&&data.length>0){
       const similar=data.find(q=>{
         const a=q.enunciado.substring(0,150).toLowerCase().replace(/\s+/g," ").trim();
@@ -1769,7 +1784,7 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
   const loadComentarios=async()=>{
     if(!q?.id) return;
     setLoadingC(true);
-    const{data}=await supabase.from('comentarios_questao').select('*').eq('questao_id',q.id).eq('ativo',true).order('created_at',{ascending:true});
+    const data=await db(()=>supabase.from('comentarios_questao').select('*').eq('questao_id',q.id).eq('ativo',true).order('created_at',{ascending:true}),[]);
     setComentarios(data||[]);setLoadingC(false);
   };
 
@@ -2672,7 +2687,7 @@ function RevisaoTab({user}){
 
   const loadCaderno=async()=>{
     setLoading(true);
-    const{data}=await supabase.from("caderno_erros")
+    const data=await db(()=>supabase.from("caderno_erros")
       .select("*,questoes(enunciado,alternativas,gabarito,comentario,tipo,banca,nivel)")
       .eq("user_id",user.id)
       .order("revisar_em",{ascending:true});
