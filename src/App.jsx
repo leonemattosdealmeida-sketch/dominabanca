@@ -1289,7 +1289,18 @@ function AdminPanel({user,onBack}){
     });
   };
 
-  /* Detector de duplicatas — compara primeiros 120 chars */
+  /* Detecção em tempo real — dispara 800ms após parar de digitar */
+  const debounceRef=React.useRef(null);
+  React.useEffect(()=>{
+    if(!form||form.id){setDuplicata(null);return;}
+    const enunciado=form?.enunciado||"";
+    if(enunciado.length<30){setDuplicata(null);return;}
+    if(debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current=setTimeout(()=>{verificarDuplicata(enunciado);},800);
+    return()=>{if(debounceRef.current) clearTimeout(debounceRef.current);};
+  },[form?.enunciado]);
+
+  /* Detector de duplicatas — compara primeiros 150 chars */
   const verificarDuplicata=async(enunciado)=>{
     if(!enunciado||enunciado.length<20) return;
     const prefixo=enunciado.substring(0,150).trim();
