@@ -1289,7 +1289,7 @@ function AdminPanel({user,onBack}){
     setSelecionado({grupo:g,materia:m,topico:t});
     setForm(null);
     const data=await db(()=>supabase.from("questoes").select("*")
-      .eq("grupo",g).eq("materia",m).eq("topico",t).eq("ativa",true).order("created_at",{ascending:false});
+      .eq("grupo",g).eq("materia",m).eq("topico",t).eq("ativa",true).order("created_at",{ascending:false}),[]);
     setQuestoes(data||[]);
     setLoadingQ(false);
   };
@@ -2690,7 +2690,7 @@ function RevisaoTab({user}){
     const data=await db(()=>supabase.from("caderno_erros")
       .select("*,questoes(enunciado,alternativas,gabarito,comentario,tipo,banca,nivel)")
       .eq("user_id",user.id)
-      .order("revisar_em",{ascending:true});
+      .order("revisar_em",{ascending:true}),[]);
     setCaderno(data||[]);
     setLoading(false);
   };
