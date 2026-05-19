@@ -2192,7 +2192,10 @@ Responda SOMENTE com JSON válido:
                 {/* Header */}
                 <div style={{padding:"12px 16px",background:statusBg,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,flex:1,flexWrap:"wrap"}}>
-                    <span style={{fontSize:12,fontWeight:800,color:statusColor}}>Q{q.numero}</span>
+                    <input value={q.numero||""} onChange={e=>setImportQuestions(prev=>prev.map((x,j)=>j===i?{...x,numero:e.target.value}:x))}
+                      title="Editar número"
+                      style={{fontSize:12,fontWeight:800,color:statusColor,background:"transparent",border:"none",outline:"none",width:36,cursor:"text"}}
+                      onClick={e=>e.stopPropagation()}/>
                     {q.texto_base_id&&<span style={{fontSize:9,fontWeight:700,background:"#BFDBFE",color:"#1D4ED8",borderRadius:100,padding:"2px 8px"}}>📝 {q.texto_base_id}</span>}
                     <span style={{fontSize:10,fontWeight:700,background:statusColor+"20",color:statusColor,borderRadius:100,padding:"2px 8px"}}>{q.statusMsg}</span>
                     {q.gabarito&&<span style={{fontSize:10,fontWeight:700,background:"#EDE9FE",color:C.primary,borderRadius:100,padding:"2px 8px"}}>Gab: {q.gabarito}</span>}
@@ -2270,33 +2273,61 @@ Responda SOMENTE com JSON válido:
                             </div>
                           )}
 
-                          {/* Enunciado */}
+                          {/* Enunciado editável */}
                           <div style={{background:C.bg,borderRadius:10,padding:"12px 14px"}}>
-                            <div style={{fontSize:10,fontWeight:700,color:C.textLight,marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>Enunciado</div>
-                            <div style={{fontSize:13,color:C.text,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{q.enunciado}</div>
+                            <div style={{fontSize:10,fontWeight:700,color:C.textLight,marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>✏️ Enunciado</div>
+                            <textarea value={q.enunciado||""} onChange={e=>setImportQuestions(prev=>prev.map((x,j)=>j===i?{...x,enunciado:e.target.value}:x))}
+                              rows={Math.max(3,Math.ceil((q.enunciado||"").length/80))}
+                              style={{width:"100%",fontSize:13,color:C.text,lineHeight:1.8,background:"white",border:`1.5px solid ${C.border}`,borderRadius:8,padding:"10px 12px",outline:"none",resize:"vertical",fontFamily:"'Sora',sans-serif",boxSizing:"border-box"}}/>
                           </div>
 
-                          {/* Alternativas */}
+                          {/* Alternativas editáveis */}
                           {q.alternativas&&Object.entries(q.alternativas).filter(([,v])=>v).length>0&&(
                             <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                              <div style={{fontSize:10,fontWeight:700,color:C.textLight,textTransform:"uppercase",letterSpacing:0.5}}>Alternativas</div>
+                              <div style={{fontSize:10,fontWeight:700,color:C.textLight,textTransform:"uppercase",letterSpacing:0.5}}>✏️ Alternativas</div>
                               {Object.entries(q.alternativas).filter(([,v])=>v).map(([k,v])=>{
                                 const isGab=q.gabarito===k;
                                 return(
-                                  <div key={k} style={{display:"flex",gap:10,alignItems:"flex-start",padding:"10px 12px",borderRadius:8,background:isGab?"#F0FDF4":"#F9FAFB",border:`1.5px solid ${isGab?"#A7F3D0":C.border}`}}>
-                                    <span style={{fontSize:12,fontWeight:800,color:isGab?"#10B981":C.textMed,flexShrink:0,width:20}}>{k})</span>
-                                    <span style={{fontSize:12,color:isGab?"#065F46":C.text,fontWeight:isGab?700:400,lineHeight:1.6}}>{v}</span>
-                                    {isGab&&<span style={{marginLeft:"auto",fontSize:10,fontWeight:700,color:"#10B981",flexShrink:0}}>✓ GABARITO</span>}
+                                  <div key={k} style={{display:"flex",gap:10,alignItems:"flex-start",padding:"8px 12px",borderRadius:8,background:isGab?"#F0FDF4":"#F9FAFB",border:`1.5px solid ${isGab?"#10B981":C.border}`}}>
+                                    <span style={{fontSize:12,fontWeight:800,color:isGab?"#10B981":C.textMed,flexShrink:0,width:20,paddingTop:6}}>{k})</span>
+                                    <textarea value={v} onChange={e=>setImportQuestions(prev=>prev.map((x,j)=>j===i?{...x,alternativas:{...x.alternativas,[k]:e.target.value}}:x))}
+                                      rows={1}
+                                      style={{flex:1,fontSize:12,color:isGab?"#065F46":C.text,fontWeight:isGab?700:400,lineHeight:1.6,background:"transparent",border:"none",outline:"none",resize:"none",fontFamily:"'Sora',sans-serif",padding:0}}/>
+                                    <button onClick={()=>setImportQuestions(prev=>prev.map((x,j)=>j===i?{...x,gabarito:k}:x))}
+                                      title="Marcar como gabarito"
+                                      style={{padding:"3px 8px",background:isGab?"#10B981":"white",color:isGab?"white":"#9CA3AF",border:`1px solid ${isGab?"#10B981":"#E5E7EB"}`,borderRadius:6,fontSize:10,fontWeight:700,cursor:"pointer",flexShrink:0}}>
+                                      {isGab?"✓ GAB":"GAB"}
+                                    </button>
                                   </div>
                                 );
                               })}
                             </div>
                           )}
 
-                          {/* Gabarito certo/errado */}
-                          {q.tipo==="certo_errado"&&q.gabarito&&(
-                            <div style={{background:"#F0FDF4",border:"1px solid #A7F3D0",borderRadius:8,padding:"10px 14px",fontSize:13,fontWeight:700,color:"#065F46"}}>
-                              ✓ Gabarito: {q.gabarito==="C"?"CERTO":"ERRADO"}
+                          {/* Gabarito — seletor para certo/errado */}
+                          {q.tipo==="certo_errado"&&(
+                            <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                              <div style={{fontSize:10,fontWeight:700,color:C.textLight,textTransform:"uppercase",letterSpacing:0.5}}>Gabarito:</div>
+                              {["C","E"].map(op=>(
+                                <button key={op} onClick={()=>setImportQuestions(prev=>prev.map((x,j)=>j===i?{...x,gabarito:op}:x))}
+                                  style={{padding:"6px 16px",background:q.gabarito===op?"#10B981":"white",color:q.gabarito===op?"white":"#374151",border:`1.5px solid ${q.gabarito===op?"#10B981":"#E5E7EB"}`,borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                                  {op==="C"?"✓ CERTO":"✗ ERRADO"}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Gabarito editável — campo texto para múltipla */}
+                          {q.tipo!=="certo_errado"&&(
+                            <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+                              <div style={{fontSize:10,fontWeight:700,color:C.textLight,textTransform:"uppercase",letterSpacing:0.5}}>Gabarito:</div>
+                              {["A","B","C","D","E"].filter(l=>q.alternativas?.[l]).map(l=>(
+                                <button key={l} onClick={()=>setImportQuestions(prev=>prev.map((x,j)=>j===i?{...x,gabarito:l}:x))}
+                                  style={{width:32,height:32,background:q.gabarito===l?C.primary:"white",color:q.gabarito===l?"white":C.textMed,border:`1.5px solid ${q.gabarito===l?C.primary:C.border}`,borderRadius:8,fontSize:12,fontWeight:800,cursor:"pointer"}}>
+                                  {l}
+                                </button>
+                              ))}
+                              {!q.gabarito&&<span style={{fontSize:11,color:"#EF4444",fontWeight:600}}>⚠️ Selecione o gabarito</span>}
                             </div>
                           )}
 
