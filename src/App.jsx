@@ -1258,6 +1258,15 @@ function AdminPanel({user,onBack}){
   const [duplicata,setDuplicata]=React.useState(null);
   const [busca,setBusca]=React.useState("");
   const [expandido,setExpandido]=React.useState({});
+  // Estados de importação
+  const [importPhase,setImportPhase]=React.useState("form"); // form|processing|preview|comments|done
+  const [importMeta,setImportMeta]=React.useState({grupo:"",materia:"",topico:"",banca:"",concurso:"",ano:"",cargo:""});
+  const [importQuestions,setImportQuestions]=React.useState([]);
+  const [importTextosBase,setImportTextosBase]=React.useState([]);
+  const [importProgress,setImportProgress]=React.useState("");
+  const [importStats,setImportStats]=React.useState(null);
+  const [gerandoComentarios,setGerandoComentarios]=React.useState(false);
+  const [comentariosProgress,setComentariosProgress]=React.useState(0);
 
   // Carrega árvore de grupos/matérias/tópicos com contagem
   const loadGrupos=React.useCallback(async()=>{
@@ -1355,8 +1364,17 @@ ${form.enunciado}
 ${form.tipo!=="certo_errado"?`Alternativas:\n${altsStr}\n`:""}
 Gabarito correto: ${form.gabarito==="C"?"CERTO":form.gabarito==="E"?"ERRADO":`${form.gabarito}) ${form.alternativas[form.gabarito]||""}`}
 
+Escreva um comentário completo seguindo EXATAMENTE esta estrutura:
+
+1. EXPLICAÇÃO DA QUESTÃO: Explique o conceito cobrado com base em lei, doutrina ou jurisprudência.
+2. POR QUE O GABARITO ESTÁ CERTO: Justifique a alternativa correta de forma clara e fundamentada.
+3. POR QUE AS OUTRAS ESTÃO ERRADAS: Para cada alternativa incorreta, explique objetivamente o erro.
+4. INFORMAÇÃO EXTRA: Termine com um dado adicional relevante sobre o conteúdo da questão — pode ser um aprofundamento do tema, uma exceção importante, uma distinção que cai bastante em provas ou um detalhe que ajuda a fixar o assunto.
+
+Máximo 400 palavras. Tom didático, como um professor explicando em aula.
+
 Responda SOMENTE com JSON válido (sem texto fora do JSON):
-{"nivel":<1 a 5: 1=muito fácil 2=fácil 3=médio 4=difícil 5=muito difícil>,"comentario":"<explicação como aula: justifique o gabarito com lei/doutrina/jurisprudência, explique o conceito, aponte erros das alternativas, dê dica ou mnemônico. Máximo 350 palavras>"}`;
+{"nivel":<1 a 5: 1=muito fácil 2=fácil 3=médio 4=difícil 5=muito difícil>,"comentario":"<comentário completo seguindo a estrutura acima>"}`;
 
       const resp=await fetch("/api/index",{
         method:"POST",headers:{"Content-Type":"application/json"},
@@ -1444,7 +1462,7 @@ Responda SOMENTE com JSON válido (sem texto fora do JSON):
         </div>
         {/* Linha 2: tabs */}
         <div style={{display:"flex",borderTop:`1px solid ${C.border}`,padding:"0 20px"}}>
-          {[{id:"questoes",icon:"📚",l:"Questões"},{id:"simulados",icon:"🏆",l:"Simulados"}].map(a=>(
+          {[{id:"questoes",icon:"📚",l:"Questões"},{id:"simulados",icon:"🏆",l:"Simulados"},{id:"importar",icon:"📥",l:"Importar Prova"}].map(a=>(
             <button key={a.id} onClick={()=>setAbaAdmin(a.id)} style={{
               padding:"10px 20px",background:"transparent",border:"none",
               borderBottom:`3px solid ${abaAdmin===a.id?C.primary:"transparent"}`,
@@ -1460,6 +1478,43 @@ Responda SOMENTE com JSON válido (sem texto fora do JSON):
       <div style={{display:"flex",flex:1,maxWidth:1300,width:"100%",margin:"0 auto",padding:"16px",gap:16,alignItems:"start",flexWrap:"wrap"}} className="admin-layout">
 
         {abaAdmin==="simulados"&&<SimuladoAdmin user={user}/>}
+        {abaAdmin==="importar"&&<ImportarProva
+          user={user}
+          importPhase={importPhase} setImportPhase={setImportPhase}
+          importMeta={importMeta} setImportMeta={setImportMeta}
+          importQuestions={importQuestions} setImportQuestions={setImportQuestions}
+          importTextosBase={importTextosBase} setImportTextosBase={setImportTextosBase}
+          importProgress={importProgress} setImportProgress={setImportProgress}
+          importStats={importStats} setImportStats={setImportStats}
+          gerandoComentarios={gerandoComentarios} setGerandoComentarios={setGerandoComentarios}
+          comentariosProgress={comentariosProgress} setComentariosProgress={setComentariosProgress}
+          onPublicar={async(questoesAprovadas)=>{
+            let salvas=0;
+            for(const q of questoesAprovadas){
+              const payload={
+                grupo:q.grupo||importMeta.grupo,
+                materia:q.materia||importMeta.materia,
+                topico:q.topico||importMeta.topico,
+                banca:importMeta.banca,
+                fonte:importMeta.concurso,
+                ano:importMeta.ano||null,
+                tipo:q.tipo||"multipla",
+                enunciado:q.enunciado,
+                alternativas:q.alternativas||{},
+                gabarito:q.gabarito||"",
+                comentario:q.comentario||"",
+                texto_base:q.texto_base||null,
+                nivel:q.nivel||"medio",
+                ativa:true
+              };
+              await supabase.from("questoes").insert(payload);
+              salvas++;
+            }
+            await loadGrupos();
+            setImportPhase("done");
+            setImportStats(s=>({...s,salvas}));
+          }}
+        />}
         {abaAdmin==="questoes"&&<>
 
         {/* SIDEBAR — ÁRVORE */}
@@ -1762,6 +1817,476 @@ Responda SOMENTE com JSON válido (sem texto fora do JSON):
       </div>
     </div>
   );
+}
+
+
+/* ─── COMPONENTE: IMPORTAR PROVA ────────────────────────────── */
+function ImportarProva({user,importPhase,setImportPhase,importMeta,setImportMeta,
+  importQuestions,setImportQuestions,importTextosBase,setImportTextosBase,
+  importProgress,setImportProgress,importStats,setImportStats,
+  gerandoComentarios,setGerandoComentarios,comentariosProgress,setComentariosProgress,onPublicar}){
+
+  const provaPdfRef=React.useRef(null);
+  const gabaritoPdfRef=React.useRef(null);
+  const [provaPdf,setProvaPdf]=React.useState(null);
+  const [gabaritoPdf,setGabaritoPdf]=React.useState(null);
+  const [erroImport,setErroImport]=React.useState("");
+  const IM=(k,v)=>setImportMeta(m=>({...m,[k]:v}));
+
+  /* ── EXTRAÇÃO DO PDF ── */
+  const processarImportacao=async()=>{
+    if(!provaPdf){setErroImport("Selecione o PDF da prova.");return;}
+    if(!importMeta.materia||!importMeta.grupo){setErroImport("Preencha pelo menos Grupo/Carreira e Matéria.");return;}
+    setErroImport("");setImportPhase("processing");
+
+    try{
+      // Converte PDFs para base64
+      const toBase64=file=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(",")[1]);r.onerror=rej;r.readAsDataURL(file);});
+      const provaB64=await toBase64(provaPdf);
+      const gabaritoB64=gabaritoPdf?await toBase64(gabaritoPdf):null;
+
+      setImportProgress("Lendo o PDF da prova com IA...");
+
+      // Prompt de extração
+      const promptExtracao=`Você é especialista em concursos públicos brasileiros. Analise esta prova e extraia TODAS as questões.
+
+Para cada questão identifique:
+- numero: número/identificador da questão
+- texto_base_id: ID do texto base (ex: "T1","T2") se a questão pertencer a um texto compartilhado, ou null
+- enunciado: enunciado completo da questão
+- alternativas: objeto {A,B,C,D,E} com o texto de cada alternativa (só as que existirem)
+- tipo: "multipla" (A-E) ou "certo_errado"
+- gabarito: letra do gabarito se estiver disponível na prova, ou null
+- anulada: true se houver indicação de anulação, false caso contrário
+- nivel: "facil", "medio" ou "dificil" baseado na complexidade
+
+Para textos base (textos compartilhados por múltiplas questões):
+- id: identificador único (T1, T2, etc.)
+- texto: conteúdo completo do texto
+
+Retorne APENAS JSON válido sem texto adicional:
+{
+  "textos_base": [{"id":"T1","texto":"conteúdo..."}],
+  "questoes": [
+    {
+      "numero": 1,
+      "texto_base_id": "T1",
+      "enunciado": "...",
+      "alternativas": {"A":"...","B":"...","C":"...","D":"..."},
+      "tipo": "multipla",
+      "gabarito": "B",
+      "anulada": false,
+      "nivel": "medio"
+    }
+  ]
+}`;
+
+      const messages=[{role:"user",content:[
+        {type:"document",source:{type:"base64",media_type:"application/pdf",data:provaB64}},
+        {type:"text",text:promptExtracao}
+      ]}];
+
+      const resp=await fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"gpt-4o-mini",max_tokens:4000,
+          system:"Você é especialista em concursos públicos. Extraia questões de provas. Retorne APENAS JSON válido.",
+          messages})});
+      const d=await resp.json();
+      const text=d.content?.[0]?.text||"{}";
+      let dados=null;
+      try{dados=JSON.parse(text.replace(/```json|```/g,"").trim());}catch(e){
+        setErroImport("Erro ao processar o PDF. Tente novamente.");setImportPhase("form");return;
+      }
+
+      let questoesExtraidas=dados.questoes||[];
+      const textosBase=dados.textos_base||[];
+
+      // Se tiver gabarito separado, processa e cruza
+      if(gabaritoB64&&questoesExtraidas.length>0){
+        setImportProgress("Lendo gabarito oficial...");
+        const promptGabarito=`Extraia o gabarito desta prova. Retorne APENAS JSON:
+{"gabarito":[{"numero":1,"resposta":"B","anulada":false}]}`;
+        const respGab=await fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({model:"gpt-4o-mini",max_tokens:2000,
+            system:"Extraia gabaritos de provas. Retorne APENAS JSON válido.",
+            messages:[{role:"user",content:[
+              {type:"document",source:{type:"base64",media_type:"application/pdf",data:gabaritoB64}},
+              {type:"text",text:promptGabarito}
+            ]}]})});
+        const dGab=await respGab.json();
+        try{
+          const gabDados=JSON.parse((dGab.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim());
+          const gabMap={};
+          (gabDados.gabarito||[]).forEach(g=>{gabMap[g.numero]={resposta:g.resposta,anulada:g.anulada||false};});
+          questoesExtraidas=questoesExtraidas.map(q=>{
+            const gab=gabMap[q.numero];
+            return gab?{...q,gabarito:gab.resposta,anulada:gab.anulada}:q;
+          });
+        }catch(e){}
+      }
+
+      // Verifica duplicatas no banco
+      setImportProgress("Verificando duplicatas no banco...");
+      const questoesComStatus=await Promise.all(questoesExtraidas.map(async(q)=>{
+        if(!q.enunciado||q.enunciado.length<20) return{...q,status:"invalida",statusMsg:"Enunciado muito curto"};
+        if(q.anulada) return{...q,status:"anulada",statusMsg:"Questão anulada"};
+        const prefixo=q.enunciado.substring(0,80);
+        const{data:similar}=await supabase.from("questoes").select("id,enunciado,materia").eq("ativa",true)
+          .ilike("enunciado",`${prefixo.substring(0,50)}%`).limit(1);
+        if(similar&&similar.length>0){
+          const a=similar[0].enunciado.substring(0,120).toLowerCase().replace(/\s+/g," ");
+          const b=q.enunciado.substring(0,120).toLowerCase().replace(/\s+/g," ");
+          let iguais=0;
+          for(let i=0;i<Math.min(a.length,b.length);i++){if(a[i]===b[i])iguais++;}
+          if((iguais/Math.max(a.length,b.length))>0.80){
+            return{...q,status:"duplicata",statusMsg:"Já existe no banco",duplicataId:similar[0].id};
+          }
+        }
+        return{...q,status:"ok",statusMsg:"Pronta para publicar",aprovada:true};
+      }));
+
+      setImportTextosBase(textosBase);
+      setImportQuestions(questoesComStatus);
+      const stats={
+        total:questoesComStatus.length,
+        ok:questoesComStatus.filter(q=>q.status==="ok").length,
+        duplicatas:questoesComStatus.filter(q=>q.status==="duplicata").length,
+        anuladas:questoesComStatus.filter(q=>q.status==="anulada").length,
+        invalidas:questoesComStatus.filter(q=>q.status==="invalida").length,
+      };
+      setImportStats(stats);
+      setImportPhase("preview");
+    }catch(e){
+      setErroImport("Erro: "+e.message);
+      setImportPhase("form");
+    }
+  };
+
+  /* ── GERAR COMENTÁRIOS EM MASSA ── */
+  const gerarComentariosEmMassa=async()=>{
+    const aprovadas=importQuestions.filter(q=>q.aprovada&&!q.comentario);
+    if(!aprovadas.length){setImportPhase("publicar");return;}
+    setGerandoComentarios(true);setComentariosProgress(0);
+    const total=aprovadas.length;
+    for(let i=0;i<aprovadas.length;i++){
+      const q=aprovadas[i];
+      try{
+        const altsStr=q.tipo==="certo_errado"
+          ?`Tipo: Certo ou Errado. Gabarito: ${q.gabarito==="C"?"CERTO":"ERRADO"}.`
+          :Object.entries(q.alternativas||{}).map(([k,v])=>`${k}) ${v}`).join("\n");
+        const prompt=`Você é um professor especialista em concursos públicos, didático e preciso.
+Questão: ${q.enunciado}
+${altsStr}
+Gabarito correto: ${q.gabarito}
+
+Escreva um comentário completo seguindo EXATAMENTE esta estrutura:
+
+1. EXPLICAÇÃO DA QUESTÃO: Explique o conceito cobrado com base em lei, doutrina ou jurisprudência.
+2. POR QUE O GABARITO ESTÁ CERTO: Justifique a alternativa correta de forma clara e fundamentada.
+3. POR QUE AS OUTRAS ESTÃO ERRADAS: Para cada alternativa incorreta, explique objetivamente o erro.
+4. INFORMAÇÃO EXTRA: Termine com um dado adicional relevante sobre o conteúdo da questão — pode ser um aprofundamento do tema, uma exceção importante, uma distinção que cai bastante em provas ou um detalhe que ajuda a fixar o assunto.
+
+Máximo 400 palavras. Tom didático, como um professor explicando em aula.
+
+Responda SOMENTE com JSON válido:
+{"nivel":<1 a 5>,"comentario":"<comentário completo seguindo a estrutura acima>"}`;
+        const resp=await fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({model:"gpt-4o-mini",max_tokens:600,
+            system:"Professor de concursos. Retorne APENAS JSON válido.",
+            messages:[{role:"user",content:prompt}]})});
+        const d=await resp.json();
+        const text=(d.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim();
+        try{
+          const p=JSON.parse(text);
+          setImportQuestions(prev=>prev.map(pq=>pq.numero===q.numero?{...pq,comentario:p.comentario||"",nivel:String(p.nivel||"medio")}:pq));
+        }catch(e){}
+      }catch(e){}
+      setComentariosProgress(Math.round(((i+1)/total)*100));
+    }
+    setGerandoComentarios(false);
+    setImportPhase("publicar");
+  };
+
+  /* ── TELA: FORMULÁRIO INICIAL ── */
+  if(importPhase==="form") return(
+    <div style={{flex:1,padding:"0 8px"}}>
+      <div style={{background:C.white,borderRadius:18,border:`1px solid ${C.border}`,padding:"28px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)",maxWidth:760}}>
+        <div style={{fontFamily:"'Lora',serif",fontSize:18,fontWeight:700,color:C.text,marginBottom:4}}>📥 Importar Prova</div>
+        <div style={{fontSize:12,color:C.textMed,marginBottom:24}}>Suba o PDF da prova e a IA extrai todas as questões automaticamente.</div>
+
+        {/* Metadados */}
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:12}}>📋 Informações da prova</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}} className="evo-grid2-inner">
+            {[
+              {k:"grupo",l:"Grupo/Carreira *",p:"Ex: Direito, Administração"},
+              {k:"materia",l:"Matéria *",p:"Ex: Direito Administrativo"},
+              {k:"topico",l:"Assunto/Tópico",p:"Ex: Atos Administrativos"},
+              {k:"banca",l:"Banca",p:"Ex: CESPE, FCC, VUNESP"},
+              {k:"concurso",l:"Concurso/Fonte",p:"Ex: TRF 1ª Região 2024"},
+              {k:"cargo",l:"Cargo",p:"Ex: Analista Judiciário"},
+              {k:"ano",l:"Ano",p:"Ex: 2024"},
+            ].map(f=>(
+              <div key={f.k}>
+                <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:5}}>{f.l}</div>
+                <input value={importMeta[f.k]||""} onChange={e=>IM(f.k,e.target.value)} placeholder={f.p}
+                  style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${C.border}`,borderRadius:8,fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Upload PDFs */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:20}} className="evo-grid2-inner">
+          {/* PDF da prova */}
+          <div>
+            <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:8}}>📄 PDF da Prova *</div>
+            <input ref={provaPdfRef} type="file" accept=".pdf" style={{display:"none"}} onChange={e=>{setProvaPdf(e.target.files[0]||null);}}/>
+            <div onClick={()=>provaPdfRef.current?.click()}
+              style={{border:`2px dashed ${provaPdf?C.primary:C.border}`,borderRadius:12,padding:"20px",textAlign:"center",cursor:"pointer",background:provaPdf?C.primaryXLight:"#F9FAFB",transition:"all 0.2s"}}>
+              {provaPdf?(
+                <div>
+                  <div style={{fontSize:20,marginBottom:6}}>📄</div>
+                  <div style={{fontSize:12,fontWeight:700,color:C.primary}}>{provaPdf.name}</div>
+                  <div style={{fontSize:10,color:C.textMed,marginTop:2}}>{(provaPdf.size/1024/1024).toFixed(1)}MB</div>
+                </div>
+              ):(
+                <div>
+                  <div style={{fontSize:28,marginBottom:6}}>📎</div>
+                  <div style={{fontSize:12,fontWeight:600,color:C.text}}>Clique para selecionar</div>
+                  <div style={{fontSize:10,color:C.textLight}}>PDF da prova completa</div>
+                </div>
+              )}
+            </div>
+          </div>
+          {/* PDF do gabarito */}
+          <div>
+            <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:8}}>📋 Gabarito Oficial <span style={{fontWeight:400,color:C.textLight}}>(opcional)</span></div>
+            <input ref={gabaritoPdfRef} type="file" accept=".pdf" style={{display:"none"}} onChange={e=>{setGabaritoPdf(e.target.files[0]||null);}}/>
+            <div onClick={()=>gabaritoPdfRef.current?.click()}
+              style={{border:`2px dashed ${gabaritoPdf?C.primary:C.border}`,borderRadius:12,padding:"20px",textAlign:"center",cursor:"pointer",background:gabaritoPdf?C.primaryXLight:"#F9FAFB",transition:"all 0.2s"}}>
+              {gabaritoPdf?(
+                <div>
+                  <div style={{fontSize:20,marginBottom:6}}>📋</div>
+                  <div style={{fontSize:12,fontWeight:700,color:C.primary}}>{gabaritoPdf.name}</div>
+                  <div style={{fontSize:10,color:C.textMed,marginTop:2}}>{(gabaritoPdf.size/1024/1024).toFixed(1)}MB</div>
+                </div>
+              ):(
+                <div>
+                  <div style={{fontSize:28,marginBottom:6}}>📝</div>
+                  <div style={{fontSize:12,fontWeight:600,color:C.text}}>Clique para selecionar</div>
+                  <div style={{fontSize:10,color:C.textLight}}>Gabarito separado (se houver)</div>
+                </div>
+              )}
+            </div>
+            {gabaritoPdf&&(
+              <button onClick={()=>setGabaritoPdf(null)} style={{marginTop:6,fontSize:10,color:"#EF4444",background:"none",border:"none",cursor:"pointer"}}>✕ Remover gabarito</button>
+            )}
+          </div>
+        </div>
+
+        {erroImport&&<div style={{background:"#FEE2E2",border:"1px solid #FECACA",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#991B1B",marginBottom:16}}>{erroImport}</div>}
+
+        <button onClick={processarImportacao} disabled={!provaPdf}
+          style={{width:"100%",padding:"14px",background:provaPdf?`linear-gradient(135deg,${C.primary},${C.primaryLight})`:"#E5E7EB",color:provaPdf?"white":C.textLight,border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:provaPdf?"pointer":"not-allowed",boxShadow:provaPdf?"0 4px 14px rgba(108,60,225,0.3)":"none"}}>
+          🤖 Processar com IA
+        </button>
+        <div style={{fontSize:10,color:C.textLight,textAlign:"center",marginTop:8}}>A IA vai extrair questões, identificar textos base e verificar duplicatas automaticamente</div>
+      </div>
+    </div>
+  );
+
+  /* ── TELA: PROCESSANDO ── */
+  if(importPhase==="processing") return(
+    <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"60px 20px"}}>
+      <div style={{textAlign:"center",maxWidth:400}}>
+        <div style={{width:64,height:64,border:`6px solid ${C.primaryXLight}`,borderTop:`6px solid ${C.primary}`,borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto 24px"}}/>
+        <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,color:C.text,marginBottom:8}}>Processando prova...</div>
+        <div style={{fontSize:13,color:C.textMed,lineHeight:1.6}}>{importProgress||"Aguarde enquanto a IA lê e extrai as questões."}</div>
+      </div>
+    </div>
+  );
+
+  /* ── TELA: PREVIEW ── */
+  if(importPhase==="preview"){
+    const aprovadas=importQuestions.filter(q=>q.aprovada);
+    return(
+      <div style={{flex:1,padding:"0 8px"}}>
+        {/* Stats */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:16}} className="evo-grid">
+          {[
+            {l:"Total extraídas",v:importStats?.total||0,cor:C.primary,icon:"📊"},
+            {l:"Prontas",v:importStats?.ok||0,cor:"#10B981",icon:"✅"},
+            {l:"Duplicatas",v:importStats?.duplicatas||0,cor:"#F59E0B",icon:"⚠️"},
+            {l:"Anuladas",v:importStats?.anuladas||0,cor:"#EF4444",icon:"🚫"},
+          ].map(s=>(
+            <div key={s.l} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:"14px 16px",textAlign:"center",boxShadow:"0 2px 6px rgba(0,0,0,0.04)"}}>
+              <div style={{fontSize:18,marginBottom:4}}>{s.icon}</div>
+              <div style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:800,color:s.cor}}>{s.v}</div>
+              <div style={{fontSize:10,color:C.textLight,marginTop:2}}>{s.l}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Ações */}
+        <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+          <button onClick={()=>{setImportQuestions(q=>q.map(x=>x.status==="ok"?{...x,aprovada:true}:x));}}
+            style={{padding:"8px 16px",background:"#10B981",color:"white",border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+            ✓ Aprovar todas as válidas ({importStats?.ok||0})
+          </button>
+          <button onClick={()=>gerarComentariosEmMassa()}
+            disabled={!aprovadas.length}
+            style={{padding:"8px 16px",background:aprovadas.length?C.primary:"#E5E7EB",color:aprovadas.length?"white":C.textLight,border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:aprovadas.length?"pointer":"not-allowed"}}>
+            🤖 Gerar comentários ({aprovadas.length})
+          </button>
+          <button onClick={()=>onPublicar(aprovadas)}
+            disabled={!aprovadas.length}
+            style={{padding:"8px 16px",background:aprovadas.length?"#1E1B4B":"#E5E7EB",color:aprovadas.length?"white":C.textLight,border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:aprovadas.length?"pointer":"not-allowed"}}>
+            🚀 Publicar aprovadas ({aprovadas.length})
+          </button>
+          <button onClick={()=>{setImportPhase("form");setImportQuestions([]);setImportTextosBase([]);setGabaritoPdf(null);setProvaPdf(null);}}
+            style={{padding:"8px 16px",background:"white",color:C.textMed,border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>
+            ← Nova importação
+          </button>
+        </div>
+
+        {/* Textos base */}
+        {importTextosBase.length>0&&(
+          <div style={{background:"#EFF6FF",border:"1px solid #BFDBFE",borderRadius:12,padding:"14px 16px",marginBottom:16}}>
+            <div style={{fontSize:11,fontWeight:700,color:"#1D4ED8",marginBottom:8}}>📝 {importTextosBase.length} texto(s) base identificado(s)</div>
+            {importTextosBase.map(t=>(
+              <div key={t.id} style={{marginBottom:8}}>
+                <span style={{fontSize:10,fontWeight:700,background:"#BFDBFE",color:"#1D4ED8",borderRadius:100,padding:"2px 8px",marginRight:6}}>{t.id}</span>
+                <span style={{fontSize:11,color:"#1E40AF"}}>{t.texto.substring(0,120)}...</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Lista de questões */}
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {importQuestions.map((q,i)=>{
+            const statusColor={ok:"#10B981",duplicata:"#F59E0B",anulada:"#EF4444",invalida:"#9CA3AF"}[q.status];
+            const statusBg={ok:"#F0FDF4",duplicata:"#FFFBEB",anulada:"#FFF1F1",invalida:"#F9FAFB"}[q.status];
+            const statusBorder={ok:"#A7F3D0",duplicata:"#FDE68A",anulada:"#FECACA",invalida:"#E5E7EB"}[q.status];
+            const textoBase=importTextosBase.find(t=>t.id===q.texto_base_id);
+            return(
+              <div key={i} style={{background:C.white,border:`1.5px solid ${q.aprovada?C.primary:statusBorder}`,borderRadius:14,overflow:"hidden",boxShadow:"0 2px 6px rgba(0,0,0,0.04)"}}>
+                {/* Header */}
+                <div style={{padding:"12px 16px",background:statusBg,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,flex:1}}>
+                    <span style={{fontSize:12,fontWeight:800,color:statusColor}}>Q{q.numero}</span>
+                    {q.texto_base_id&&<span style={{fontSize:9,fontWeight:700,background:"#BFDBFE",color:"#1D4ED8",borderRadius:100,padding:"2px 8px"}}>📝 {q.texto_base_id}</span>}
+                    <span style={{fontSize:10,fontWeight:700,background:statusColor+"20",color:statusColor,borderRadius:100,padding:"2px 8px"}}>{q.statusMsg}</span>
+                    {q.gabarito&&<span style={{fontSize:10,fontWeight:700,background:"#EDE9FE",color:C.primary,borderRadius:100,padding:"2px 8px"}}>Gab: {q.gabarito}</span>}
+                    {q.comentario&&<span style={{fontSize:9,background:"#D1FAE5",color:"#065F46",borderRadius:100,padding:"2px 8px"}}>✅ Comentário</span>}
+                  </div>
+                  <div style={{display:"flex",gap:6,flexShrink:0}}>
+                    {q.status==="ok"&&(
+                      <button onClick={()=>setImportQuestions(prev=>prev.map((x,j)=>j===i?{...x,aprovada:!x.aprovada}:x))}
+                        style={{padding:"5px 12px",background:q.aprovada?C.primary:"white",color:q.aprovada?"white":C.primary,border:`1.5px solid ${C.primary}`,borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                        {q.aprovada?"✓ Aprovada":"Aprovar"}
+                      </button>
+                    )}
+                    {q.status==="duplicata"&&(
+                      <button onClick={()=>setImportQuestions(prev=>prev.map((x,j)=>j===i?{...x,status:"ok",statusMsg:"Forçar inclusão",aprovada:true}:x))}
+                        style={{padding:"5px 12px",background:"white",color:"#F59E0B",border:"1.5px solid #F59E0B",borderRadius:8,fontSize:11,fontWeight:600,cursor:"pointer"}}>
+                        Incluir mesmo assim
+                      </button>
+                    )}
+                    <button onClick={()=>setImportQuestions(prev=>prev.filter((_,j)=>j!==i))}
+                      style={{padding:"5px 10px",background:"white",color:"#EF4444",border:"1px solid #FECACA",borderRadius:8,fontSize:11,cursor:"pointer"}}>✕</button>
+                  </div>
+                </div>
+                {/* Enunciado */}
+                <div style={{padding:"12px 16px"}}>
+                  {textoBase&&(
+                    <div style={{background:"#EFF6FF",border:"1px solid #BFDBFE",borderRadius:8,padding:"8px 12px",marginBottom:10,fontSize:11,color:"#1E40AF",lineHeight:1.6}}>
+                      <strong>Texto {q.texto_base_id}:</strong> {textoBase.texto.substring(0,200)}...
+                    </div>
+                  )}
+                  <div style={{fontSize:12,color:C.text,lineHeight:1.6,marginBottom:q.alternativas?10:0}}>{q.enunciado}</div>
+                  {q.alternativas&&Object.entries(q.alternativas).filter(([,v])=>v).map(([k,v])=>(
+                    <div key={k} style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:4}}>
+                      <span style={{fontSize:11,fontWeight:700,color:q.gabarito===k?C.primary:C.textMed,flexShrink:0,width:16}}>{k})</span>
+                      <span style={{fontSize:11,color:q.gabarito===k?C.primary:C.text,fontWeight:q.gabarito===k?600:400}}>{v}</span>
+                    </div>
+                  ))}
+                  {q.comentario&&(
+                    <div style={{background:"#F0FDF4",border:"1px solid #A7F3D0",borderRadius:8,padding:"8px 12px",marginTop:10,fontSize:11,color:"#065F46",lineHeight:1.6}}>
+                      💬 {q.comentario}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  /* ── TELA: GERANDO COMENTÁRIOS ── */
+  if(importPhase==="comments"||gerandoComentarios) return(
+    <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"60px 20px"}}>
+      <div style={{textAlign:"center",maxWidth:400}}>
+        <div style={{width:64,height:64,border:`6px solid ${C.primaryXLight}`,borderTop:`6px solid ${C.primary}`,borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto 24px"}}/>
+        <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,color:C.text,marginBottom:8}}>Gerando comentários...</div>
+        <div style={{fontSize:13,color:C.textMed,marginBottom:20}}>A IA está criando as explicações para cada questão.</div>
+        <div style={{height:8,background:"#F3F4F6",borderRadius:100,overflow:"hidden"}}>
+          <div style={{height:"100%",width:`${comentariosProgress}%`,background:`linear-gradient(90deg,${C.primary},${C.primaryLight})`,borderRadius:100,transition:"width 0.4s ease"}}/>
+        </div>
+        <div style={{fontSize:13,fontWeight:700,color:C.primary,marginTop:8}}>{comentariosProgress}%</div>
+      </div>
+    </div>
+  );
+
+  /* ── TELA: PUBLICAR ── */
+  if(importPhase==="publicar"){
+    const aprovadas=importQuestions.filter(q=>q.aprovada);
+    return(
+      <div style={{flex:1,padding:"0 8px"}}>
+        <div style={{background:C.white,borderRadius:18,border:`1px solid ${C.border}`,padding:"28px",maxWidth:600,boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
+          <div style={{fontFamily:"'Lora',serif",fontSize:18,fontWeight:700,color:C.text,marginBottom:4}}>🚀 Pronto para publicar</div>
+          <div style={{fontSize:13,color:C.textMed,marginBottom:20}}>{aprovadas.length} questões aprovadas e com comentários. Deseja publicar agora?</div>
+          <div style={{background:C.bg,borderRadius:12,padding:"14px 16px",marginBottom:20}}>
+            {[
+              {l:"Questões aprovadas",v:aprovadas.length,cor:C.primary},
+              {l:"Com comentário",v:aprovadas.filter(q=>q.comentario).length,cor:"#10B981"},
+              {l:"Sem comentário",v:aprovadas.filter(q=>!q.comentario).length,cor:"#F59E0B"},
+            ].map(s=>(
+              <div key={s.l} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${C.border}`}}>
+                <span style={{fontSize:12,color:C.textMed}}>{s.l}</span>
+                <span style={{fontSize:13,fontWeight:700,color:s.cor}}>{s.v}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={()=>setImportPhase("preview")} style={{flex:1,padding:"12px",background:"white",color:C.textMed,border:`1px solid ${C.border}`,borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer"}}>← Voltar</button>
+            <button onClick={()=>onPublicar(aprovadas)} style={{flex:2,padding:"12px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 14px rgba(108,60,225,0.3)"}}>
+              🚀 Publicar {aprovadas.length} questões
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── TELA: CONCLUÍDO ── */
+  if(importPhase==="done") return(
+    <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"60px 20px"}}>
+      <div style={{textAlign:"center",maxWidth:400}}>
+        <div style={{fontSize:64,marginBottom:16}}>✅</div>
+        <div style={{fontFamily:"'Lora',serif",fontSize:22,fontWeight:700,color:C.text,marginBottom:8}}>Importação concluída!</div>
+        <div style={{fontSize:14,color:C.textMed,marginBottom:24}}>{importStats?.salvas||0} questões publicadas com sucesso no banco.</div>
+        <button onClick={()=>{setImportPhase("form");setImportQuestions([]);setImportTextosBase([]);setImportStats(null);}}
+          style={{padding:"12px 28px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:12,fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 14px rgba(108,60,225,0.3)"}}>
+          + Nova importação
+        </button>
+      </div>
+    </div>
+  );
+
+  return null;
 }
 
 /* ─── COMPONENTE: QUESTÃO COM COMENTÁRIOS E REPORT ─────────── */
