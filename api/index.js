@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   if (!apiKey) return res.status(500).json({ error: 'OPENAI_API_KEY nao configurada' });
 
   try {
-    const { messages, system, max_tokens } = req.body;
+    const { messages, system, max_tokens, model } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'Campo messages ausente ou invalido' });
@@ -61,6 +61,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Nenhuma mensagem valida' });
     }
 
+    // Modelos permitidos — whitelist de segurança
+    const MODELOS_PERMITIDOS = ['gpt-4o-mini', 'gpt-4o', 'gpt-4o-2024-08-06'];
+    const modeloFinal = MODELOS_PERMITIDOS.includes(model) ? model : 'gpt-4o-mini';
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -68,7 +72,7 @@ export default async function handler(req, res) {
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: modeloFinal,
         max_tokens: max_tokens || 1000,
         messages: openaiMessages
       })
