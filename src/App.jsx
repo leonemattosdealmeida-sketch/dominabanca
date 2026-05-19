@@ -2331,17 +2331,16 @@ Responda SOMENTE com JSON válido:
                             </div>
                           )}
 
-                          {/* Comentário */}
-                          {q.comentario?(
-                            <div style={{background:"#F0FDF4",border:"1px solid #A7F3D0",borderRadius:10,padding:"12px 14px"}}>
-                              <div style={{fontSize:10,fontWeight:700,color:"#065F46",marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>💬 Comentário da IA</div>
-                              <div style={{fontSize:12,color:"#065F46",lineHeight:1.8,whiteSpace:"pre-wrap"}}>{q.comentario}</div>
+                          {/* Comentário editável */}
+                          <div style={{background:"#F0FDF4",border:`1px solid ${q.comentario?"#A7F3D0":"#FDE68A"}`,borderRadius:10,padding:"12px 14px"}}>
+                            <div style={{fontSize:10,fontWeight:700,color:q.comentario?"#065F46":"#92400E",marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>
+                              {q.comentario?"✏️ Comentário (editável)":"⚠️ Sem comentário — escreva ou gere com IA"}
                             </div>
-                          ):(
-                            <div style={{background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:10,padding:"12px 14px",fontSize:12,color:"#92400E",textAlign:"center"}}>
-                              ⚠️ Comentário não gerado ainda — clique em "Gerar comentários" antes de publicar
-                            </div>
-                          )}
+                            <textarea value={q.comentario||""} onChange={e=>setImportQuestions(prev=>prev.map((x,j)=>j===i?{...x,comentario:e.target.value}:x))}
+                              placeholder="Digite o comentário ou clique em 'Gerar comentários' para a IA criar automaticamente..."
+                              rows={Math.max(4,Math.ceil((q.comentario||"").length/80))}
+                              style={{width:"100%",fontSize:12,color:"#065F46",lineHeight:1.8,background:"white",border:`1px solid ${q.comentario?"#A7F3D0":"#FDE68A"}`,borderRadius:8,padding:"10px 12px",outline:"none",resize:"vertical",fontFamily:"'Sora',sans-serif",boxSizing:"border-box"}}/>
+                          </div>
 
                           {/* Ações inline */}
                           <div style={{display:"flex",gap:8,flexWrap:"wrap",paddingTop:4,borderTop:`1px solid ${C.border}`}}>
