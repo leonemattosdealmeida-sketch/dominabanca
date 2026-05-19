@@ -2065,34 +2065,14 @@ Responda SOMENTE com JSON válido:
               💡 A IA vai identificar a matéria e o assunto de cada questão automaticamente. Você pode corrigir na prévia.
             </div>
 
-            {/* Grupo — dropdown com grupos existentes */}
+            {/* Grupo — dropdown fixo igual ao formulário de questão */}
             <div style={{marginBottom:12}}>
               <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:5}}>Grupo/Carreira *</div>
-              {(()=>{
-                const [gruposOpts,setGruposOpts]=React.useState([]);
-                React.useEffect(()=>{
-                  supabase.from("questoes").select("grupo").eq("ativa",true).then(({data})=>{
-                    if(data){
-                      const unicos=[...new Set(data.map(q=>q.grupo).filter(Boolean))].sort();
-                      setGruposOpts(unicos);
-                    }
-                  });
-                },[]);
-                return(
-                  <select value={importMeta.grupo||""} onChange={e=>IM("grupo",e.target.value)}
-                    style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${importMeta.grupo?C.primary:C.border}`,borderRadius:8,fontSize:12,outline:"none",boxSizing:"border-box",background:"white",color:importMeta.grupo?C.text:C.textLight}}>
-                    <option value="">Selecione o grupo/carreira...</option>
-                    {gruposOpts.map(g=><option key={g} value={g}>{g}</option>)}
-                    <option value="__novo__">+ Novo grupo...</option>
-                  </select>
-                );
-              })()}
-              {importMeta.grupo==="__novo__"&&(
-                <input autoFocus value={importMeta.grupoNovo||""} onChange={e=>IM("grupoNovo",e.target.value)}
-                  onBlur={e=>{if(e.target.value.trim()){IM("grupo",e.target.value.trim());IM("grupoNovo","");}}}
-                  placeholder="Digite o nome do novo grupo..."
-                  style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${C.primary}`,borderRadius:8,fontSize:12,outline:"none",boxSizing:"border-box",marginTop:6}}/>
-              )}
+              <select value={importMeta.grupo||""} onChange={e=>IM("grupo",e.target.value)}
+                style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${importMeta.grupo?C.primary:C.border}`,borderRadius:8,fontSize:12,outline:"none",boxSizing:"border-box",background:"white",color:importMeta.grupo?C.text:C.textLight}}>
+                <option value="">Selecione a carreira...</option>
+                {["Previdenciária","Fiscal","Policial","Tribunais","Agências Reguladoras","Financeira","Diplomacia","Administrativa / Gestão Pública","Saúde","Educação"].map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
 
             {/* Demais campos */}
