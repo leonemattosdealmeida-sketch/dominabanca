@@ -1505,6 +1505,7 @@ Responda SOMENTE com JSON válido (sem texto fora do JSON):
           importStats={importStats} setImportStats={setImportStats}
           gerandoComentarios={gerandoComentarios} setGerandoComentarios={setGerandoComentarios}
           comentariosProgress={comentariosProgress} setComentariosProgress={setComentariosProgress}
+          limparRascunho={limparRascunho}
           onPublicar={async(questoesAprovadas)=>{
             let salvas=0;
             for(const q of questoesAprovadas){
@@ -1841,7 +1842,8 @@ Responda SOMENTE com JSON válido (sem texto fora do JSON):
 function ImportarProva({user,importPhase,setImportPhase,importMeta,setImportMeta,
   importQuestions,setImportQuestions,importTextosBase,setImportTextosBase,
   importProgress,setImportProgress,importStats,setImportStats,
-  gerandoComentarios,setGerandoComentarios,comentariosProgress,setComentariosProgress,onPublicar}){
+  gerandoComentarios,setGerandoComentarios,comentariosProgress,setComentariosProgress,
+  onPublicar,limparRascunho}){
 
   const provaPdfRef=React.useRef(null);
   const gabaritoPdfRef=React.useRef(null);
@@ -2286,7 +2288,8 @@ Responda SOMENTE com JSON válido:
                     Nenhuma questão neste filtro.
                   </div>
                 ):questoesFiltradas.map((q,_idx)=>{
-                  const i=importQuestions.indexOf(q);
+                  const i=importQuestions.findIndex(x=>x===q||(x.numero===q.numero&&x.enunciado===q.enunciado));
+                  if(i===-1) return null;
             const statusColor={ok:"#10B981",duplicata:"#F59E0B",anulada:"#EF4444",invalida:"#9CA3AF"}[q.status];
             const statusBg={ok:"#F0FDF4",duplicata:"#FFFBEB",anulada:"#FFF1F1",invalida:"#F9FAFB"}[q.status];
             const statusBorder={ok:"#A7F3D0",duplicata:"#FDE68A",anulada:"#FECACA",invalida:"#E5E7EB"}[q.status];
