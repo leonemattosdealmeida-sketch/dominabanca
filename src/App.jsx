@@ -1259,14 +1259,31 @@ function AdminPanel({user,onBack}){
   const [busca,setBusca]=React.useState("");
   const [expandido,setExpandido]=React.useState({});
   // Estados de importação
-  const [importPhase,setImportPhase]=React.useState("form"); // form|processing|preview|comments|done
-  const [importMeta,setImportMeta]=React.useState({grupo:"",materia:"",topico:"",banca:"",concurso:"",ano:"",cargo:""});
-  const [importQuestions,setImportQuestions]=React.useState([]);
-  const [importTextosBase,setImportTextosBase]=React.useState([]);
+  const [importPhase,setImportPhase]=React.useState(()=>{try{const s=localStorage.getItem("db_import_phase");return s&&s!=="done"&&s!=="processing"?s:"form";}catch{return"form";}});
+  const [importMeta,setImportMeta]=React.useState(()=>{try{return JSON.parse(localStorage.getItem("db_import_meta")||"null")||{grupo:"",banca:"",concurso:"",ano:"",cargo:""};}catch{return{grupo:"",banca:"",concurso:"",ano:"",cargo:""};}});
+  const [importQuestions,setImportQuestions]=React.useState(()=>{try{return JSON.parse(localStorage.getItem("db_import_questions")||"[]");}catch{return[];}});
+  const [importTextosBase,setImportTextosBase]=React.useState(()=>{try{return JSON.parse(localStorage.getItem("db_import_textos")||"[]");}catch{return[];}});
   const [importProgress,setImportProgress]=React.useState("");
-  const [importStats,setImportStats]=React.useState(null);
+  const [importStats,setImportStats]=React.useState(()=>{try{return JSON.parse(localStorage.getItem("db_import_stats")||"null");}catch{return null;}});
   const [gerandoComentarios,setGerandoComentarios]=React.useState(false);
   const [comentariosProgress,setComentariosProgress]=React.useState(0);
+
+  // Salva rascunho automaticamente
+  React.useEffect(()=>{
+    try{
+      if(importPhase!=="done"&&importPhase!=="processing"){
+        localStorage.setItem("db_import_phase",importPhase);
+        localStorage.setItem("db_import_meta",JSON.stringify(importMeta));
+        localStorage.setItem("db_import_questions",JSON.stringify(importQuestions));
+        localStorage.setItem("db_import_textos",JSON.stringify(importTextosBase));
+        localStorage.setItem("db_import_stats",JSON.stringify(importStats));
+      }
+    }catch(e){}
+  },[importPhase,importMeta,importQuestions,importTextosBase,importStats]);
+
+  const limparRascunho=()=>{
+    try{["db_import_phase","db_import_meta","db_import_questions","db_import_textos","db_import_stats"].forEach(k=>localStorage.removeItem(k));}catch(e){}
+  };
 
   // Carrega árvore de grupos/matérias/tópicos com contagem
   const loadGrupos=React.useCallback(async()=>{
@@ -2121,6 +2138,43 @@ Responda SOMENTE com JSON válido:
     const aprovadas=importQuestions.filter(q=>q.aprovada);
     return(
       <div style={{flex:1,padding:"0 8px"}}>
+        {/* Fix 3: Barra de progresso da revisão */}
+        {(()=>{
+          const total=importQuestions.length;
+          const aprovadas=importQuestions.filter(q=>q.aprovada).length;
+          const comComentario=importQuestions.filter(q=>q.aprovada&&q.comentario).length;
+          const pctAprov=total>0?Math.round((aprovadas/total)*100):0;
+          const pctComent=aprovadas>0?Math.round((comComentario/aprovadas)*100):0;
+          return(
+            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:"16px 20px",marginBottom:16,boxShadow:"0 2px 6px rgba(0,0,0,0.04)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:8}}>
+                <div style={{fontSize:13,fontWeight:700,color:C.text}}>📋 Progresso da revisão</div>
+                <div style={{fontSize:12,color:C.textMed}}>{aprovadas} de {total} questões aprovadas</div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <div>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                    <span style={{fontSize:11,color:C.textMed}}>Aprovadas</span>
+                    <span style={{fontSize:11,fontWeight:700,color:"#10B981"}}>{aprovadas}/{total} ({pctAprov}%)</span>
+                  </div>
+                  <div style={{height:8,background:"#F3F4F6",borderRadius:100,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${pctAprov}%`,background:"#10B981",borderRadius:100,transition:"width 0.4s ease"}}/>
+                  </div>
+                </div>
+                <div>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                    <span style={{fontSize:11,color:C.textMed}}>Com comentário</span>
+                    <span style={{fontSize:11,fontWeight:700,color:C.primary}}>{comComentario}/{aprovadas} ({pctComent}%)</span>
+                  </div>
+                  <div style={{height:8,background:"#F3F4F6",borderRadius:100,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${pctComent}%`,background:C.primary,borderRadius:100,transition:"width 0.4s ease"}}/>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Stats */}
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:16}} className="evo-grid">
           {[
@@ -2137,8 +2191,53 @@ Responda SOMENTE com JSON válido:
           ))}
         </div>
 
-        {/* Ações */}
-        <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+        {/* Fix 2: Filtro por status */}
+        {(()=>{
+          const [filtroStatus,setFiltroStatus]=React.useState("todas");
+          const FILTROS=[
+            {id:"todas",l:"Todas",icon:"📋"},
+            {id:"ok",l:"Prontas",icon:"✅"},
+            {id:"aprovadas",l:"Aprovadas",icon:"✓"},
+            {id:"sem_gabarito",l:"Sem gabarito",icon:"⚠️"},
+            {id:"sem_comentario",l:"Sem comentário",icon:"💬"},
+            {id:"duplicata",l:"Duplicatas",icon:"🔁"},
+            {id:"anulada",l:"Anuladas",icon:"🚫"},
+          ];
+          const questoesFiltradas=importQuestions.filter(q=>{
+            if(filtroStatus==="todas") return true;
+            if(filtroStatus==="ok") return q.status==="ok";
+            if(filtroStatus==="aprovadas") return q.aprovada;
+            if(filtroStatus==="sem_gabarito") return !q.gabarito||q.gabarito.trim()==="";
+            if(filtroStatus==="sem_comentario") return q.aprovada&&(!q.comentario||q.comentario.trim()==="");
+            if(filtroStatus==="duplicata") return q.status==="duplicata";
+            if(filtroStatus==="anulada") return q.status==="anulada";
+            return true;
+          });
+          return(
+            <>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+                {FILTROS.map(f=>{
+                  const count=f.id==="todas"?importQuestions.length:importQuestions.filter(q=>{
+                    if(f.id==="ok") return q.status==="ok";
+                    if(f.id==="aprovadas") return q.aprovada;
+                    if(f.id==="sem_gabarito") return !q.gabarito||q.gabarito.trim()==="";
+                    if(f.id==="sem_comentario") return q.aprovada&&(!q.comentario||q.comentario.trim()==="");
+                    if(f.id==="duplicata") return q.status==="duplicata";
+                    if(f.id==="anulada") return q.status==="anulada";
+                    return false;
+                  }).length;
+                  if(count===0&&f.id!=="todas") return null;
+                  return(
+                    <button key={f.id} onClick={()=>setFiltroStatus(f.id)}
+                      style={{padding:"5px 12px",background:filtroStatus===f.id?C.primary:"white",color:filtroStatus===f.id?"white":C.textMed,border:`1px solid ${filtroStatus===f.id?C.primary:C.border}`,borderRadius:100,fontSize:11,fontWeight:filtroStatus===f.id?700:500,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                      <span>{f.icon}</span><span>{f.l}</span><span style={{background:filtroStatus===f.id?"rgba(255,255,255,0.25)":C.bg,borderRadius:100,padding:"1px 6px",fontSize:10,fontWeight:700}}>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Ações */}
+              <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
           <button onClick={()=>{setImportQuestions(q=>q.map(x=>x.status==="ok"?{...x,aprovada:true}:x));}}
             style={{padding:"8px 16px",background:"#10B981",color:"white",border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>
             ✓ Aprovar todas as válidas ({importStats?.ok||0})
@@ -2161,7 +2260,7 @@ Responda SOMENTE com JSON válido:
               </div>
             );
           })()}
-          <button onClick={()=>{setImportPhase("form");setImportQuestions([]);setImportTextosBase([]);setGabaritoPdf(null);setProvaPdf(null);}}
+          <button onClick={()=>{limparRascunho();setImportPhase("form");setImportQuestions([]);setImportTextosBase([]);setImportStats(null);}}
             style={{padding:"8px 16px",background:"white",color:C.textMed,border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>
             ← Nova importação
           </button>
@@ -2180,9 +2279,14 @@ Responda SOMENTE com JSON válido:
           </div>
         )}
 
-        {/* Lista de questões */}
-        <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {importQuestions.map((q,i)=>{
+              {/* Lista de questões filtradas */}
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {questoesFiltradas.length===0?(
+                  <div style={{textAlign:"center",padding:"40px",background:C.white,borderRadius:14,border:`1px solid ${C.border}`,color:C.textLight,fontSize:13}}>
+                    Nenhuma questão neste filtro.
+                  </div>
+                ):questoesFiltradas.map((q,_idx)=>{
+                  const i=importQuestions.indexOf(q);
             const statusColor={ok:"#10B981",duplicata:"#F59E0B",anulada:"#EF4444",invalida:"#9CA3AF"}[q.status];
             const statusBg={ok:"#F0FDF4",duplicata:"#FFFBEB",anulada:"#FFF1F1",invalida:"#F9FAFB"}[q.status];
             const statusBorder={ok:"#A7F3D0",duplicata:"#FDE68A",anulada:"#FECACA",invalida:"#E5E7EB"}[q.status];
@@ -2414,7 +2518,10 @@ Responda SOMENTE com JSON válido: {"nivel":<1 a 5>,"comentario":"<comentário c
               </div>
             );
           })}
-        </div>
+              </div>
+            </>
+          );
+        })()}
       </div>
     );
   }
@@ -2472,7 +2579,7 @@ Responda SOMENTE com JSON válido: {"nivel":<1 a 5>,"comentario":"<comentário c
         <div style={{fontSize:64,marginBottom:16}}>✅</div>
         <div style={{fontFamily:"'Lora',serif",fontSize:22,fontWeight:700,color:C.text,marginBottom:8}}>Importação concluída!</div>
         <div style={{fontSize:14,color:C.textMed,marginBottom:24}}>{importStats?.salvas||0} questões publicadas com sucesso no banco.</div>
-        <button onClick={()=>{setImportPhase("form");setImportQuestions([]);setImportTextosBase([]);setImportStats(null);}}
+        <button onClick={()=>{limparRascunho();setImportPhase("form");setImportQuestions([]);setImportTextosBase([]);setImportStats(null);}}
           style={{padding:"12px 28px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:12,fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 14px rgba(108,60,225,0.3)"}}>
           + Nova importação
         </button>
