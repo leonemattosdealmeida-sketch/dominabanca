@@ -2331,16 +2331,61 @@ Responda SOMENTE com JSON válido:
                             </div>
                           )}
 
-                          {/* Comentário editável */}
-                          <div style={{background:"#F0FDF4",border:`1px solid ${q.comentario?"#A7F3D0":"#FDE68A"}`,borderRadius:10,padding:"12px 14px"}}>
-                            <div style={{fontSize:10,fontWeight:700,color:q.comentario?"#065F46":"#92400E",marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>
-                              {q.comentario?"✏️ Comentário (editável)":"⚠️ Sem comentário — escreva ou gere com IA"}
-                            </div>
-                            <textarea value={q.comentario||""} onChange={e=>setImportQuestions(prev=>prev.map((x,j)=>j===i?{...x,comentario:e.target.value}:x))}
-                              placeholder="Digite o comentário ou clique em 'Gerar comentários' para a IA criar automaticamente..."
-                              rows={Math.max(4,Math.ceil((q.comentario||"").length/80))}
-                              style={{width:"100%",fontSize:12,color:"#065F46",lineHeight:1.8,background:"white",border:`1px solid ${q.comentario?"#A7F3D0":"#FDE68A"}`,borderRadius:8,padding:"10px 12px",outline:"none",resize:"vertical",fontFamily:"'Sora',sans-serif",boxSizing:"border-box"}}/>
-                          </div>
+                          {/* Comentário editável + gerar individual */}
+                          {(()=>{
+                            const [gerandoInd,setGerandoInd]=React.useState(false);
+                            const gerarComentarioIndividual=async()=>{
+                              setGerandoInd(true);
+                              try{
+                                const altsStr=q.tipo==="certo_errado"
+                                  ?`Tipo: Certo ou Errado. Gabarito: ${q.gabarito==="C"?"CERTO":"ERRADO"}.`
+                                  :Object.entries(q.alternativas||{}).filter(([,v])=>v).map(([k,v])=>`${k}) ${v}`).join("\n");
+                                const prompt=`Você é um professor especialista em concursos públicos, didático e preciso.
+Questão: ${q.enunciado}
+${altsStr}
+Gabarito correto: ${q.gabarito}
+
+Escreva um comentário completo seguindo EXATAMENTE esta estrutura:
+1. EXPLICAÇÃO DA QUESTÃO: Explique o conceito cobrado com base em lei, doutrina ou jurisprudência.
+2. POR QUE O GABARITO ESTÁ CERTO: Justifique a alternativa correta de forma clara e fundamentada.
+3. POR QUE AS OUTRAS ESTÃO ERRADAS: Para cada alternativa incorreta, explique objetivamente o erro.
+4. INFORMAÇÃO EXTRA: Termine com um dado adicional relevante sobre o conteúdo da questão — pode ser um aprofundamento do tema, uma exceção importante, uma distinção que cai bastante em provas ou um detalhe que ajuda a fixar o assunto.
+
+Máximo 400 palavras. Tom didático, como um professor explicando em aula.
+Responda SOMENTE com JSON válido: {"nivel":<1 a 5>,"comentario":"<comentário completo>"}`;
+                                const resp=await fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},
+                                  body:JSON.stringify({model:"gpt-4o",max_tokens:1000,
+                                    system:"Professor de concursos. Retorne APENAS JSON válido.",
+                                    messages:[{role:"user",content:prompt}]})});
+                                const d=await resp.json();
+                                const text=(d.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim();
+                                try{
+                                  const p=JSON.parse(text);
+                                  setImportQuestions(prev=>prev.map((x,j)=>j===i?{...x,comentario:p.comentario||"",nivel:String(p.nivel||"3")}:x));
+                                }catch(e){
+                                  setImportQuestions(prev=>prev.map((x,j)=>j===i?{...x,comentario:text}:x));
+                                }
+                              }catch(e){}
+                              setGerandoInd(false);
+                            };
+                            return(
+                              <div style={{background:"#F0FDF4",border:`1px solid ${q.comentario?"#A7F3D0":"#FDE68A"}`,borderRadius:10,padding:"12px 14px"}}>
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                                  <div style={{fontSize:10,fontWeight:700,color:q.comentario?"#065F46":"#92400E",textTransform:"uppercase",letterSpacing:0.5}}>
+                                    {q.comentario?"✏️ Comentário (editável)":"⚠️ Sem comentário"}
+                                  </div>
+                                  <button onClick={gerarComentarioIndividual} disabled={gerandoInd||!q.gabarito}
+                                    style={{padding:"4px 12px",background:gerandoInd?"#E5E7EB":C.primary,color:gerandoInd?C.textLight:"white",border:"none",borderRadius:8,fontSize:11,fontWeight:700,cursor:gerandoInd||!q.gabarito?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:4}}>
+                                    {gerandoInd?<><div style={{width:10,height:10,border:"2px solid white",borderTop:"2px solid transparent",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/> Gerando...</>:"🤖 Gerar"}
+                                  </button>
+                                </div>
+                                <textarea value={q.comentario||""} onChange={e=>setImportQuestions(prev=>prev.map((x,j)=>j===i?{...x,comentario:e.target.value}:x))}
+                                  placeholder="Digite o comentário ou clique em '🤖 Gerar' para a IA criar automaticamente..."
+                                  rows={Math.max(4,Math.ceil((q.comentario||"").length/80))}
+                                  style={{width:"100%",fontSize:12,color:"#065F46",lineHeight:1.8,background:"white",border:`1px solid ${q.comentario?"#A7F3D0":"#FDE68A"}`,borderRadius:8,padding:"10px 12px",outline:"none",resize:"vertical",fontFamily:"'Sora',sans-serif",boxSizing:"border-box"}}/>
+                              </div>
+                            );
+                          })()}
 
                           {/* Ações inline */}
                           <div style={{display:"flex",gap:8,flexWrap:"wrap",paddingTop:4,borderTop:`1px solid ${C.border}`}}>
