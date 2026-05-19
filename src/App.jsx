@@ -1379,7 +1379,7 @@ Responda SOMENTE com JSON válido (sem texto fora do JSON):
       const resp=await fetch("/api/index",{
         method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
-          model:"gpt-4o-mini",
+          model:"gpt-4o",
           max_tokens:900,
           system:"Você é um professor especialista em concursos públicos. Retorne APENAS JSON válido sem texto adicional.",
           messages:[{role:"user",content:prompt}]
@@ -1836,7 +1836,7 @@ function ImportarProva({user,importPhase,setImportPhase,importMeta,setImportMeta
   /* ── EXTRAÇÃO DO PDF ── */
   const processarImportacao=async()=>{
     if(!provaPdf){setErroImport("Selecione o PDF da prova.");return;}
-    if(!importMeta.materia||!importMeta.grupo){setErroImport("Preencha pelo menos Grupo/Carreira e Matéria.");return;}
+    if(!importMeta.grupo){setErroImport("Preencha pelo menos Grupo/Carreira.");return;}
     setErroImport("");setImportPhase("processing");
 
     try{
@@ -1852,6 +1852,9 @@ function ImportarProva({user,importPhase,setImportPhase,importMeta,setImportMeta
 
 Para cada questão identifique:
 - numero: número/identificador da questão
+- grupo: área de conhecimento (ex: "Direito", "Língua Portuguesa", "Raciocínio Lógico", "Informática", "Administração") — identifique pelo conteúdo
+- materia: matéria específica (ex: "Direito Administrativo", "Interpretação de Texto", "Raciocínio Lógico Matemático")
+- topico: assunto específico dentro da matéria (ex: "Atos Administrativos", "Coerência e Coesão", "Sequências Numéricas")
 - texto_base_id: ID do texto base (ex: "T1","T2") se a questão pertencer a um texto compartilhado, ou null
 - enunciado: enunciado completo da questão
 - alternativas: objeto {A,B,C,D,E} com o texto de cada alternativa (só as que existirem)
@@ -1870,6 +1873,9 @@ Retorne APENAS JSON válido sem texto adicional:
   "questoes": [
     {
       "numero": 1,
+      "grupo": "Direito",
+      "materia": "Direito Administrativo",
+      "topico": "Atos Administrativos",
       "texto_base_id": "T1",
       "enunciado": "...",
       "alternativas": {"A":"...","B":"...","C":"...","D":"..."},
@@ -1887,8 +1893,8 @@ Retorne APENAS JSON válido sem texto adicional:
       ]}];
 
       const resp=await fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"gpt-4o-mini",max_tokens:4000,
-          system:"Você é especialista em concursos públicos. Extraia questões de provas. Retorne APENAS JSON válido.",
+        body:JSON.stringify({model:"gpt-4o-mini",max_tokens:8000,
+          system:"Você é especialista em concursos públicos. Extraia questões de provas. Retorne APENAS JSON válido. Se a prova for muito longa, extraia o máximo possível de questões completas.",
           messages})});
       const d=await resp.json();
       const text=d.content?.[0]?.text||"{}";
@@ -1990,7 +1996,7 @@ Máximo 400 palavras. Tom didático, como um professor explicando em aula.
 Responda SOMENTE com JSON válido:
 {"nivel":<1 a 5>,"comentario":"<comentário completo seguindo a estrutura acima>"}`;
         const resp=await fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({model:"gpt-4o-mini",max_tokens:600,
+          body:JSON.stringify({model:"gpt-4o",max_tokens:1000,
             system:"Professor de concursos. Retorne APENAS JSON válido.",
             messages:[{role:"user",content:prompt}]})});
         const d=await resp.json();
@@ -2017,10 +2023,11 @@ Responda SOMENTE com JSON válido:
         <div style={{marginBottom:20}}>
           <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:12}}>📋 Informações da prova</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}} className="evo-grid2-inner">
+            <div style={{background:"#EFF6FF",border:"1px solid #BFDBFE",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:"#1D4ED8"}}>
+              💡 A IA vai identificar a matéria e o assunto de cada questão automaticamente. Você pode corrigir na prévia.
+            </div>
             {[
-              {k:"grupo",l:"Grupo/Carreira *",p:"Ex: Direito, Administração"},
-              {k:"materia",l:"Matéria *",p:"Ex: Direito Administrativo"},
-              {k:"topico",l:"Assunto/Tópico",p:"Ex: Atos Administrativos"},
+              {k:"grupo",l:"Grupo/Carreira *",p:"Ex: Policial Federal, Analista Judiciário"},
               {k:"banca",l:"Banca",p:"Ex: CESPE, FCC, VUNESP"},
               {k:"concurso",l:"Concurso/Fonte",p:"Ex: TRF 1ª Região 2024"},
               {k:"cargo",l:"Cargo",p:"Ex: Analista Judiciário"},
@@ -2091,6 +2098,9 @@ Responda SOMENTE com JSON válido:
           🤖 Processar com IA
         </button>
         <div style={{fontSize:10,color:C.textLight,textAlign:"center",marginTop:8}}>A IA vai extrair questões, identificar textos base e verificar duplicatas automaticamente</div>
+        <div style={{marginTop:10,background:"#FFF7ED",border:"1px solid #FED7AA",borderRadius:8,padding:"8px 12px",fontSize:11,color:"#92400E"}}>
+          ⚠️ <strong>Provas longas (+80 questões):</strong> a IA pode não extrair todas de uma vez. Nesse caso, divida o PDF em partes e importe separadamente.
+        </div>
       </div>
     </div>
   );
@@ -2138,11 +2148,19 @@ Responda SOMENTE com JSON válido:
             style={{padding:"8px 16px",background:aprovadas.length?C.primary:"#E5E7EB",color:aprovadas.length?"white":C.textLight,border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:aprovadas.length?"pointer":"not-allowed"}}>
             🤖 Gerar comentários ({aprovadas.length})
           </button>
-          <button onClick={()=>onPublicar(aprovadas)}
-            disabled={!aprovadas.length}
-            style={{padding:"8px 16px",background:aprovadas.length?"#1E1B4B":"#E5E7EB",color:aprovadas.length?"white":C.textLight,border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:aprovadas.length?"pointer":"not-allowed"}}>
-            🚀 Publicar aprovadas ({aprovadas.length})
-          </button>
+          {(()=>{
+            const semGabarito=aprovadas.filter(q=>!q.gabarito||q.gabarito.trim()==="").length;
+            return(
+              <div>
+                <button onClick={()=>onPublicar(aprovadas.filter(q=>q.gabarito&&q.gabarito.trim()!==""))}
+                  disabled={!aprovadas.filter(q=>q.gabarito&&q.gabarito.trim()!=="").length}
+                  style={{padding:"8px 16px",background:aprovadas.length?"#1E1B4B":"#E5E7EB",color:aprovadas.length?"white":C.textLight,border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:aprovadas.length?"pointer":"not-allowed"}}>
+                  🚀 Publicar com gabarito ({aprovadas.filter(q=>q.gabarito&&q.gabarito.trim()!=="").length})
+                </button>
+                {semGabarito>0&&<div style={{fontSize:10,color:"#F59E0B",fontWeight:600,marginTop:4}}>⚠️ {semGabarito} questão(ões) sem gabarito serão ignoradas</div>}
+              </div>
+            );
+          })()}
           <button onClick={()=>{setImportPhase("form");setImportQuestions([]);setImportTextosBase([]);setGabaritoPdf(null);setProvaPdf(null);}}
             style={{padding:"8px 16px",background:"white",color:C.textMed,border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>
             ← Nova importação
@@ -2173,12 +2191,24 @@ Responda SOMENTE com JSON válido:
               <div key={i} style={{background:C.white,border:`1.5px solid ${q.aprovada?C.primary:statusBorder}`,borderRadius:14,overflow:"hidden",boxShadow:"0 2px 6px rgba(0,0,0,0.04)"}}>
                 {/* Header */}
                 <div style={{padding:"12px 16px",background:statusBg,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8,flex:1}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,flex:1,flexWrap:"wrap"}}>
                     <span style={{fontSize:12,fontWeight:800,color:statusColor}}>Q{q.numero}</span>
                     {q.texto_base_id&&<span style={{fontSize:9,fontWeight:700,background:"#BFDBFE",color:"#1D4ED8",borderRadius:100,padding:"2px 8px"}}>📝 {q.texto_base_id}</span>}
                     <span style={{fontSize:10,fontWeight:700,background:statusColor+"20",color:statusColor,borderRadius:100,padding:"2px 8px"}}>{q.statusMsg}</span>
                     {q.gabarito&&<span style={{fontSize:10,fontWeight:700,background:"#EDE9FE",color:C.primary,borderRadius:100,padding:"2px 8px"}}>Gab: {q.gabarito}</span>}
                     {q.comentario&&<span style={{fontSize:9,background:"#D1FAE5",color:"#065F46",borderRadius:100,padding:"2px 8px"}}>✅ Comentário</span>}
+                    <input value={q.grupo||importMeta.grupo||""} onChange={e=>setImportQuestions(prev=>prev.map((x,j)=>j===i?{...x,grupo:e.target.value}:x))}
+                      placeholder="Grupo" title="Editar grupo"
+                      style={{fontSize:10,color:"#065F46",background:"#D1FAE5",border:"1px solid #A7F3D0",borderRadius:100,padding:"2px 10px",outline:"none",maxWidth:120}}/>
+                    <input value={q.materia||""} onChange={e=>setImportQuestions(prev=>prev.map((x,j)=>j===i?{...x,materia:e.target.value}:x))}
+                      placeholder="Matéria" title="Editar matéria"
+                      style={{fontSize:10,fontWeight:600,color:C.primary,background:C.primaryXLight,border:`1px solid ${C.borderPurple}`,borderRadius:100,padding:"2px 10px",outline:"none",maxWidth:160}}/>
+                    <input value={q.topico||""} onChange={e=>setImportQuestions(prev=>prev.map((x,j)=>j===i?{...x,topico:e.target.value}:x))}
+                      placeholder="Assunto" title="Editar assunto"
+                      style={{fontSize:10,color:C.textMed,background:"#F3F4F6",border:`1px solid ${C.border}`,borderRadius:100,padding:"2px 10px",outline:"none",maxWidth:140}}/>
+                    {(!q.gabarito||q.gabarito.trim()==="")&&(
+                      <span style={{fontSize:9,fontWeight:700,background:"#FEF3C7",color:"#92400E",borderRadius:100,padding:"2px 8px"}}>⚠️ Sem gabarito</span>
+                    )}
                   </div>
                   <div style={{display:"flex",gap:6,flexShrink:0}}>
                     {q.status==="ok"&&(
@@ -2197,26 +2227,115 @@ Responda SOMENTE com JSON válido:
                       style={{padding:"5px 10px",background:"white",color:"#EF4444",border:"1px solid #FECACA",borderRadius:8,fontSize:11,cursor:"pointer"}}>✕</button>
                   </div>
                 </div>
-                {/* Enunciado */}
-                <div style={{padding:"12px 16px"}}>
-                  {textoBase&&(
-                    <div style={{background:"#EFF6FF",border:"1px solid #BFDBFE",borderRadius:8,padding:"8px 12px",marginBottom:10,fontSize:11,color:"#1E40AF",lineHeight:1.6}}>
-                      <strong>Texto {q.texto_base_id}:</strong> {textoBase.texto.substring(0,200)}...
-                    </div>
-                  )}
-                  <div style={{fontSize:12,color:C.text,lineHeight:1.6,marginBottom:q.alternativas?10:0}}>{q.enunciado}</div>
-                  {q.alternativas&&Object.entries(q.alternativas).filter(([,v])=>v).map(([k,v])=>(
-                    <div key={k} style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:4}}>
-                      <span style={{fontSize:11,fontWeight:700,color:q.gabarito===k?C.primary:C.textMed,flexShrink:0,width:16}}>{k})</span>
-                      <span style={{fontSize:11,color:q.gabarito===k?C.primary:C.text,fontWeight:q.gabarito===k?600:400}}>{v}</span>
-                    </div>
-                  ))}
-                  {q.comentario&&(
-                    <div style={{background:"#F0FDF4",border:"1px solid #A7F3D0",borderRadius:8,padding:"8px 12px",marginTop:10,fontSize:11,color:"#065F46",lineHeight:1.6}}>
-                      💬 {q.comentario}
-                    </div>
-                  )}
-                </div>
+                {/* Expansível — clica no header para ver tudo */}
+                {(()=>{
+                  const [expandida,setExpandida]=React.useState(false);
+                  return(
+                    <>
+                      {/* Botão expandir */}
+                      <div onClick={()=>setExpandida(e=>!e)}
+                        style={{padding:"6px 16px",background:"#F9FAFB",borderTop:`1px solid ${C.border}`,cursor:"pointer",fontSize:11,color:C.textMed,display:"flex",alignItems:"center",gap:6,userSelect:"none"}}>
+                        <span>{expandida?"▲ Recolher":"▼ Ver questão completa"}</span>
+                        {!expandida&&q.gabarito&&<span style={{marginLeft:"auto",fontSize:10,fontWeight:700,color:C.primary}}>Gab: {q.gabarito}</span>}
+                      </div>
+
+                      {expandida&&(
+                        <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:14}}>
+
+                          {/* Metadados completos */}
+                          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                            {[
+                              {l:"Grupo",v:q.grupo||importMeta.grupo,cor:"#065F46",bg:"#D1FAE5"},
+                              {l:"Matéria",v:q.materia,cor:C.primary,bg:C.primaryXLight},
+                              {l:"Assunto",v:q.topico,cor:"#1D4ED8",bg:"#DBEAFE"},
+                              {l:"Banca",v:importMeta.banca,cor:"#92400E",bg:"#FEF3C7"},
+                              {l:"Concurso",v:importMeta.concurso,cor:"#374151",bg:"#F3F4F6"},
+                              {l:"Cargo",v:importMeta.cargo,cor:"#374151",bg:"#F3F4F6"},
+                              {l:"Ano",v:importMeta.ano,cor:"#374151",bg:"#F3F4F6"},
+                              {l:"Tipo",v:q.tipo==="certo_errado"?"Certo/Errado":"Múltipla escolha",cor:"#374151",bg:"#F3F4F6"},
+                              {l:"Nível",v:q.nivel==="facil"?"Fácil 🟢":q.nivel==="dificil"?"Difícil 🔴":"Médio 🟡",cor:"#374151",bg:"#F3F4F6"},
+                            ].filter(m=>m.v).map(m=>(
+                              <div key={m.l} style={{background:m.bg,borderRadius:8,padding:"4px 10px"}}>
+                                <span style={{fontSize:9,fontWeight:700,color:m.cor,textTransform:"uppercase",letterSpacing:0.5}}>{m.l}: </span>
+                                <span style={{fontSize:10,fontWeight:600,color:m.cor}}>{m.v}</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Texto base completo */}
+                          {textoBase&&(
+                            <div style={{background:"#EFF6FF",border:"1px solid #BFDBFE",borderRadius:10,padding:"12px 14px"}}>
+                              <div style={{fontSize:10,fontWeight:700,color:"#1D4ED8",marginBottom:6}}>📝 TEXTO BASE — {q.texto_base_id}</div>
+                              <div style={{fontSize:12,color:"#1E40AF",lineHeight:1.8,whiteSpace:"pre-wrap"}}>{textoBase.texto}</div>
+                            </div>
+                          )}
+
+                          {/* Enunciado */}
+                          <div style={{background:C.bg,borderRadius:10,padding:"12px 14px"}}>
+                            <div style={{fontSize:10,fontWeight:700,color:C.textLight,marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>Enunciado</div>
+                            <div style={{fontSize:13,color:C.text,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{q.enunciado}</div>
+                          </div>
+
+                          {/* Alternativas */}
+                          {q.alternativas&&Object.entries(q.alternativas).filter(([,v])=>v).length>0&&(
+                            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                              <div style={{fontSize:10,fontWeight:700,color:C.textLight,textTransform:"uppercase",letterSpacing:0.5}}>Alternativas</div>
+                              {Object.entries(q.alternativas).filter(([,v])=>v).map(([k,v])=>{
+                                const isGab=q.gabarito===k;
+                                return(
+                                  <div key={k} style={{display:"flex",gap:10,alignItems:"flex-start",padding:"10px 12px",borderRadius:8,background:isGab?"#F0FDF4":"#F9FAFB",border:`1.5px solid ${isGab?"#A7F3D0":C.border}`}}>
+                                    <span style={{fontSize:12,fontWeight:800,color:isGab?"#10B981":C.textMed,flexShrink:0,width:20}}>{k})</span>
+                                    <span style={{fontSize:12,color:isGab?"#065F46":C.text,fontWeight:isGab?700:400,lineHeight:1.6}}>{v}</span>
+                                    {isGab&&<span style={{marginLeft:"auto",fontSize:10,fontWeight:700,color:"#10B981",flexShrink:0}}>✓ GABARITO</span>}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* Gabarito certo/errado */}
+                          {q.tipo==="certo_errado"&&q.gabarito&&(
+                            <div style={{background:"#F0FDF4",border:"1px solid #A7F3D0",borderRadius:8,padding:"10px 14px",fontSize:13,fontWeight:700,color:"#065F46"}}>
+                              ✓ Gabarito: {q.gabarito==="C"?"CERTO":"ERRADO"}
+                            </div>
+                          )}
+
+                          {/* Comentário */}
+                          {q.comentario?(
+                            <div style={{background:"#F0FDF4",border:"1px solid #A7F3D0",borderRadius:10,padding:"12px 14px"}}>
+                              <div style={{fontSize:10,fontWeight:700,color:"#065F46",marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>💬 Comentário da IA</div>
+                              <div style={{fontSize:12,color:"#065F46",lineHeight:1.8,whiteSpace:"pre-wrap"}}>{q.comentario}</div>
+                            </div>
+                          ):(
+                            <div style={{background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:10,padding:"12px 14px",fontSize:12,color:"#92400E",textAlign:"center"}}>
+                              ⚠️ Comentário não gerado ainda — clique em "Gerar comentários" antes de publicar
+                            </div>
+                          )}
+
+                          {/* Ações inline */}
+                          <div style={{display:"flex",gap:8,flexWrap:"wrap",paddingTop:4,borderTop:`1px solid ${C.border}`}}>
+                            {q.status==="ok"&&(
+                              <button onClick={()=>setImportQuestions(prev=>prev.map((x,j)=>j===i?{...x,aprovada:!x.aprovada}:x))}
+                                style={{padding:"7px 16px",background:q.aprovada?C.primary:"white",color:q.aprovada?"white":C.primary,border:`1.5px solid ${C.primary}`,borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                                {q.aprovada?"✓ Aprovada":"Aprovar"}
+                              </button>
+                            )}
+                            {q.status==="duplicata"&&(
+                              <button onClick={()=>setImportQuestions(prev=>prev.map((x,j)=>j===i?{...x,status:"ok",statusMsg:"Forçar inclusão",aprovada:true}:x))}
+                                style={{padding:"7px 16px",background:"white",color:"#F59E0B",border:"1.5px solid #F59E0B",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                                Incluir mesmo assim
+                              </button>
+                            )}
+                            <button onClick={()=>setImportQuestions(prev=>prev.filter((_,j)=>j!==i))}
+                              style={{padding:"7px 14px",background:"white",color:"#EF4444",border:"1px solid #FECACA",borderRadius:8,fontSize:12,cursor:"pointer"}}>
+                              🗑 Remover
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             );
           })}
@@ -3515,7 +3634,7 @@ Responda SOMENTE com um JSON válido, sem texto fora do JSON, no formato:
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
-          model:"gpt-4o-mini",
+          model:"gpt-4o",
           max_tokens:1500,
           system:"Você é um corretor especialista em redações de concursos públicos brasileiros. Retorne APENAS JSON válido sem texto adicional.",
           messages:[{role:"user",content:[contentMedia,{type:"text",text:prompt}]}]
