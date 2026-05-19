@@ -1928,7 +1928,7 @@ Retorne APENAS JSON válido sem texto adicional:
         resp=await fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},
           signal:controller.signal,
           body:JSON.stringify({model:"gpt-4o-mini",max_tokens:8000,
-            system:"Você é especialista em concursos públicos. Extraia questões de provas. Retorne APENAS JSON válido. Se a prova for muito longa, extraia o máximo possível de questões completas.",
+            system:"Você é especialista em concursos públicos brasileiros. Extraia questões de provas. IMPORTANTE: Retorne APENAS o JSON puro, sem texto antes ou depois, sem markdown, sem explicações. Comece com { e termine com }. Se a prova for muito longa, extraia o máximo possível de questões completas.",
             messages})});
         clearTimeout(timeoutId);
       }catch(fetchErr){
@@ -1939,8 +1939,42 @@ Retorne APENAS JSON válido sem texto adicional:
       const d=await resp.json();
       const text=d.content?.[0]?.text||"{}";
       let dados=null;
-      try{dados=JSON.parse(text.replace(/```json|```/g,"").trim());}catch(e){
-        setErroImport("Erro ao processar o PDF. Tente novamente.");setImportPhase("form");return;
+      try{
+        // Tenta parse direto
+        const textLimpo=text.replace(/```json|```/g,"").trim();
+        try{
+          dados=JSON.parse(textLimpo);
+        }catch(e1){
+          // Tenta extrair JSON do meio do texto
+          const jsonMatch=textLimpo.match(/\{[\s\S]*\}/);
+          if(jsonMatch){
+            try{dados=JSON.parse(jsonMatch[0]);}
+            catch(e2){
+              // Tenta extrair array de questoes diretamente
+              const arrMatch=textLimpo.match(/"questoes"\s*:\s*\[[\s\S]*\]/);
+              if(arrMatch){
+                try{dados=JSON.parse("{"+arrMatch[0]+"}");}
+                catch(e3){
+                  console.error("[Parse Error]",text.substring(0,500));
+                  setErroImport("A IA não retornou um formato válido. Tente novamente.");
+                  setImportPhase("form");return;
+                }
+              }else{
+                console.error("[Parse Error] Texto da IA:",text.substring(0,500));
+                setErroImport("A IA não retornou um formato válido. Tente novamente.");
+                setImportPhase("form");return;
+              }
+            }
+          }else{
+            console.error("[Parse Error] Sem JSON:",text.substring(0,500));
+            setErroImport("A IA não retornou um formato válido. Tente novamente.");
+            setImportPhase("form");return;
+          }
+        }
+      }catch(e){
+        console.error("[Parse Exception]",e);
+        setErroImport("Erro ao processar resposta da IA. Tente novamente.");
+        setImportPhase("form");return;
       }
 
       let questoesExtraidas=dados.questoes||[];
