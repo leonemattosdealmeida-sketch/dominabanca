@@ -1860,11 +1860,17 @@ function ImportarProva({user,importPhase,setImportPhase,importMeta,setImportMeta
 
     try{
       // Converte PDFs para base64
-      const toBase64=file=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(",")[1]);r.onerror=rej;r.readAsDataURL(file);});
+      setImportProgress("Convertendo PDF para processamento...");
+      const toBase64=file=>new Promise((res,rej)=>{
+        const r=new FileReader();
+        r.onload=()=>res(r.result.split(",")[1]);
+        r.onerror=rej;
+        r.readAsDataURL(file);
+      });
       const provaB64=await toBase64(provaPdf);
       const gabaritoB64=gabaritoPdf?await toBase64(gabaritoPdf):null;
 
-      setImportProgress("Lendo o PDF da prova com IA...");
+      setImportProgress("PDF convertido. Enviando para a IA...");
 
       // Prompt de extração
       const promptExtracao=`Você é especialista em concursos públicos brasileiros. Analise esta prova e extraia TODAS as questões.
@@ -1911,10 +1917,22 @@ Retorne APENAS JSON válido sem texto adicional:
         {type:"text",text:promptExtracao}
       ]}];
 
-      const resp=await fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"gpt-4o-mini",max_tokens:8000,
-          system:"Você é especialista em concursos públicos. Extraia questões de provas. Retorne APENAS JSON válido. Se a prova for muito longa, extraia o máximo possível de questões completas.",
-          messages})});
+      setImportProgress("IA lendo o PDF... isso pode levar 30-60 segundos para provas longas.");
+      const controller=new AbortController();
+      const timeoutId=setTimeout(()=>controller.abort(),120000); // 2 min timeout
+      let resp;
+      try{
+        resp=await fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},
+          signal:controller.signal,
+          body:JSON.stringify({model:"gpt-4o-mini",max_tokens:8000,
+            system:"Você é especialista em concursos públicos. Extraia questões de provas. Retorne APENAS JSON válido. Se a prova for muito longa, extraia o máximo possível de questões completas.",
+            messages})});
+        clearTimeout(timeoutId);
+      }catch(fetchErr){
+        clearTimeout(timeoutId);
+        if(fetchErr.name==="AbortError") throw new Error("Tempo limite excedido (2 min). O PDF pode ser muito grande — tente dividir em partes menores.");
+        throw fetchErr;
+      }
       const d=await resp.json();
       const text=d.content?.[0]?.text||"{}";
       let dados=null;
@@ -1981,7 +1999,8 @@ Retorne APENAS JSON válido sem texto adicional:
       setImportStats(stats);
       setImportPhase("preview");
     }catch(e){
-      setErroImport("Erro: "+e.message);
+      console.error("[ImportarProva]", e);
+      setErroImport("Erro ao processar: "+(e.message||"Erro desconhecido")+". Tente novamente ou divida o PDF em partes menores.");
       setImportPhase("form");
     }
   };
@@ -2045,19 +2064,52 @@ Responda SOMENTE com JSON válido:
             <div style={{background:"#EFF6FF",border:"1px solid #BFDBFE",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:"#1D4ED8"}}>
               💡 A IA vai identificar a matéria e o assunto de cada questão automaticamente. Você pode corrigir na prévia.
             </div>
-            {[
-              {k:"grupo",l:"Grupo/Carreira *",p:"Ex: Policial Federal, Analista Judiciário"},
-              {k:"banca",l:"Banca",p:"Ex: CESPE, FCC, VUNESP"},
-              {k:"concurso",l:"Concurso/Fonte",p:"Ex: TRF 1ª Região 2024"},
-              {k:"cargo",l:"Cargo",p:"Ex: Analista Judiciário"},
-              {k:"ano",l:"Ano",p:"Ex: 2024"},
-            ].map(f=>(
-              <div key={f.k}>
-                <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:5}}>{f.l}</div>
-                <input value={importMeta[f.k]||""} onChange={e=>IM(f.k,e.target.value)} placeholder={f.p}
-                  style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${C.border}`,borderRadius:8,fontSize:12,outline:"none",boxSizing:"border-box"}}/>
-              </div>
-            ))}
+
+            {/* Grupo — dropdown com grupos existentes */}
+            <div style={{marginBottom:12}}>
+              <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:5}}>Grupo/Carreira *</div>
+              {(()=>{
+                const [gruposOpts,setGruposOpts]=React.useState([]);
+                React.useEffect(()=>{
+                  supabase.from("questoes").select("grupo").eq("ativa",true).then(({data})=>{
+                    if(data){
+                      const unicos=[...new Set(data.map(q=>q.grupo).filter(Boolean))].sort();
+                      setGruposOpts(unicos);
+                    }
+                  });
+                },[]);
+                return(
+                  <select value={importMeta.grupo||""} onChange={e=>IM("grupo",e.target.value)}
+                    style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${importMeta.grupo?C.primary:C.border}`,borderRadius:8,fontSize:12,outline:"none",boxSizing:"border-box",background:"white",color:importMeta.grupo?C.text:C.textLight}}>
+                    <option value="">Selecione o grupo/carreira...</option>
+                    {gruposOpts.map(g=><option key={g} value={g}>{g}</option>)}
+                    <option value="__novo__">+ Novo grupo...</option>
+                  </select>
+                );
+              })()}
+              {importMeta.grupo==="__novo__"&&(
+                <input autoFocus value={importMeta.grupoNovo||""} onChange={e=>IM("grupoNovo",e.target.value)}
+                  onBlur={e=>{if(e.target.value.trim()){IM("grupo",e.target.value.trim());IM("grupoNovo","");}}}
+                  placeholder="Digite o nome do novo grupo..."
+                  style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${C.primary}`,borderRadius:8,fontSize:12,outline:"none",boxSizing:"border-box",marginTop:6}}/>
+              )}
+            </div>
+
+            {/* Demais campos */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}} className="evo-grid2-inner">
+              {[
+                {k:"banca",l:"Banca",p:"Ex: CESPE, FCC, VUNESP"},
+                {k:"concurso",l:"Concurso/Fonte",p:"Ex: TRF 1ª Região 2024"},
+                {k:"cargo",l:"Cargo",p:"Ex: Analista Judiciário"},
+                {k:"ano",l:"Ano",p:"Ex: 2024"},
+              ].map(f=>(
+                <div key={f.k}>
+                  <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:5}}>{f.l}</div>
+                  <input value={importMeta[f.k]||""} onChange={e=>IM(f.k,e.target.value)} placeholder={f.p}
+                    style={{width:"100%",padding:"9px 12px",border:`1.5px solid ${C.border}`,borderRadius:8,fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
