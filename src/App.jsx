@@ -1259,6 +1259,8 @@ function AdminPanel({user,onBack}){
   const [busca,setBusca]=React.useState("");
   const [expandido,setExpandido]=React.useState({});
   // Estados de importação
+  const [provaPdf,setProvaPdf]=React.useState(null);
+  const [gabaritoPdf,setGabaritoPdf]=React.useState(null);
   const [importPhase,setImportPhase]=React.useState(()=>{try{const s=localStorage.getItem("db_import_phase");return s&&s!=="done"&&s!=="processing"?s:"form";}catch{return"form";}});
   const [importMeta,setImportMeta]=React.useState(()=>{try{return JSON.parse(localStorage.getItem("db_import_meta")||"null")||{grupo:"",banca:"",concurso:"",ano:"",cargo:""};}catch{return{grupo:"",banca:"",concurso:"",ano:"",cargo:""};}});
   const [importQuestions,setImportQuestions]=React.useState(()=>{try{return JSON.parse(localStorage.getItem("db_import_questions")||"[]");}catch{return[];}});
@@ -1497,6 +1499,8 @@ Responda SOMENTE com JSON válido (sem texto fora do JSON):
         {abaAdmin==="simulados"&&<SimuladoAdmin user={user}/>}
         {abaAdmin==="importar"&&<ImportarProva
           user={user}
+          provaPdf={provaPdf} setProvaPdf={setProvaPdf}
+          gabaritoPdf={gabaritoPdf} setGabaritoPdf={setGabaritoPdf}
           importPhase={importPhase} setImportPhase={setImportPhase}
           importMeta={importMeta} setImportMeta={setImportMeta}
           importQuestions={importQuestions} setImportQuestions={setImportQuestions}
@@ -1839,7 +1843,8 @@ Responda SOMENTE com JSON válido (sem texto fora do JSON):
 
 
 /* ─── COMPONENTE: IMPORTAR PROVA ────────────────────────────── */
-function ImportarProva({user,importPhase,setImportPhase,importMeta,setImportMeta,
+function ImportarProva({user,provaPdf,setProvaPdf,gabaritoPdf,setGabaritoPdf,
+  importPhase,setImportPhase,importMeta,setImportMeta,
   importQuestions,setImportQuestions,importTextosBase,setImportTextosBase,
   importProgress,setImportProgress,importStats,setImportStats,
   gerandoComentarios,setGerandoComentarios,comentariosProgress,setComentariosProgress,
@@ -1847,8 +1852,6 @@ function ImportarProva({user,importPhase,setImportPhase,importMeta,setImportMeta
 
   const provaPdfRef=React.useRef(null);
   const gabaritoPdfRef=React.useRef(null);
-  const [provaPdf,setProvaPdf]=React.useState(null);
-  const [gabaritoPdf,setGabaritoPdf]=React.useState(null);
   const [erroImport,setErroImport]=React.useState("");
   const IM=(k,v)=>setImportMeta(m=>({...m,[k]:v}));
 
@@ -2294,7 +2297,7 @@ Responda SOMENTE com JSON válido:
               </div>
             );
           })()}
-          <button onClick={()=>{limparRascunho();setImportPhase("form");setImportQuestions([]);setImportTextosBase([]);setImportStats(null);}}
+          <button onClick={()=>{limparRascunho();setImportPhase("form");setImportQuestions([]);setImportTextosBase([]);setImportStats(null);setProvaPdf(null);setGabaritoPdf(null);}}
             style={{padding:"8px 16px",background:"white",color:C.textMed,border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>
             ← Nova importação
           </button>
@@ -2614,7 +2617,7 @@ Responda SOMENTE com JSON válido: {"nivel":<1 a 5>,"comentario":"<comentário c
         <div style={{fontSize:64,marginBottom:16}}>✅</div>
         <div style={{fontFamily:"'Lora',serif",fontSize:22,fontWeight:700,color:C.text,marginBottom:8}}>Importação concluída!</div>
         <div style={{fontSize:14,color:C.textMed,marginBottom:24}}>{importStats?.salvas||0} questões publicadas com sucesso no banco.</div>
-        <button onClick={()=>{limparRascunho();setImportPhase("form");setImportQuestions([]);setImportTextosBase([]);setImportStats(null);}}
+        <button onClick={()=>{limparRascunho();setImportPhase("form");setImportQuestions([]);setImportTextosBase([]);setImportStats(null);setProvaPdf(null);setGabaritoPdf(null);}}
           style={{padding:"12px 28px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:12,fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 14px rgba(108,60,225,0.3)"}}>
           + Nova importação
         </button>
