@@ -1867,18 +1867,43 @@ function ImportarProva({user,provaPdf,setProvaPdf,gabaritoPdf,setGabaritoPdf,
     setErroImport("");setImportPhase("processing");
 
     try{
-      // Converte PDFs para base64
-      setImportProgress("Convertendo PDF para processamento...");
-      const toBase64=file=>new Promise((res,rej)=>{
-        const r=new FileReader();
-        r.onload=()=>res(r.result.split(",")[1]);
-        r.onerror=rej;
-        r.readAsDataURL(file);
-      });
-      const provaB64=await toBase64(provaPdf);
-      const gabaritoB64=gabaritoPdf?await toBase64(gabaritoPdf):null;
+      // Extrai texto do PDF client-side com pdf.js (evita timeout do servidor)
+      setImportProgress("Carregando leitor de PDF...");
 
-      setImportProgress("PDF convertido. Enviando para a IA...");
+      const extrairTextoPDF=async(file)=>{
+        const arrayBuffer=await file.arrayBuffer();
+        if(!window.pdfjsLib){
+          await new Promise((res,rej)=>{
+            const s=document.createElement("script");
+            s.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+            s.onload=()=>{
+              window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+              res();
+            };
+            s.onerror=rej;
+            document.head.appendChild(s);
+          });
+        }
+        const pdf=await window.pdfjsLib.getDocument({data:arrayBuffer}).promise;
+        let texto="";
+        for(let p=1;p<=pdf.numPages;p++){
+          const page=await pdf.getPage(p);
+          const tc=await page.getTextContent();
+          texto+=`\n--- Página ${p} ---\n`+tc.items.map(i=>i.str).join(" ");
+        }
+        return texto;
+      };
+
+      setImportProgress("Extraindo texto da prova...");
+      const textoProva=await extrairTextoPDF(provaPdf);
+
+      let textoGabarito="";
+      if(gabaritoPdf){
+        setImportProgress("Extraindo texto do gabarito...");
+        textoGabarito=await extrairTextoPDF(gabaritoPdf);
+      }
+
+      setImportProgress("Enviando para a IA analisar... aguarde alguns segundos.");
 
       // Prompt de extração
       const promptExtracao=`Você é especialista em concursos públicos brasileiros. Analise esta prova e extraia TODAS as questões.
@@ -1920,27 +1945,13 @@ Retorne APENAS JSON válido sem texto adicional:
   ]
 }`;
 
-      const messages=[{role:"user",content:[
-        {type:"document",source:{type:"base64",media_type:"application/pdf",data:provaB64}},
-        {type:"text",text:promptExtracao}
-      ]}];
+      const mensagemCompleta=`${promptExtracao}\n\nTEXTO EXTRAÍDO DA PROVA:\n${textoProva}${textoGabarito?"\n\nGABARITO OFICIAL:\n"+textoGabarito:""}`;
+      const messages=[{role:"user",content:mensagemCompleta}];
 
-      setImportProgress("IA lendo o PDF... isso pode levar 30-60 segundos para provas longas.");
-      const controller=new AbortController();
-      const timeoutId=setTimeout(()=>controller.abort(),120000); // 2 min timeout
-      let resp;
-      try{
-        resp=await fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},
-          signal:controller.signal,
-          body:JSON.stringify({model:"gpt-4o-mini",max_tokens:8000,
-            system:"Você é especialista em concursos públicos brasileiros. Extraia questões de provas. IMPORTANTE: Retorne APENAS o JSON puro, sem texto antes ou depois, sem markdown, sem explicações. Comece com { e termine com }. Se a prova for muito longa, extraia o máximo possível de questões completas.",
-            messages})});
-        clearTimeout(timeoutId);
-      }catch(fetchErr){
-        clearTimeout(timeoutId);
-        if(fetchErr.name==="AbortError") throw new Error("Tempo limite excedido (2 min). O PDF pode ser muito grande — tente dividir em partes menores.");
-        throw fetchErr;
-      }
+      const resp=await fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"gpt-4o-mini",max_tokens:8000,
+          system:"Você é especialista em concursos públicos brasileiros. Extraia questões de provas. IMPORTANTE: Retorne APENAS o JSON puro, sem texto antes ou depois, sem markdown. Comece com { e termine com }.",
+          messages})});
       const d=await resp.json();
       const text=d.content?.[0]?.text||"{}";
       let dados=null;
@@ -1988,17 +1999,17 @@ Retorne APENAS JSON válido sem texto adicional:
       const textosBase=dados.textos_base||[];
 
       // Se tiver gabarito separado, processa e cruza
-      if(gabaritoB64&&questoesExtraidas.length>0){
-        setImportProgress("Lendo gabarito oficial...");
-        const promptGabarito=`Extraia o gabarito desta prova. Retorne APENAS JSON:
-{"gabarito":[{"numero":1,"resposta":"B","anulada":false}]}`;
+      if(textoGabarito&&questoesExtraidas.length>0){
+        setImportProgress("Cruzando com gabarito oficial...");
+        const promptGabarito=`Com base no gabarito abaixo, extraia as respostas. Retorne APENAS JSON:
+{"gabarito":[{"numero":1,"resposta":"B","anulada":false}]}
+
+GABARITO:
+${textoGabarito}`;
         const respGab=await fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},
           body:JSON.stringify({model:"gpt-4o-mini",max_tokens:2000,
             system:"Extraia gabaritos de provas. Retorne APENAS JSON válido.",
-            messages:[{role:"user",content:[
-              {type:"document",source:{type:"base64",media_type:"application/pdf",data:gabaritoB64}},
-              {type:"text",text:promptGabarito}
-            ]}]})});
+            messages:[{role:"user",content:promptGabarito}]})});
         const dGab=await respGab.json();
         try{
           const gabDados=JSON.parse((dGab.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim());
