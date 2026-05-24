@@ -3429,7 +3429,6 @@ function TreinoTab({user,plano,onIniciar}){
       {/* PAINEL STICKY DE SELECIONADOS */}
       {detalhar&&selecionados.length>0&&(
           <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(15,10,40,0.85)",display:"flex",alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(4px)"}}>
-          <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(15,10,40,0.85)",display:"flex",alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(4px)"}}>
             <div style={{width:"100%",maxWidth:640,background:"white",borderRadius:"20px 20px 0 0",maxHeight:"85vh",display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 -8px 40px rgba(0,0,0,0.3)"}}>
               {/* Header */}
               <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
