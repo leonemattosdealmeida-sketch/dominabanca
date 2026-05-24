@@ -455,7 +455,8 @@ function Login({onBack,onCadastro,onSuccess}){
 
 /* ─── CRONOGRAMA CALENDÁRIO ─────────────────────────────────────── */
 function CronogramaCalendario({
-  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;plan,mats,meta,dias,totalQ,getPrevisoSemanas}){
+plan,mats,meta,dias,totalQ,getPrevisoSemanas}){
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const [weekOffset,setWeekOffset]=React.useState(0);
 
   /* ── distribuição de matérias por dia da semana ── */
@@ -652,7 +653,8 @@ function CronogramaCalendario({
 
 /* ─── ADMIN: SIMULADOS ──────────────────────────────────────── */
 function SimuladoAdmin({
-  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;user}){
+user}){
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const [simulados,setSimulados]=React.useState([]);
   const [loading,setLoading]=React.useState(true);
   const [form,setForm]=React.useState(null); // null=lista, "novo"=criar, {id}=editar
@@ -997,7 +999,8 @@ function SimuladoAdmin({
 
 /* ─── TELA DO SIMULADO (ALUNO) ──────────────────────────────── */
 function SimuladoTela({
-  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;user,simulado,inscricao,onConcluir,onVoltar}){
+user,simulado,inscricao,onConcluir,onVoltar}){
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const questoes=simulado?.questoes||[];
   const duracao=(simulado?.duracao_minutos||180)*60; // em segundos
   const [idx,setIdx]=React.useState(0);
@@ -1200,7 +1203,8 @@ function SimuladoTela({
 
 /* ─── RESULTADO DO SIMULADO (ALUNO) ─────────────────────────── */
 function SimuladoResultado({
-  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;resultado,simulado,onVoltar}){
+resultado,simulado,onVoltar}){
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const {nota,acertos,erros,total,ranking,totalParticipantes,porMateria}=resultado;
   const cor=nota>=70?"#10B981":nota>=50?"#F59E0B":"#EF4444";
   const bg=nota>=70?"#F0FDF4":nota>=50?"#FFFBEB":"#FFF1F1";
@@ -1281,7 +1285,8 @@ function SimuladoResultado({
 
 /* ─── PAINEL ADMIN ──────────────────────────────────────────── */
 function AdminPanel({
-  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;user,onBack}){
+user,onBack}){
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const [abaAdmin,setAbaAdmin]=React.useState("questoes");
   const [grupos,setGrupos]=React.useState([]);
   const [selecionado,setSelecionado]=React.useState(null);
@@ -2926,7 +2931,8 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
 
 /* ─── CADERNO DE ERROS BTN ──────────────────────────────────── */
 function CadernoErrosBtn({
-  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;user,q}){
+user,q}){
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const [salvo,setSalvo]=React.useState(false);
   const salvarErro=async()=>{
     if(!q?.id||!user?.id) return;
