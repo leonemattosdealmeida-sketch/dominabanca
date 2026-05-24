@@ -3743,7 +3743,7 @@ function TreinoTab({user,plano,onIniciar}){
               </>
             )}
           </div>
-        </div>
+        </>
       )}
 
       {/* PAINEL STICKY DE SELECIONADOS */}
@@ -3838,8 +3838,6 @@ function TreinoTab({user,plano,onIniciar}){
     </div>
   );
 }
-
-/* ─── SESSÃO DE TREINO ───────────────────────────────────────── */
 function TreinoSessao({user,filtro,onVoltar}){
   const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const [questoes,setQuestoes]=React.useState([]);
