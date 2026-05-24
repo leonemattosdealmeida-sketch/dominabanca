@@ -3423,43 +3423,122 @@ function TreinoTab({user,plano,onIniciar}){
       )}
 
       {/* PAINEL STICKY DE SELECIONADOS */}
-      {selecionados.length>0&&(
-        <div style={{position:"sticky",bottom:16,zIndex:50,marginTop:8}}>
-          <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:16,padding:"14px 18px",boxShadow:"0 8px 32px rgba(108,60,225,0.4),0 2px 8px rgba(0,0,0,0.2)"}}>
-            {/* Linha 1: total + botões */}
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,marginBottom:8}}>
-              <div style={{display:"flex",alignItems:"baseline",gap:6}}>
-                <span style={{fontFamily:"'Lora',serif",fontSize:22,fontWeight:800,color:"white"}}>{totalSelecionado}</span>
-                <span style={{fontSize:12,color:"rgba(255,255,255,0.7)"}}>{totalSelecionado===1?"questão selecionada":"questões selecionadas"}</span>
+      {selecionados.length>0&&(()=>{
+        const [detalhar,setDetalhar]=React.useState(false);
+        const LIMITE=4;
+        const visiveis=selecionados.slice(0,LIMITE);
+        const ocultos=selecionados.length-LIMITE;
+
+        /* ── TELA DETALHAR ── */
+        if(detalhar) return(
+          <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(15,10,40,0.85)",display:"flex",alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(4px)"}}>
+            <div style={{width:"100%",maxWidth:640,background:"white",borderRadius:"20px 20px 0 0",maxHeight:"85vh",display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 -8px 40px rgba(0,0,0,0.3)"}}>
+              {/* Header */}
+              <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>Treino selecionado</div>
+                  <div style={{display:"flex",alignItems:"baseline",gap:6}}>
+                    <span style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:800,color:"white"}}>{totalSelecionado}</span>
+                    <span style={{fontSize:12,color:"rgba(255,255,255,0.7)"}}>{totalSelecionado===1?"questão":"questões"}</span>
+                  </div>
+                </div>
+                <button onClick={()=>setDetalhar(false)}
+                  style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.25)",color:"white",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  ←
+                </button>
               </div>
-              <div style={{display:"flex",gap:8,flexShrink:0}}>
+              {/* Lista detalhada */}
+              <div style={{flex:1,overflowY:"auto",padding:"16px"}}>
+                <div style={{fontSize:11,fontWeight:700,color:C.textLight,textTransform:"uppercase",letterSpacing:1,marginBottom:12}}>
+                  {selecionados.length} {selecionados.length===1?"tópico selecionado":"tópicos selecionados"}
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {selecionados.map((s,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",background:C.bg,borderRadius:12,border:`1px solid ${C.border}`}}>
+                      <div style={{width:32,height:32,borderRadius:10,background:C.primaryXLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:C.primary,flexShrink:0}}>
+                        {i+1}
+                      </div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:12,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                          {s.topico==="todas"?`Todos os tópicos`:s.topico}
+                        </div>
+                        <div style={{fontSize:11,color:C.textLight,marginTop:2}}>{s.materia}</div>
+                      </div>
+                      <div style={{textAlign:"right",flexShrink:0}}>
+                        <div style={{fontSize:16,fontWeight:800,color:C.primary}}>{s.contagem}</div>
+                        <div style={{fontSize:9,color:C.textLight}}>questões</div>
+                      </div>
+                      <button onClick={()=>removerSelecionado(i)}
+                        style={{width:28,height:28,borderRadius:"50%",background:"#FEE2E2",border:"none",color:"#EF4444",cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Footer */}
+              <div style={{padding:"14px 16px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0}}>
                 <button onClick={limparTudo}
-                  style={{padding:"7px 14px",background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.8)",border:"1px solid rgba(255,255,255,0.25)",borderRadius:8,fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>
-                  Limpar
+                  style={{flex:1,padding:"12px",background:"white",color:C.textMed,border:`1px solid ${C.border}`,borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer"}}>
+                  Limpar tudo
                 </button>
                 <button onClick={()=>onIniciar({topicos:selecionados,total:totalSelecionado})}
-                  style={{padding:"7px 18px",background:"white",color:C.primary,border:"none",borderRadius:8,fontSize:12,fontWeight:800,cursor:"pointer",boxShadow:"0 2px 8px rgba(0,0,0,0.2)",whiteSpace:"nowrap"}}>
-                  Começar →
+                  style={{flex:2,padding:"12px",background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 14px rgba(108,60,225,0.3)"}}>
+                  Começar treino →
                 </button>
               </div>
             </div>
-            {/* Linha 2: tags dos tópicos */}
-            <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-              {selecionados.map((s,i)=>(
-                <div key={i} style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:100,padding:"3px 8px 3px 10px"}}>
-                  <span style={{fontSize:10,color:"white",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:180}}>
-                    {s.topico==="todas"?`${s.materia} — todos`:s.topico}
-                  </span>
-                  <button onClick={()=>removerSelecionado(i)}
-                    style={{width:14,height:14,borderRadius:"50%",background:"rgba(255,255,255,0.2)",border:"none",color:"white",cursor:"pointer",fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginLeft:2}}>
-                    ✕
+          </div>
+        );
+
+        /* ── BARRA STICKY COMPACTA ── */
+        return(
+          <div style={{position:"sticky",bottom:16,zIndex:50,marginTop:8}}>
+            <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:14,padding:"12px 16px",boxShadow:"0 8px 32px rgba(108,60,225,0.45),0 2px 8px rgba(0,0,0,0.2)"}}>
+              {/* Linha 1: total + botões */}
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:8}}>
+                <div style={{display:"flex",alignItems:"baseline",gap:6}}>
+                  <span style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:800,color:"white"}}>{totalSelecionado}</span>
+                  <span style={{fontSize:11,color:"rgba(255,255,255,0.65)"}}>{totalSelecionado===1?"questão":"questões"}</span>
+                </div>
+                <div style={{display:"flex",gap:8,flexShrink:0}}>
+                  <button onClick={limparTudo}
+                    style={{padding:"6px 12px",background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.8)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:8,fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>
+                    Limpar
+                  </button>
+                  <button onClick={()=>onIniciar({topicos:selecionados,total:totalSelecionado})}
+                    style={{padding:"6px 16px",background:"white",color:C.primary,border:"none",borderRadius:8,fontSize:12,fontWeight:800,cursor:"pointer",boxShadow:"0 2px 8px rgba(0,0,0,0.15)",whiteSpace:"nowrap"}}>
+                    Começar →
                   </button>
                 </div>
-              ))}
+              </div>
+              {/* Linha 2: tags (máx 4) + ... + Detalhar */}
+              <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"nowrap",overflow:"hidden"}}>
+                {visiveis.map((s,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.18)",borderRadius:100,padding:"3px 8px 3px 10px",flexShrink:0,maxWidth:160}}>
+                    <span style={{fontSize:10,color:"white",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                      {s.topico==="todas"?s.materia:s.topico}
+                    </span>
+                    <button onClick={()=>removerSelecionado(i)}
+                      style={{width:13,height:13,borderRadius:"50%",background:"rgba(255,255,255,0.2)",border:"none",color:"white",cursor:"pointer",fontSize:8,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                {ocultos>0&&(
+                  <span style={{fontSize:11,color:"rgba(255,255,255,0.6)",flexShrink:0,marginLeft:2}}>+{ocultos} mais</span>
+                )}
+                {selecionados.length>LIMITE&&(
+                  <button onClick={()=>setDetalhar(true)}
+                    style={{marginLeft:"auto",padding:"3px 10px",background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.25)",borderRadius:100,fontSize:10,fontWeight:700,color:"white",cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>
+                    Detalhar ↑
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
