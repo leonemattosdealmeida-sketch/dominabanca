@@ -3254,7 +3254,11 @@ function TreinoTab({user,plano,onIniciar}){
   // Seleção múltipla: [{topico, materia, grupo, contagem}]
   const [selecionados,setSelecionados]=React.useState([]);
   const [contagemPorTopico,setContagemPorTopico]=React.useState({});
+  const [detalhar,setDetalhar]=React.useState(false);
   const totalSelecionado=selecionados.reduce((s,x)=>s+x.contagem,0);
+  const LIMITE=4;
+  const visiveis=selecionados.slice(0,LIMITE);
+  const ocultos=selecionados.length-LIMITE;
 
   React.useEffect(()=>{
     (async()=>{
@@ -3423,14 +3427,8 @@ function TreinoTab({user,plano,onIniciar}){
       )}
 
       {/* PAINEL STICKY DE SELECIONADOS */}
-      {selecionados.length>0&&(()=>{
-        const [detalhar,setDetalhar]=React.useState(false);
-        const LIMITE=4;
-        const visiveis=selecionados.slice(0,LIMITE);
-        const ocultos=selecionados.length-LIMITE;
-
-        /* ── TELA DETALHAR ── */
-        if(detalhar) return(
+      {detalhar&&selecionados.length>0&&(
+          <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(15,10,40,0.85)",display:"flex",alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(4px)"}}>
           <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(15,10,40,0.85)",display:"flex",alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(4px)"}}>
             <div style={{width:"100%",maxWidth:640,background:"white",borderRadius:"20px 20px 0 0",maxHeight:"85vh",display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 -8px 40px rgba(0,0,0,0.3)"}}>
               {/* Header */}
@@ -3489,10 +3487,8 @@ function TreinoTab({user,plano,onIniciar}){
               </div>
             </div>
           </div>
-        );
-
-        /* ── BARRA STICKY COMPACTA ── */
-        return(
+      )}
+      {selecionados.length>0&&(
           <div style={{position:"sticky",bottom:16,zIndex:50,marginTop:8}}>
             <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:14,padding:"12px 16px",boxShadow:"0 8px 32px rgba(108,60,225,0.45),0 2px 8px rgba(0,0,0,0.2)"}}>
               {/* Linha 1: total + botões */}
@@ -3537,8 +3533,7 @@ function TreinoTab({user,plano,onIniciar}){
               </div>
             </div>
           </div>
-        );
-      })()}
+      )}
     </div>
   );
 }
