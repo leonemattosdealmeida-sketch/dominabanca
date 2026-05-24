@@ -2730,7 +2730,7 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
                   <span style={{fontSize:20}}>{acertou?'✓':'✗'}</span>
                   <div style={{flex:1}}>
                     <div style={{fontSize:14,fontWeight:700,color:acertou?'#15803D':'#B91C1C'}}>
-                      {acertou?'Resposta correta!`:`Incorreto. Gabarito: ${q?.gabarito==='C'?'Certo':q?.gabarito==='E'?'Errado':q?.gabarito}`}
+                      {acertou?'Resposta correta!':`Incorreto. Gabarito: ${q?.gabarito==='C'?'Certo':q?.gabarito==='E'?'Errado':q?.gabarito}`}
                     </div>
                     <div style={{fontSize:12,color:acertou?'#166534':'#991B1B',marginTop:2}}>
                       {acertou?'Ótimo! Clique em Próxima para continuar.':'Veja a explicação para entender o erro.'}
