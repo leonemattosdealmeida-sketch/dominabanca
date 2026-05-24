@@ -3354,21 +3354,36 @@ function TreinoTab({user,plano,onIniciar}){
             ):(
               <>
                 {/* TÓPICOS */}
-                <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"20px 22px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-                  <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:4}}>{materiaSel}</div>
-                  <div style={{fontSize:11,color:C.textLight,marginBottom:16}}>Escolha um tópico ou treine com todos</div>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-                    {/* Opção: todas as questões da matéria */}
+                <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"22px 24px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+                  {/* Header */}
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:8}}>
+                    <div>
+                      <div style={{fontFamily:"'Lora',serif",fontSize:16,fontWeight:700,color:C.text}}>{materiaSel}</div>
+                      <div style={{fontSize:11,color:C.textLight,marginTop:2}}>{materiaAtual?.topicos?.length||0} tópicos disponíveis</div>
+                    </div>
                     <button onClick={()=>handleTopico("todas")}
-                      style={{padding:"8px 16px",border:`2px solid ${topicoSel==="todas"?C.primary:C.border}`,borderRadius:100,fontSize:12,fontWeight:topicoSel==="todas"?700:500,cursor:"pointer",background:topicoSel==="todas"?C.primary:"white",color:topicoSel==="todas"?"white":C.text,transition:"all 0.15s"}}>
-                      📚 Todos os tópicos
+                      style={{padding:"10px 18px",border:`2px solid ${topicoSel==="todas"?C.primary:C.border}`,borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer",background:topicoSel==="todas"?C.primary:"white",color:topicoSel==="todas"?"white":C.primary,transition:"all 0.15s",boxShadow:topicoSel==="todas"?"0 4px 12px rgba(108,60,225,0.25)":"none",display:"flex",alignItems:"center",gap:6}}>
+                      📚 Treinar todos os tópicos
                     </button>
-                    {materiaAtual?.topicos.map(t=>(
-                      <button key={t} onClick={()=>handleTopico(t)}
-                        style={{padding:"8px 16px",border:`2px solid ${topicoSel===t?C.primary:C.border}`,borderRadius:100,fontSize:12,fontWeight:topicoSel===t?700:500,cursor:"pointer",background:topicoSel===t?C.primary:"white",color:topicoSel===t?"white":C.text,transition:"all 0.15s"}}>
-                        {t}
-                      </button>
-                    ))}
+                  </div>
+                  <div style={{height:1,background:C.border,marginBottom:16}}/>
+                  {/* Lista de tópicos */}
+                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {materiaAtual?.topicos.map((t,i)=>{
+                      const sel=topicoSel===t;
+                      return(
+                        <button key={t} onClick={()=>handleTopico(t)}
+                          style={{padding:"11px 16px",border:`1.5px solid ${sel?C.primary:C.border}`,borderRadius:10,fontSize:12,fontWeight:sel?700:400,cursor:"pointer",background:sel?C.primaryXLight:"white",color:sel?C.primary:C.text,transition:"all 0.15s",textAlign:"left",display:"flex",alignItems:"center",gap:10}}
+                          onMouseEnter={e=>{if(!sel){e.currentTarget.style.borderColor=C.primary;e.currentTarget.style.background="#FAFAFA";}}}
+                          onMouseLeave={e=>{if(!sel){e.currentTarget.style.borderColor=C.border;e.currentTarget.style.background="white";}}}>
+                          <span style={{width:22,height:22,borderRadius:6,background:sel?C.primary:C.bg,border:`1px solid ${sel?C.primary:C.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:sel?"white":C.textLight,flexShrink:0}}>
+                            {i+1}
+                          </span>
+                          <span style={{flex:1,lineHeight:1.4}}>{t}</span>
+                          {sel&&<span style={{fontSize:14,color:C.primary,flexShrink:0}}>✓</span>}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
