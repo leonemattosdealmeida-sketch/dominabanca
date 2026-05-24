@@ -3390,7 +3390,7 @@ function TreinoTab({user,plano,onIniciar}){
                         {selecionados.find(s=>s.materia===materiaSel&&s.topico==="todas")?"✓":"📚"}
                       </span>
                       <span style={{flex:1}}>Todos os tópicos</span>
-                      <span style={{fontSize:11,fontWeight:700,color:C.primary,background:C.primaryXLight,borderRadius:100,padding:"2px 8px"}}>{contagemPorTopico["todas"]||0}q</span>
+                      <span style={{fontSize:11,fontWeight:700,color:C.primary,background:C.primaryXLight,borderRadius:100,padding:"2px 8px"}}>{contagemPorTopico["todas"]||0}</span>
                     </button>
                   )}
                   {/* Lista de tópicos */}
@@ -3409,7 +3409,7 @@ function TreinoTab({user,plano,onIniciar}){
                               {sel?"✓":i+1}
                             </span>
                             <span style={{flex:1,lineHeight:1.4}}>{t}</span>
-                            <span style={{fontSize:11,fontWeight:700,color:sel?C.primary:C.textLight,background:sel?C.primaryXLight:"#F3F4F6",borderRadius:100,padding:"2px 8px",flexShrink:0}}>{ct}q</span>
+                            <span style={{fontSize:11,fontWeight:700,color:sel?C.primary:C.textLight,background:sel?C.primaryXLight:"#F3F4F6",borderRadius:100,padding:"2px 8px",flexShrink:0}}>{ct}</span>
                           </button>
                         );
                       })}
@@ -3422,45 +3422,48 @@ function TreinoTab({user,plano,onIniciar}){
         </div>
       )}
 
-      {/* PAINEL DE SELECIONADOS — aparece quando há tópicos selecionados */}
+      {/* PAINEL STICKY DE SELECIONADOS */}
       {selecionados.length>0&&(
-        <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:18,padding:"20px 24px",boxShadow:"0 4px 20px rgba(108,60,225,0.3)"}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:10}}>
-            <div>
-              <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>Treino selecionado</div>
-              <div style={{display:"flex",alignItems:"baseline",gap:8}}>
-                <span style={{fontFamily:"'Lora',serif",fontSize:28,fontWeight:800,color:"white"}}>{totalSelecionado}</span>
-                <span style={{fontSize:13,color:"rgba(255,255,255,0.7)"}}>questões no total</span>
+        <div style={{position:"sticky",bottom:16,zIndex:50,marginTop:8}}>
+          <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:16,padding:"14px 18px",boxShadow:"0 8px 32px rgba(108,60,225,0.4),0 2px 8px rgba(0,0,0,0.2)"}}>
+            {/* Linha 1: total + botões */}
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,marginBottom:8}}>
+              <div style={{display:"flex",alignItems:"baseline",gap:6}}>
+                <span style={{fontFamily:"'Lora',serif",fontSize:22,fontWeight:800,color:"white"}}>{totalSelecionado}</span>
+                <span style={{fontSize:12,color:"rgba(255,255,255,0.7)"}}>{totalSelecionado===1?"questão selecionada":"questões selecionadas"}</span>
               </div>
-            </div>
-            <div style={{display:"flex",gap:10}}>
-              <button onClick={limparTudo}
-                style={{padding:"9px 16px",background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.8)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>
-                Limpar tudo
-              </button>
-              <button onClick={()=>onIniciar({topicos:selecionados,total:totalSelecionado})}
-                style={{padding:"9px 22px",background:"white",color:C.primary,border:"none",borderRadius:8,fontSize:13,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 12px rgba(0,0,0,0.2)"}}>
-                Começar treino →
-              </button>
-            </div>
-          </div>
-          {/* Tags dos selecionados */}
-          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-            {selecionados.map((s,i)=>(
-              <div key={i} style={{display:"flex",alignItems:"center",gap:6,background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:100,padding:"4px 10px 4px 12px"}}>
-                <span style={{fontSize:11,color:"white",fontWeight:600}}>{s.topico==="todas"?`${s.materia} (todos)`:s.topico}</span>
-                <span style={{fontSize:10,color:"rgba(255,255,255,0.6)",marginLeft:2}}>{s.contagem}q</span>
-                <button onClick={()=>removerSelecionado(i)}
-                  style={{width:16,height:16,borderRadius:"50%",background:"rgba(255,255,255,0.2)",border:"none",color:"white",cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginLeft:2}}>
-                  ✕
+              <div style={{display:"flex",gap:8,flexShrink:0}}>
+                <button onClick={limparTudo}
+                  style={{padding:"7px 14px",background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.8)",border:"1px solid rgba(255,255,255,0.25)",borderRadius:8,fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>
+                  Limpar
+                </button>
+                <button onClick={()=>onIniciar({topicos:selecionados,total:totalSelecionado})}
+                  style={{padding:"7px 18px",background:"white",color:C.primary,border:"none",borderRadius:8,fontSize:12,fontWeight:800,cursor:"pointer",boxShadow:"0 2px 8px rgba(0,0,0,0.2)",whiteSpace:"nowrap"}}>
+                  Começar →
                 </button>
               </div>
-            ))}
+            </div>
+            {/* Linha 2: tags dos tópicos */}
+            <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+              {selecionados.map((s,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:100,padding:"3px 8px 3px 10px"}}>
+                  <span style={{fontSize:10,color:"white",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:180}}>
+                    {s.topico==="todas"?`${s.materia} — todos`:s.topico}
+                  </span>
+                  <button onClick={()=>removerSelecionado(i)}
+                    style={{width:14,height:14,borderRadius:"50%",background:"rgba(255,255,255,0.2)",border:"none",color:"white",cursor:"pointer",fontSize:9,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginLeft:2}}>
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
     </div>
   );
+}
+
 }
 
 /* ─── SESSÃO DE TREINO ───────────────────────────────────────── */
