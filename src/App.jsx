@@ -2626,56 +2626,19 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
   return(
     <div style={{display:'flex',flexDirection:'column',minHeight:'100%'}}>
 
-      {/* ── HEADER ── */}
-      <div style={{background:'#1A1045',borderRadius:'16px 16px 0 0',padding:'0 20px',display:'flex',alignItems:'stretch',gap:0,minHeight:52}}>
-        {/* Matéria + tópico */}
-        <div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'center',gap:2,paddingRight:16,borderRight:'1px solid rgba(255,255,255,0.08)'}}>
-          <div style={{fontSize:14,fontWeight:700,color:'#fff',letterSpacing:-0.3}}>{q?.materia||'—'}</div>
-          <div style={{fontSize:10,color:'rgba(255,255,255,0.4)',fontFamily:"'Courier New',monospace",letterSpacing:0.5}}>{q?.topico||q?.grupo||'—'}</div>
-        </div>
-        {/* Toggle Só novas + Contador */}
-        <div style={{display:'flex',alignItems:'center',gap:12,paddingLeft:16}}>
-          {setSoNaoRespondidas&&respondidas&&respondidas.size>0&&(
-            <div style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}} onClick={()=>setSoNaoRespondidas(v=>!v)}>
-              <div style={{width:32,height:18,borderRadius:100,background:soNaoRespondidas?'#A78BFA':'rgba(255,255,255,0.15)',position:'relative',transition:'background 0.2s',border:'1px solid rgba(255,255,255,0.2)'}}>
-                <div style={{width:14,height:14,borderRadius:'50%',background:'white',position:'absolute',top:1,left:soNaoRespondidas?16:1,transition:'left 0.2s',boxShadow:'0 1px 3px rgba(0,0,0,0.3)'}}/>
-              </div>
-              <span style={{fontSize:9,color:'rgba(255,255,255,0.6)',whiteSpace:'nowrap'}}>Só novas</span>
-            </div>
-          )}
-          {total>0&&(
-            <div style={{textAlign:'right'}}>
-              <div style={{fontSize:16,fontWeight:800,color:'#fff',lineHeight:1}}>
-                {atual}<span style={{fontSize:11,color:'rgba(255,255,255,0.35)',fontWeight:400}}>/{total}</span>
-              </div>
-              <div style={{fontSize:9,color:'rgba(255,255,255,0.35)',marginTop:1}}>questões</div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Barra de progresso */}
-      {total>0&&(
-        <div style={{height:3,background:'rgba(26,16,69,0.15)'}}>
-          <div style={{height:'100%',width:`${progresso}%`,background:'linear-gradient(90deg,#7C3AED,#A855F7)',transition:'width .4s ease'}}/>
-        </div>
-      )}
-
-      {/* ── METADATA STRIP ── */}
-      <div style={{background:'white',padding:'10px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-        {numQ&&<span style={{fontSize:10,fontWeight:800,padding:'3px 9px',borderRadius:6,background:'#1A104515',color:'#1A1045',border:'1px solid #1A104530',fontFamily:"'Courier New',monospace"}}>{numQ}</span>}
-        {q?.banca&&<span style={{fontSize:10,fontWeight:600,padding:'3px 9px',borderRadius:6,background:'#4B556315',color:'#4B5563',border:'1px solid #4B556330'}}>{q.banca}</span>}
-        {q?.fonte&&<span style={{fontSize:10,padding:'3px 9px',borderRadius:6,background:'#4B556315',color:'#4B5563',border:'1px solid #4B556330'}}>{q.fonte}</span>}
-        {q?.ano&&<span style={{fontSize:10,padding:'3px 9px',borderRadius:6,background:'#4B556315',color:'#4B5563',border:'1px solid #4B556330'}}>{q.ano}</span>}
-        <span style={{fontSize:10,fontWeight:700,padding:'3px 9px',borderRadius:6,background:`${C.primary}15`,color:C.primary,border:`1px solid ${C.primary}30`}}>
-          {q?.tipo==='certo_errado'?'CERTO / ERRADO':'MÚLTIPLA ESCOLHA'}
+      {/* ── METADATA STRIP — compacto e profissional ── */}
+      <div style={{background:C.white,padding:'8px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',borderRadius:'16px 16px 0 0'}}>
+        {numQ&&<span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:4,background:C.bg,color:C.textMed,border:`1px solid ${C.border}`,fontFamily:"'Courier New',monospace",letterSpacing:0.3}}>{numQ}</span>}
+        {q?.banca&&<span style={{fontSize:10,color:C.textMed}}>{q.banca}</span>}
+        {q?.banca&&q?.fonte&&<span style={{color:C.border,fontSize:10}}>·</span>}
+        {q?.fonte&&<span style={{fontSize:10,color:C.textMed}}>{q.fonte}</span>}
+        {q?.ano&&<><span style={{color:C.border,fontSize:10}}>·</span><span style={{fontSize:10,color:C.textMed}}>{q.ano}</span></>}
+        <span style={{fontSize:10,fontWeight:600,padding:'2px 8px',borderRadius:4,background:`${C.primary}10`,color:C.primary}}>
+          {q?.tipo==='certo_errado'?'C/E':'Múltipla escolha'}
         </span>
-        {q?.nivel&&(
-          <span style={{marginLeft:'auto',fontSize:10,fontWeight:700,padding:'3px 9px',borderRadius:6,background:nivelCor+'15',color:nivelCor,border:`1px solid ${nivelCor}30`}}>
-            {nivelLabel}
-          </span>
-        )}
+        {q?.nivel&&<span style={{marginLeft:'auto',fontSize:10,fontWeight:600,color:nivelCor}}>{nivelLabel}</span>}
       </div>
+
 
       {/* ── ABAS ── */}
       <div style={{background:'white',display:'flex',borderBottom:`1px solid ${C.border}`}}>
@@ -3272,18 +3235,28 @@ function SessaoEstudos({user,plano,onConcluir,onVoltar}){
 
   return(
     <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column"}}>
-      {/* BARRA DE PROGRESSO */}
-      <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,padding:"16px 24px",position:"sticky",top:0,zIndex:100}}>
-        <div style={{maxWidth:720,margin:"0 auto"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,color:"white"}}>
-            <button onClick={onVoltar} style={{background:"rgba(255,255,255,0.15)",border:"none",color:"white",borderRadius:8,padding:"6px 12px",fontSize:12,cursor:"pointer"}}>← Sair</button>
-            <span style={{fontSize:12,fontWeight:700}}>Questão {idx+1} de {questoes.length}</span>
-            <span style={{fontSize:12,background:"rgba(255,255,255,0.2)",padding:"4px 10px",borderRadius:100}}>{acertosAte} ✓</span>
+      {/* HEADER DA SESSÃO */}
+      <div style={{background:"white",borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,zIndex:100}}>
+        <div style={{maxWidth:960,margin:"0 auto",display:"flex",alignItems:"center",height:52,padding:"0 4px"}}>
+          <button onClick={onVoltar}
+            style={{height:"100%",padding:"0 16px",background:"none",border:"none",borderRight:`1px solid ${C.border}`,color:C.textMed,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontFamily:"'Sora',sans-serif",transition:"color 0.15s"}}
+            onMouseEnter={e=>e.currentTarget.style.color=C.text}
+            onMouseLeave={e=>e.currentTarget.style.color=C.textMed}>
+            ← Sair
+          </button>
+          <div style={{flex:1,padding:"0 16px",minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{q?.materia||'—'}</div>
+            {q?.topico&&<div style={{fontSize:11,color:C.textLight,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{q.topico}</div>}
           </div>
-          <div style={{height:6,background:"rgba(255,255,255,0.2)",borderRadius:100}}>
-            <div style={{height:"100%",width:`${((idx+1)/questoes.length)*100}%`,background:"white",borderRadius:100,transition:"width 0.4s ease"}}/>
+          <div style={{padding:"0 16px",borderLeft:`1px solid ${C.border}`,height:"100%",display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+            <span style={{fontSize:11,color:C.textLight}}>{acertosAte} acertos</span>
+            <span style={{color:C.border}}>·</span>
+            <span style={{fontSize:13,fontWeight:700,color:C.text}}>{idx+1}</span>
+            <span style={{fontSize:11,color:C.textLight}}>/{questoes.length}</span>
           </div>
-          <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",marginTop:6}}>{q?.materia} · {q?.topico}</div>
+        </div>
+        <div style={{height:2,background:C.border,maxWidth:960,margin:"0 auto"}}>
+          <div style={{height:"100%",width:`${((idx+1)/questoes.length)*100}%`,background:C.primary,transition:"width 0.4s ease"}}/>
         </div>
       </div>
 
@@ -4007,15 +3980,48 @@ function TreinoSessao({user,filtro,onVoltar}){
 
   return(
     <div style={{display:"flex",flexDirection:"column",gap:0}}>
-      {/* BARRA DE PROGRESSO */}
-      <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:16,padding:"14px 20px",marginBottom:16,maxWidth:960,width:"100%",margin:"0 auto 16px"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",color:"white",marginBottom:8}}>
-          <button onClick={onVoltar} style={{background:"rgba(255,255,255,0.15)",border:"none",color:"white",borderRadius:8,padding:"5px 12px",fontSize:12,cursor:"pointer"}}>← Sair</button>
-          <span style={{fontSize:12,fontWeight:700}}>{filtro.materia} {filtro.topico!=="todas"?`· ${filtro.topico}`:""}</span>
-          <span style={{fontSize:12,background:"rgba(255,255,255,0.2)",padding:"4px 10px",borderRadius:100}}>{idx+1}/{total}</span>
+      {/* HEADER DA SESSÃO — único, limpo, profissional */}
+      <div style={{background:"white",borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,zIndex:10,maxWidth:960,width:"100%",margin:"0 auto"}}>
+        <div style={{display:"flex",alignItems:"center",gap:0,height:52,padding:"0 4px"}}>
+          {/* Sair */}
+          <button onClick={onVoltar}
+            style={{height:"100%",padding:"0 16px",background:"none",border:"none",borderRight:`1px solid ${C.border}`,color:C.textMed,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:6,whiteSpace:"nowrap",fontFamily:"'Sora',sans-serif",transition:"color 0.15s"}}
+            onMouseEnter={e=>e.currentTarget.style.color=C.text}
+            onMouseLeave={e=>e.currentTarget.style.color=C.textMed}>
+            ← Sair
+          </button>
+          {/* Matéria e tópico */}
+          <div style={{flex:1,padding:"0 16px",minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+              {(filtro.topicos&&filtro.topicos.length>0)
+                ? [...new Set(filtro.topicos.map(t=>t.materia))].join(', ')
+                : filtro.materia||'Treino livre'}
+            </div>
+            {(filtro.topicos?.length===1||filtro.topico)&&(
+              <div style={{fontSize:11,color:C.textLight,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                {filtro.topicos?.[0]?.topico!=="todas"?filtro.topicos?.[0]?.topico:filtro.topico!=="todas"?filtro.topico:"Todos os tópicos"}
+              </div>
+            )}
+          </div>
+          {/* Toggle só novas */}
+          {soNaoRespondidas!==undefined&&respondidas&&respondidas.size>0&&(
+            <div style={{display:"flex",alignItems:"center",gap:6,padding:"0 12px",borderLeft:`1px solid ${C.border}`,cursor:"pointer",height:"100%"}}
+              onClick={()=>setSoNaoRespondidas(v=>!v)}>
+              <div style={{width:28,height:16,borderRadius:100,background:soNaoRespondidas?C.primary:C.border,position:"relative",transition:"background 0.2s",flexShrink:0}}>
+                <div style={{width:12,height:12,borderRadius:"50%",background:"white",position:"absolute",top:2,left:soNaoRespondidas?14:2,transition:"left 0.2s",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}}/>
+              </div>
+              <span style={{fontSize:10,color:C.textMed,whiteSpace:"nowrap"}}>Só novas</span>
+            </div>
+          )}
+          {/* Contador */}
+          <div style={{padding:"0 16px",borderLeft:`1px solid ${C.border}`,height:"100%",display:"flex",alignItems:"center",flexShrink:0}}>
+            <span style={{fontSize:13,fontWeight:700,color:C.text}}>{idx+1}</span>
+            <span style={{fontSize:11,color:C.textLight}}>/{total}</span>
+          </div>
         </div>
-        <div style={{height:5,background:"rgba(255,255,255,0.2)",borderRadius:100}}>
-          <div style={{height:"100%",width:`${((idx+1)/total)*100}%`,background:"white",borderRadius:100,transition:"width 0.4s ease"}}/>
+        {/* Barra de progresso fina */}
+        <div style={{height:2,background:C.border}}>
+          <div style={{height:"100%",width:`${total>0?((idx+1)/total)*100:0}%`,background:C.primary,transition:"width 0.4s ease"}}/>
         </div>
       </div>
 
