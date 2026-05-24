@@ -3834,8 +3834,6 @@ function TreinoTab({user,plano,onIniciar}){
           </div>
         </div>
       )}
-        </>
-      )}
       </>)}
     </div>
   );
