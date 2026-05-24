@@ -1906,50 +1906,18 @@ function ImportarProva({user,provaPdf,setProvaPdf,gabaritoPdf,setGabaritoPdf,
       setImportProgress("Enviando para a IA analisar... aguarde alguns segundos.");
 
       // Prompt de extração
-      const promptExtracao=`Você é especialista em concursos públicos brasileiros. Analise esta prova e extraia TODAS as questões.
+      const promptExtracao=`Extraia TODAS as questões desta prova. Retorne APENAS JSON compacto:
+{"textos_base":[{"id":"T1","texto":"..."}],"questoes":[{"n":1,"tb":null,"e":"enunciado completo","a":{"A":"...","B":"...","C":"...","D":"..."},"t":"multipla","g":"C","x":false}]}
 
-Para cada questão identifique:
-- numero: número/identificador da questão
-- grupo: área de conhecimento (ex: "Direito", "Língua Portuguesa", "Raciocínio Lógico", "Informática", "Administração") — identifique pelo conteúdo
-- materia: matéria específica (ex: "Direito Administrativo", "Interpretação de Texto", "Raciocínio Lógico Matemático")
-- topico: assunto específico dentro da matéria (ex: "Atos Administrativos", "Coerência e Coesão", "Sequências Numéricas")
-- texto_base_id: ID do texto base (ex: "T1","T2") se a questão pertencer a um texto compartilhado, ou null
-- enunciado: enunciado completo da questão
-- alternativas: objeto {A,B,C,D,E} com o texto de cada alternativa (só as que existirem)
-- tipo: "multipla" (A-E) ou "certo_errado"
-- gabarito: letra do gabarito se estiver disponível na prova, ou null
-- anulada: true se houver indicação de anulação, false caso contrário
-- nivel: "facil", "medio" ou "dificil" baseado na complexidade
-
-Para textos base (textos compartilhados por múltiplas questões):
-- id: identificador único (T1, T2, etc.)
-- texto: conteúdo completo do texto
-
-Retorne APENAS JSON válido sem texto adicional:
-{
-  "textos_base": [{"id":"T1","texto":"conteúdo..."}],
-  "questoes": [
-    {
-      "numero": 1,
-      "grupo": "Direito",
-      "materia": "Direito Administrativo",
-      "topico": "Atos Administrativos",
-      "texto_base_id": "T1",
-      "enunciado": "...",
-      "alternativas": {"A":"...","B":"...","C":"...","D":"..."},
-      "tipo": "multipla",
-      "gabarito": "B",
-      "anulada": false,
-      "nivel": "medio"
-    }
-  ]
-}`;
+Campos: n=numero, tb=texto_base_id(ou null), e=enunciado, a=alternativas(objeto vazio {} se certo_errado), t=tipo(multipla ou certo_errado), g=gabarito(letra ou null), x=anulada(true/false).
+Textos base: apenas quando múltiplas questões compartilham um texto.
+IMPORTANTE: inclua TODAS as questões, não pule nenhuma.`;
 
       const mensagemCompleta=`${promptExtracao}\n\nTEXTO EXTRAÍDO DA PROVA:\n${textoProva}${textoGabarito?"\n\nGABARITO OFICIAL:\n"+textoGabarito:""}`;
       const messages=[{role:"user",content:mensagemCompleta}];
 
       const resp=await fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"gpt-4o-mini",max_tokens:8000,
+        body:JSON.stringify({model:"gpt-4o-mini",max_tokens:12000,
           system:"Você é especialista em concursos públicos brasileiros. Extraia questões de provas. IMPORTANTE: Retorne APENAS o JSON puro, sem texto antes ou depois, sem markdown. Comece com { e termine com }.",
           messages})});
       const d=await resp.json();
@@ -1995,8 +1963,22 @@ Retorne APENAS JSON válido sem texto adicional:
         setImportPhase("form");return;
       }
 
-      let questoesExtraidas=dados.questoes||[];
+      // Converte formato compacto para formato interno
       const textosBase=dados.textos_base||[];
+      let questoesExtraidas=(dados.questoes||[]).map(q=>({
+        numero: q.n||q.numero,
+        texto_base_id: q.tb||q.texto_base_id||null,
+        enunciado: q.e||q.enunciado||"",
+        alternativas: q.a||q.alternativas||{},
+        tipo: q.t||q.tipo||"certo_errado",
+        gabarito: q.g||q.gabarito||null,
+        anulada: q.x||q.anulada||false,
+        // campos a preencher na revisão
+        grupo: importMeta.grupo||"",
+        materia: "",
+        topico: "",
+        nivel: "medio",
+      }));
 
       // Se tiver gabarito separado, processa e cruza
       if(textoGabarito&&questoesExtraidas.length>0){
@@ -2536,7 +2518,7 @@ Responda SOMENTE com JSON: {"nivel":<1 a 5>,"comentario":"<comentário completo>
 }
 
 /* ─── COMPONENTE: QUESTÃO COM COMENTÁRIOS E REPORT ─────────── */
-function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,onProxima,isLast}){
+function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,onProxima,isLast,atual,total}){
   const ADMIN_EMAIL=import.meta.env.VITE_ADMIN_EMAIL||'';
   const [abaQ,setAbaQ]=React.useState('questao');
   const [comentarios,setComentarios]=React.useState([]);
@@ -2549,8 +2531,10 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
   const LETRAS=['A','B','C','D','E'];
 
   React.useEffect(()=>{if(abaQ==='comentarios') loadComentarios();},[abaQ,q?.id]);
+  React.useEffect(()=>{setAbaQ('questao');},[q?.id]);
 
   const numQ=q?.numero?`Q-${String(q.numero).padStart(4,'0')}`:null;
+  const progresso=total>0?Math.round((atual/total)*100):0;
 
   const loadComentarios=async()=>{
     if(!q?.id) return;
@@ -2581,15 +2565,8 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
     const nQ=numQ||'S/N';
     const tipoLabel={pergunta:'Erro na pergunta',comentario:'Erro no comentário da plataforma',anulada:'Questão anulada pela banca'}[report.tipo];
     await supabase.from('reports_questao').insert({questao_id:q.id,questao_num:q?.numero||null,user_id:user.id,email:report.email,tipo:report.tipo,observacao:report.observacao});
-    // Envia emails via API server-side (chaves seguras no servidor)
     await fetch('/api/send-email',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        tipo:'report',
-        questaoNum:nQ,
-        tipoLabel,
-        alunoEmail:report.email,
-        observacao:report.observacao
-      })});
+      body:JSON.stringify({tipo:'report',questaoNum:nQ,tipoLabel,alunoEmail:report.email,observacao:report.observacao})});
     setEnviandoR(false);setReportEnviado(true);
   };
 
@@ -2600,206 +2577,333 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
     return{bg:'#F9FAFB',border:C.border,color:C.textLight};
   };
 
-  const ABAS_Q=[{id:'questao',l:'❓ Questão'},{id:'comentario_plataforma',l:'💡 Explicação'},{id:'comentarios',l:`💬 Debate (${comentarios.length})`},{id:'report',l:'🚩 Reportar'}];
+  const nivelCor=q?.nivel==='facil'?'#22c55e':q?.nivel==='medio'?'#F59E0B':'#EF4444';
+  const nivelLabel=q?.nivel==='facil'?'Fácil':q?.nivel==='medio'?'Médio':'Difícil';
+  const acertou=confirmada&&selecionada===q?.gabarito;
+  const errou=confirmada&&selecionada!==q?.gabarito;
 
   return(
-    <div>
-      {/* Número + badges + estrelas */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8,marginBottom:12}}>
-        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-          {numQ&&<span style={{background:C.primaryXLight,color:C.primary,borderRadius:100,padding:'3px 10px',fontSize:11,fontWeight:800}}>{numQ}</span>}
-          {q?.banca&&<span style={{background:'#F3F4F6',color:C.textMed,borderRadius:100,padding:'3px 10px',fontSize:10}}>{q.banca}</span>}
-          {q?.fonte&&<span style={{background:'#F3F4F6',color:C.textMed,borderRadius:100,padding:'3px 10px',fontSize:10}}>{q.fonte}</span>}
-          {q?.ano&&<span style={{background:'#F3F4F6',color:C.textMed,borderRadius:100,padding:'3px 10px',fontSize:10}}>{q.ano}</span>}
-          {q?.tipo==='certo_errado'&&<span style={{background:'#FEF3C7',color:'#92400E',borderRadius:100,padding:'3px 10px',fontSize:10,fontWeight:700}}>CERTO/ERRADO</span>}
+    <div style={{display:'flex',flexDirection:'column',minHeight:'100%'}}>
+
+      {/* ── HEADER ── */}
+      <div style={{background:'#1A1045',borderRadius:'16px 16px 0 0',padding:'0 20px',display:'flex',alignItems:'stretch',gap:0,minHeight:52}}>
+        {/* Matéria + tópico */}
+        <div style={{flex:1,display:'flex',flexDirection:'column',justifyContent:'center',gap:2,paddingRight:16,borderRight:'1px solid rgba(255,255,255,0.08)'}}>
+          <div style={{fontSize:14,fontWeight:700,color:'#fff',letterSpacing:-0.3}}>{q?.materia||'—'}</div>
+          <div style={{fontSize:10,color:'rgba(255,255,255,0.4)',fontFamily:"'Courier New',monospace",letterSpacing:0.5}}>{q?.topico||q?.grupo||'—'}</div>
         </div>
-        {/* Estrelas de dificuldade */}
-        {q?.nivel&&(()=>{
-          const n=parseInt(q.nivel)||0;
-          const cores=['','#10B981','#84CC16','#F59E0B','#EF4444','#991B1B'];
-          const cor=cores[Math.min(n,5)]||C.textLight;
-          return(
-            <div style={{display:'flex',alignItems:'center',gap:3}}>
-              {[1,2,3,4,5].map(i=>(
-                <svg key={i} width="12" height="12" viewBox="0 0 24 24" fill={i<=n?cor:'#E5E7EB'} xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                </svg>
-              ))}
+        {/* Contador */}
+        {total>0&&(
+          <div style={{display:'flex',alignItems:'center',gap:8,paddingLeft:16}}>
+            <div style={{textAlign:'right'}}>
+              <div style={{fontSize:16,fontWeight:800,color:'#fff',lineHeight:1}}>
+                {atual}<span style={{fontSize:11,color:'rgba(255,255,255,0.35)',fontWeight:400}}>/{total}</span>
+              </div>
+              <div style={{fontSize:9,color:'rgba(255,255,255,0.35)',marginTop:1}}>questões</div>
             </div>
-          );
-        })()}
+          </div>
+        )}
       </div>
-      {/* Sub-abas */}
-      <div style={{display:'flex',background:'#F3F4F6',borderRadius:10,padding:2,marginBottom:16,overflowX:'auto',gap:2}}>
-        {ABAS_Q.map(a=>(
-          <button key={a.id} onClick={()=>setAbaQ(a.id)}
-            style={{flex:1,padding:'8px 6px',border:'none',borderRadius:8,background:abaQ===a.id?'white':'transparent',
-              color:abaQ===a.id?C.primary:C.textMed,fontSize:10,fontWeight:abaQ===a.id?700:500,
-              cursor:'pointer',whiteSpace:'nowrap',boxShadow:abaQ===a.id?'0 1px 4px rgba(0,0,0,0.1)':'none'}}>
-            {a.l}
-          </button>
+
+      {/* Barra de progresso */}
+      {total>0&&(
+        <div style={{height:3,background:'rgba(26,16,69,0.15)'}}>
+          <div style={{height:'100%',width:`${progresso}%`,background:'linear-gradient(90deg,#7C3AED,#A855F7)',transition:'width .4s ease'}}/>
+        </div>
+      )}
+
+      {/* ── METADATA STRIP ── */}
+      <div style={{background:'white',padding:'10px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+        {numQ&&<span style={{fontSize:10,fontWeight:800,padding:'3px 9px',borderRadius:6,background:'#1A104515',color:'#1A1045',border:'1px solid #1A104530',fontFamily:"'Courier New',monospace"}}>{numQ}</span>}
+        {q?.banca&&<span style={{fontSize:10,fontWeight:600,padding:'3px 9px',borderRadius:6,background:'#4B556315',color:'#4B5563',border:'1px solid #4B556330'}}>{q.banca}</span>}
+        {q?.fonte&&<span style={{fontSize:10,padding:'3px 9px',borderRadius:6,background:'#4B556315',color:'#4B5563',border:'1px solid #4B556330'}}>{q.fonte}</span>}
+        {q?.ano&&<span style={{fontSize:10,padding:'3px 9px',borderRadius:6,background:'#4B556315',color:'#4B5563',border:'1px solid #4B556330'}}>{q.ano}</span>}
+        <span style={{fontSize:10,fontWeight:700,padding:'3px 9px',borderRadius:6,background:`${C.primary}15`,color:C.primary,border:`1px solid ${C.primary}30`}}>
+          {q?.tipo==='certo_errado'?'CERTO / ERRADO':'MÚLTIPLA ESCOLHA'}
+        </span>
+        {q?.nivel&&(
+          <span style={{marginLeft:'auto',fontSize:10,fontWeight:700,padding:'3px 9px',borderRadius:6,background:nivelCor+'15',color:nivelCor,border:`1px solid ${nivelCor}30`}}>
+            {nivelLabel}
+          </span>
+        )}
+      </div>
+
+      {/* ── ABAS ── */}
+      <div style={{background:'white',display:'flex',borderBottom:`1px solid ${C.border}`}}>
+        {[
+          {id:'questao',l:'Questão'},
+          {id:'comentario_plataforma',l:'Explicação'},
+          {id:'comentarios',l:`Debate (${comentarios.length})`},
+          {id:'report',l:'Reportar'},
+        ].map(a=>(
+          <button key={a.id} onClick={()=>setAbaQ(a.id)} style={{
+            padding:'12px 16px',border:'none',background:'none',cursor:'pointer',
+            fontSize:12,fontFamily:"'Sora',sans-serif",fontWeight:abaQ===a.id?700:400,
+            color:abaQ===a.id?'#1A1045':C.textLight,
+            borderBottom:abaQ===a.id?'2px solid #7C3AED':'2px solid transparent',
+            marginBottom:-1,transition:'all .2s',whiteSpace:'nowrap',
+          }}>{a.l}</button>
         ))}
       </div>
-      {/* QUESTÃO */}
-      {abaQ==='questao'&&(
-        <div>
-          <div style={{fontSize:15,lineHeight:1.8,color:C.text,marginBottom:20}}>{q?.enunciado}</div>
-          {q?.tipo==='certo_errado'?(
-            <div style={{display:'flex',gap:12,marginBottom:16}}>
-              {[{v:'C',l:'✅ Certo'},{v:'E',l:'❌ Errado'}].map(opt=>{
-                const isGab=confirmada&&opt.v===q?.gabarito;
-                const isErro=confirmada&&selecionada===opt.v&&opt.v!==q?.gabarito;
-                const isSel=!confirmada&&selecionada===opt.v;
-                return(<button key={opt.v} onClick={()=>!confirmada&&onSelect(opt.v)}
-                  style={{flex:1,padding:'18px',border:`2px solid ${isGab?'#10B981':isErro?'#EF4444':isSel?C.primary:C.border}`,
-                    borderRadius:12,background:isGab?'#D1FAE5':isErro?'#FEE2E2':isSel?C.primaryXLight:'white',
-                    fontSize:15,fontWeight:800,cursor:confirmada?'default':'pointer',
-                    color:isGab?'#065F46':isErro?'#991B1B':isSel?C.primary:C.textMed}}>{opt.l}</button>);
-              })}
-            </div>
-          ):(
-            <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:16}}>
-              {LETRAS.filter(l=>q?.alternativas?.[l]).map(l=>{
-                const c=corLetra(l);
-                return(<button key={l} onClick={()=>!confirmada&&onSelect(l)}
-                  style={{display:'flex',alignItems:'flex-start',gap:12,padding:'11px 14px',
-                    border:`2px solid ${c.border}`,borderRadius:12,background:c.bg,
-                    cursor:confirmada?'default':'pointer',textAlign:'left',transition:'all 0.15s'}}>
-                  <span style={{width:28,height:28,borderRadius:8,border:`2px solid ${c.border}`,
-                    background:c.border===C.border?'transparent':c.border,display:'flex',alignItems:'center',
-                    justifyContent:'center',fontSize:12,fontWeight:800,color:c.color,flexShrink:0}}>{l}</span>
-                  <span style={{fontSize:13,lineHeight:1.6,color:c.color}}>{q?.alternativas?.[l]}</span>
-                </button>);
-              })}
-            </div>
-          )}
-          {!confirmada?(
-            <button onClick={onConfirmar} disabled={!selecionada}
-              style={{width:'100%',padding:'13px',background:selecionada?`linear-gradient(135deg,${C.primary},${C.primaryLight})`:'#E5E7EB',
-                color:selecionada?'white':C.textLight,border:'none',borderRadius:12,fontSize:14,fontWeight:700,
-                cursor:selecionada?'pointer':'not-allowed',boxShadow:selecionada?'0 4px 14px rgba(108,60,225,0.3)':'none'}}>
-              Confirmar resposta
-            </button>
-          ):(
-            <div style={{marginTop:8}}>
-              {/* Gabarito resultado */}
-              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12,padding:'10px 14px',
-                background:selecionada===q?.gabarito?'#D1FAE5':'#FEE2E2',borderRadius:10}}>
-                <span style={{fontSize:18}}>{selecionada===q?.gabarito?'✅':'❌'}</span>
-                <span style={{fontSize:13,fontWeight:700,color:selecionada===q?.gabarito?'#065F46':'#991B1B'}}>
-                  {selecionada===q?.gabarito?'Resposta correta!':`Incorreto. Gabarito: ${q?.gabarito}`}
-                </span>
+
+      {/* ── CONTEÚDO ── */}
+      <div style={{background:'white',padding:'24px 20px',flex:1,borderRadius:'0 0 16px 16px'}}>
+
+        {/* QUESTÃO */}
+        {abaQ==='questao'&&(
+          <div>
+            {/* Texto base */}
+            {q?.texto_base&&(
+              <div style={{background:'#F8F9FA',border:'1px solid #E5E7EB',borderLeft:'4px solid #7C3AED',borderRadius:10,padding:'14px 16px',marginBottom:20,fontSize:13,lineHeight:1.8,color:'#374151',fontFamily:"'Georgia',serif"}}>
+                {q.texto_base}
               </div>
-              <button onClick={onProxima}
-                style={{width:'100%',padding:'13px',background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,
-                  color:'white',border:'none',borderRadius:12,fontSize:14,fontWeight:700,cursor:'pointer',
-                  boxShadow:'0 4px 14px rgba(108,60,225,0.3)'}}>
-                {isLast?'Ver resultado 🏆':'Próxima →'}
+            )}
+            {/* Enunciado */}
+            <p style={{fontSize:16,lineHeight:1.8,color:'#111827',margin:'0 0 24px 0',fontFamily:"'Georgia',serif"}}>
+              {q?.enunciado}
+            </p>
+            {/* Alternativas */}
+            {q?.tipo==='certo_errado'?(
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16}}>
+                {[{v:'C',l:'Certo'},{v:'E',l:'Errado'}].map(opt=>{
+                  const isGab=confirmada&&opt.v===q?.gabarito;
+                  const isErro=confirmada&&selecionada===opt.v&&opt.v!==q?.gabarito;
+                  const isSel=!confirmada&&selecionada===opt.v;
+                  return(
+                    <button key={opt.v} onClick={()=>!confirmada&&onSelect(opt.v)}
+                      style={{padding:'18px',border:`2px solid ${isGab?'#22c55e':isErro?'#ef4444':isSel?'#7C3AED':'#E5E7EB'}`,
+                        borderRadius:12,background:isGab?'#F0FDF4':isErro?'#FEF2F2':isSel?'#F5F3FF':'white',
+                        fontSize:15,fontWeight:700,cursor:confirmada?'default':'pointer',fontFamily:"'Georgia',serif",
+                        color:isGab?'#15803D':isErro?'#B91C1C':isSel?'#7C3AED':'#374151',
+                        display:'flex',alignItems:'center',justifyContent:'center',gap:8,
+                        transition:'all .2s',boxShadow:!confirmada?'0 1px 3px rgba(0,0,0,0.06)':'none'}}
+                      onMouseEnter={e=>{if(!confirmada&&!isSel){e.currentTarget.style.borderColor='#7C3AED';e.currentTarget.style.color='#7C3AED';}}}
+                      onMouseLeave={e=>{if(!confirmada&&!isSel){e.currentTarget.style.borderColor='#E5E7EB';e.currentTarget.style.color='#374151';}}}>
+                      {isGab&&'✓ '}{isErro&&'✗ '}{opt.l}
+                    </button>
+                  );
+                })}
+              </div>
+            ):(
+              <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:16}}>
+                {LETRAS.filter(l=>q?.alternativas?.[l]).map(l=>{
+                  const c=corLetra(l);
+                  const isGab=confirmada&&l===q?.gabarito;
+                  const isErro=confirmada&&selecionada===l&&l!==q?.gabarito;
+                  return(
+                    <button key={l} onClick={()=>!confirmada&&onSelect(l)}
+                      style={{padding:'14px 16px',border:`2px solid ${c.border}`,borderRadius:12,background:c.bg,
+                        cursor:confirmada?'default':'pointer',display:'flex',alignItems:'flex-start',gap:12,textAlign:'left',
+                        transition:'all .2s',boxShadow:!confirmada?'0 1px 3px rgba(0,0,0,0.05)':'none'}}
+                      onMouseEnter={e=>{if(!confirmada&&selecionada!==l){e.currentTarget.style.borderColor='#7C3AED';}}}
+                      onMouseLeave={e=>{if(!confirmada&&selecionada!==l){e.currentTarget.style.borderColor=C.border;}}}>
+                      <span style={{fontSize:13,fontWeight:800,color:c.color,flexShrink:0,width:20}}>{l})</span>
+                      <span style={{fontSize:14,color:c.color,fontWeight:isGab?600:400,lineHeight:1.6,fontFamily:"'Georgia',serif"}}>
+                        {q.alternativas[l]}
+                      </span>
+                      {isGab&&<span style={{marginLeft:'auto',fontSize:11,fontWeight:700,color:'#15803D',flexShrink:0}}>✓</span>}
+                      {isErro&&<span style={{marginLeft:'auto',fontSize:11,fontWeight:700,color:'#B91C1C',flexShrink:0}}>✗</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Botão confirmar / feedback */}
+            {!confirmada?(
+              <button onClick={onConfirmar} disabled={!selecionada}
+                style={{width:'100%',padding:'16px',borderRadius:12,
+                  background:selecionada?'linear-gradient(135deg,#1A1045,#7C3AED)':'#E5E7EB',
+                  color:selecionada?'white':C.textLight,border:'none',cursor:selecionada?'pointer':'not-allowed',
+                  fontSize:14,fontWeight:700,fontFamily:"'Sora',sans-serif",letterSpacing:0.3,transition:'opacity .2s'}}
+                onMouseEnter={e=>{if(selecionada)e.currentTarget.style.opacity='0.9';}}
+                onMouseLeave={e=>{e.currentTarget.style.opacity='1';}}>
+                Confirmar resposta
               </button>
-            </div>
-          )}
-        </div>
-      )}
-      {/* EXPLICAÇÃO DA PLATAFORMA */}
-      {abaQ==='comentario_plataforma'&&(
-        <div>
-          {q?.comentario?(
-            <div>
-              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}>
-                <div style={{width:36,height:36,borderRadius:'50%',background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>🤖</div>
-                <div><div style={{fontSize:12,fontWeight:700,color:C.text}}>Explicação oficial</div><div style={{fontSize:10,color:C.textLight}}>Gerada pela IA do DominaBanca</div></div>
-              </div>
-              <div style={{fontSize:13,lineHeight:1.9,color:C.text,background:C.bg,borderRadius:12,padding:'16px',borderLeft:`4px solid ${C.primary}`}}>{q.comentario}</div>
-            </div>
-          ):(
-            <div style={{textAlign:'center',padding:'32px',color:C.textLight}}>
-              <div style={{fontSize:32,marginBottom:8}}>📝</div>
-              <div style={{fontSize:13}}>Ainda não há explicação para esta questão.</div>
-            </div>
-          )}
-        </div>
-      )}
-      {/* COMENTÁRIOS DOS ALUNOS */}
-      {abaQ==='comentarios'&&(
-        <div>
-          <div style={{marginBottom:14}}>
-            <textarea value={novoComentario} onChange={e=>setNovoComentario(e.target.value)}
-              placeholder='Compartilhe sua dúvida ou contribuição...'
-              rows={3} style={{width:'100%',padding:'10px 12px',border:`1.5px solid ${C.border}`,borderRadius:10,
-                fontSize:12,resize:'none',boxSizing:'border-box',outline:'none',fontFamily:"'Sora',sans-serif",lineHeight:1.6}}/>
-            <button onClick={enviarComentario} disabled={!novoComentario.trim()||enviandoC}
-              style={{marginTop:8,padding:'9px 18px',background:novoComentario.trim()?C.primary:'#E5E7EB',
-                color:novoComentario.trim()?'white':C.textLight,border:'none',borderRadius:8,fontSize:12,fontWeight:700,cursor:novoComentario.trim()?'pointer':'not-allowed'}}>
-              {enviandoC?'Enviando...':'Comentar'}
-            </button>
-          </div>
-          {loadingC?(<div style={{display:'flex',justifyContent:'center',padding:'20px'}}><div style={{width:24,height:24,border:'3px solid #EDE9FE',borderTop:`3px solid ${C.primary}`,borderRadius:'50%',animation:'spin 0.6s linear infinite'}}/></div>)
-          :comentarios.length===0?(<div style={{textAlign:'center',padding:'24px',color:C.textLight,fontSize:12}}>Seja o primeiro a comentar!</div>)
-          :(<div style={{display:'flex',flexDirection:'column',gap:10}}>
-            {comentarios.map(c=>(
-              <div key={c.id} style={{background:C.bg,borderRadius:10,padding:'12px 14px'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-                  <div style={{display:'flex',alignItems:'center',gap:8}}>
-                    <div style={{width:26,height:26,borderRadius:'50%',background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:11,fontWeight:800}}>
-                      {c.nome.charAt(0).toUpperCase()}
+            ):(
+              <div>
+                {/* Feedback */}
+                <div style={{borderRadius:12,padding:'14px 18px',
+                  background:acertou?'#F0FDF4':'#FEF2F2',
+                  border:`1px solid ${acertou?'#BBF7D0':'#FECACA'}`,
+                  display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
+                  <span style={{fontSize:20}}>{acertou?'✓':'✗'}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:14,fontWeight:700,color:acertou?'#15803D':'#B91C1C'}}>
+                      {acertou?'Resposta correta!`:`Incorreto. Gabarito: ${q?.gabarito==='C'?'Certo':q?.gabarito==='E'?'Errado':q?.gabarito}`}
                     </div>
-                    <span style={{fontSize:12,fontWeight:700,color:C.text}}>{c.nome}</span>
-                    <span style={{fontSize:10,color:C.textLight}}>{new Date(c.created_at).toLocaleDateString('pt-BR')}</span>
+                    <div style={{fontSize:12,color:acertou?'#166534':'#991B1B',marginTop:2}}>
+                      {acertou?'Ótimo! Clique em Próxima para continuar.':'Veja a explicação para entender o erro.'}
+                    </div>
                   </div>
-                  {(c.user_id===user?.id||user?.email===(import.meta.env.VITE_ADMIN_EMAIL||''))&&(
-                    <button onClick={()=>excluirComentario(c.id)} style={{background:'transparent',border:'none',color:C.textLight,cursor:'pointer',fontSize:12}}>🗑️</button>
+                  {!acertou&&(
+                    <button onClick={()=>setAbaQ('comentario_plataforma')}
+                      style={{padding:'7px 14px',borderRadius:8,background:'#B91C1C',color:'#fff',border:'none',
+                        fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Sora',sans-serif",flexShrink:0}}>
+                      Ver explicação
+                    </button>
                   )}
                 </div>
-                <div style={{fontSize:13,color:C.text,lineHeight:1.6}}>{c.texto}</div>
+                {/* Caderno de erros */}
+                {errou&&(
+                  <CadernoErrosBtn user={user} q={q}/>
+                )}
+                {/* Próxima */}
+                <button onClick={onProxima}
+                  style={{width:'100%',padding:'16px',borderRadius:12,
+                    background:'linear-gradient(135deg,#1A1045,#7C3AED)',
+                    color:'#fff',border:'none',cursor:'pointer',
+                    fontSize:15,fontWeight:700,fontFamily:"'Sora',sans-serif",
+                    letterSpacing:0.3,transition:'opacity .2s'}}
+                  onMouseEnter={e=>e.currentTarget.style.opacity='0.9'}
+                  onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
+                  {isLast?'Ver resultado 🏆':'Próxima questão →'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* EXPLICAÇÃO */}
+        {abaQ==='comentario_plataforma'&&(
+          <div>
+            {!confirmada&&(
+              <div style={{textAlign:'center',padding:'24px 0',color:C.textLight,fontSize:14,fontFamily:"'Georgia',serif"}}>
+                Responda a questão para ver a explicação.
+              </div>
+            )}
+            {confirmada&&(q?.comentario?(
+              <div style={{fontSize:14,lineHeight:1.85,color:'#374151',fontFamily:"'Georgia',serif"}}>
+                {q.comentario.split('\n\n').map((bloco,i)=>{
+                  const isTitle=/^\d\./.test(bloco);
+                  return(
+                    <p key={i} style={{margin:'0 0 16px 0',fontWeight:isTitle?700:400,color:isTitle?'#1A1045':'#374151'}}>
+                      {bloco}
+                    </p>
+                  );
+                })}
+              </div>
+            ):(
+              <div style={{textAlign:'center',padding:'32px',color:C.textLight}}>
+                <div style={{fontSize:32,marginBottom:8}}>📝</div>
+                <div style={{fontSize:13}}>Ainda não há explicação para esta questão.</div>
               </div>
             ))}
-          </div>)}
-        </div>
-      )}
-      {/* REPORT */}
-      {abaQ==='report'&&(reportEnviado?(
-        <div style={{textAlign:'center',padding:'32px'}}>
-          <div style={{fontSize:40,marginBottom:12}}>✅</div>
-          <div style={{fontFamily:"'Lora',serif",fontSize:18,fontWeight:700,color:C.text,marginBottom:8}}>Report enviado!</div>
-          <div style={{fontSize:13,color:C.textMed,marginBottom:16}}>Você receberá um email de confirmação. Obrigado! 🙏</div>
-          <button onClick={()=>{setReportEnviado(false);setReport({tipo:'',observacao:'',email:user?.email||''});setAbaQ('questao');}} style={{padding:'10px 20px',background:C.primary,color:'white',border:'none',borderRadius:10,fontSize:13,fontWeight:700,cursor:'pointer'}}>Voltar</button>
-        </div>
-      ):(
-        <div style={{display:'flex',flexDirection:'column',gap:14}}>
-          <div style={{fontSize:12,color:C.textMed}}>Encontrou um problema nesta questão? {numQ&&<span style={{fontWeight:700,color:C.primary}}>{numQ}</span>}</div>
-          <div>
-            <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:8}}>Tipo do problema *</div>
-            {[{v:'pergunta',l:'❓ Erro na pergunta',d:'Enunciado incorreto ou mal formulado'},{v:'comentario',l:'💡 Erro no comentário',d:'Explicação incorreta ou incompleta'},{v:'anulada',l:'🚫 Questão anulada',d:'A banca oficial anulou esta questão'}].map(t=>(
-              <div key={t.v} onClick={()=>setReport(r=>({...r,tipo:t.v}))}
-                style={{border:`2px solid ${report.tipo===t.v?C.primary:C.border}`,borderRadius:10,padding:'10px 14px',marginBottom:8,cursor:'pointer',background:report.tipo===t.v?C.primaryXLight:'white'}}>
-                <div style={{fontSize:12,fontWeight:700,color:report.tipo===t.v?C.primary:C.text}}>{t.l}</div>
-                <div style={{fontSize:11,color:C.textLight,marginTop:2}}>{t.d}</div>
-              </div>
-            ))}
           </div>
+        )}
+
+        {/* DEBATE */}
+        {abaQ==='comentarios'&&(
           <div>
-            <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>Sua observação *</div>
-            <textarea value={report.observacao} onChange={e=>setReport(r=>({...r,observacao:e.target.value}))} rows={3}
-              placeholder='Descreva o problema encontrado...'
-              style={{width:'100%',padding:'10px 12px',border:`1.5px solid ${C.border}`,borderRadius:10,fontSize:12,resize:'none',boxSizing:'border-box',outline:'none',fontFamily:"'Sora',sans-serif"}}/>
+            <div style={{marginBottom:14}}>
+              <textarea value={novoComentario} onChange={e=>setNovoComentario(e.target.value)}
+                placeholder='Compartilhe sua dúvida ou contribuição...'
+                rows={3} style={{width:'100%',padding:'10px 12px',border:`1.5px solid ${C.border}`,borderRadius:10,
+                  fontSize:13,resize:'none',boxSizing:'border-box',outline:'none',fontFamily:"'Sora',sans-serif",lineHeight:1.6}}/>
+              <button onClick={enviarComentario} disabled={!novoComentario.trim()||enviandoC}
+                style={{marginTop:8,padding:'9px 18px',background:novoComentario.trim()?'#1A1045':'#E5E7EB',
+                  color:novoComentario.trim()?'white':C.textLight,border:'none',borderRadius:8,fontSize:12,fontWeight:700,
+                  cursor:novoComentario.trim()?'pointer':'not-allowed',fontFamily:"'Sora',sans-serif"}}>
+                {enviandoC?'Enviando...':'Comentar'}
+              </button>
+            </div>
+            {loadingC?(<div style={{display:'flex',justifyContent:'center',padding:'20px'}}><div style={{width:24,height:24,border:'3px solid #EDE9FE',borderTop:'3px solid #7C3AED',borderRadius:'50%',animation:'spin 0.6s linear infinite'}}/></div>)
+            :comentarios.length===0?(<div style={{textAlign:'center',padding:'24px',color:C.textLight,fontSize:13,fontFamily:"'Georgia',serif"}}>Nenhum debate ainda. Seja o primeiro a comentar!</div>)
+            :(<div style={{display:'flex',flexDirection:'column',gap:10}}>
+              {comentarios.map(c=>(
+                <div key={c.id} style={{background:C.bg,borderRadius:10,padding:'12px 14px'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                    <div style={{display:'flex',alignItems:'center',gap:8}}>
+                      <div style={{width:26,height:26,borderRadius:'50%',background:'linear-gradient(135deg,#1A1045,#7C3AED)',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:11,fontWeight:800}}>
+                        {c.nome.charAt(0).toUpperCase()}
+                      </div>
+                      <span style={{fontSize:12,fontWeight:700,color:C.text}}>{c.nome}</span>
+                      <span style={{fontSize:10,color:C.textLight}}>{new Date(c.created_at).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                    {(c.user_id===user?.id||user?.email===ADMIN_EMAIL)&&(
+                      <button onClick={()=>excluirComentario(c.id)} style={{background:'transparent',border:'none',color:C.textLight,cursor:'pointer',fontSize:12}}>🗑️</button>
+                    )}
+                  </div>
+                  <div style={{fontSize:13,color:C.text,lineHeight:1.6}}>{c.texto}</div>
+                </div>
+              ))}
+            </div>)}
           </div>
-          <div>
-            <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>Seu email *</div>
-            <input value={report.email} onChange={e=>setReport(r=>({...r,email:e.target.value}))} type='email' placeholder='email@exemplo.com'
-              style={{width:'100%',padding:'10px 12px',border:`1.5px solid ${C.border}`,borderRadius:10,fontSize:12,outline:'none',boxSizing:'border-box'}}/>
-            <div style={{fontSize:10,color:C.textLight,marginTop:4}}>Você receberá uma confirmação neste email</div>
+        )}
+
+        {/* REPORT */}
+        {abaQ==='report'&&(reportEnviado?(
+          <div style={{textAlign:'center',padding:'32px'}}>
+            <div style={{fontSize:40,marginBottom:12}}>✅</div>
+            <div style={{fontFamily:"'Lora',serif",fontSize:18,fontWeight:700,color:C.text,marginBottom:8}}>Report enviado!</div>
+            <div style={{fontSize:13,color:C.textMed,marginBottom:16}}>Obrigado! Analisaremos em breve. 🙏</div>
+            <button onClick={()=>{setReportEnviado(false);setReport({tipo:'',observacao:'',email:user?.email||''});setAbaQ('questao');}}
+              style={{padding:'10px 20px',background:'#1A1045',color:'white',border:'none',borderRadius:10,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:"'Sora',sans-serif"}}>
+              Voltar
+            </button>
           </div>
-          <button onClick={enviarReport} disabled={!report.tipo||!report.observacao||!report.email||enviandoR}
-            style={{padding:'12px',background:report.tipo&&report.observacao&&report.email?`linear-gradient(135deg,${C.primary},${C.primaryLight})`:'#E5E7EB',
-              color:report.tipo&&report.observacao&&report.email?'white':C.textLight,border:'none',borderRadius:10,fontSize:13,fontWeight:700,
-              cursor:report.tipo&&report.observacao&&report.email?'pointer':'not-allowed',opacity:enviandoR?0.7:1}}>
-            {enviandoR?'Enviando...':'Enviar report'}
-          </button>
-        </div>
-      ))}
+        ):(
+          <div style={{display:'flex',flexDirection:'column',gap:14}}>
+            <div style={{fontSize:12,color:C.textMed}}>Encontrou um problema? {numQ&&<span style={{fontWeight:700,color:'#1A1045'}}>{numQ}</span>}</div>
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:8}}>Tipo do problema *</div>
+              {[{v:'pergunta',l:'❓ Erro na pergunta',d:'Enunciado incorreto ou mal formulado'},{v:'comentario',l:'💡 Erro no comentário',d:'Explicação incorreta ou incompleta'},{v:'anulada',l:'🚫 Questão anulada',d:'A banca oficial anulou esta questão'}].map(t=>(
+                <div key={t.v} onClick={()=>setReport(r=>({...r,tipo:t.v}))}
+                  style={{border:`2px solid ${report.tipo===t.v?'#7C3AED':C.border}`,borderRadius:10,padding:'10px 14px',marginBottom:8,cursor:'pointer',
+                    background:report.tipo===t.v?'#F5F3FF':'white'}}>
+                  <div style={{fontSize:12,fontWeight:700,color:report.tipo===t.v?'#7C3AED':C.text}}>{t.l}</div>
+                  <div style={{fontSize:11,color:C.textLight,marginTop:2}}>{t.d}</div>
+                </div>
+              ))}
+            </div>
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>Sua observação *</div>
+              <textarea value={report.observacao} onChange={e=>setReport(r=>({...r,observacao:e.target.value}))} rows={3}
+                placeholder='Descreva o problema encontrado...'
+                style={{width:'100%',padding:'10px 12px',border:`1.5px solid ${C.border}`,borderRadius:10,fontSize:12,resize:'none',boxSizing:'border-box',outline:'none',fontFamily:"'Sora',sans-serif"}}/>
+            </div>
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:6}}>Seu email *</div>
+              <input value={report.email} onChange={e=>setReport(r=>({...r,email:e.target.value}))} type='email' placeholder='email@exemplo.com'
+                style={{width:'100%',padding:'10px 12px',border:`1.5px solid ${C.border}`,borderRadius:10,fontSize:12,outline:'none',boxSizing:'border-box'}}/>
+            </div>
+            <button onClick={enviarReport} disabled={!report.tipo||!report.observacao||!report.email||enviandoR}
+              style={{padding:'12px',background:report.tipo&&report.observacao&&report.email?'linear-gradient(135deg,#1A1045,#7C3AED)':'#E5E7EB',
+                color:report.tipo&&report.observacao&&report.email?'white':C.textLight,border:'none',borderRadius:10,fontSize:13,fontWeight:700,
+                cursor:report.tipo&&report.observacao&&report.email?'pointer':'not-allowed',opacity:enviandoR?0.7:1,fontFamily:"'Sora',sans-serif"}}>
+              {enviandoR?'Enviando...':'Enviar report'}
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
+
+/* ─── CADERNO DE ERROS BTN ──────────────────────────────────── */
+function CadernoErrosBtn({user,q}){
+  const [salvo,setSalvo]=React.useState(false);
+  const salvarErro=async()=>{
+    if(!q?.id||!user?.id) return;
+    await supabase.from('caderno_erros').upsert({user_id:user.id,questao_id:q.id,materia:q.materia,topico:q.topico,revisar_em:new Date().toISOString().split('T')[0]});
+    setSalvo(true);
+  };
+  return(
+    <button onClick={salvarErro} disabled={salvo}
+      style={{width:'100%',padding:'13px',borderRadius:12,marginBottom:12,
+        border:salvo?`2px solid ${C.border}`:'2px solid #1A1045',
+        background:salvo?'#F9FAFB':'white',color:salvo?C.textLight:'#1A1045',
+        fontSize:13,fontWeight:700,fontFamily:"'Sora',sans-serif",
+        cursor:salvo?'default':'pointer',transition:'all .2s',
+        display:'flex',alignItems:'center',justifyContent:'center',gap:8}}
+      onMouseEnter={e=>{if(!salvo)e.currentTarget.style.background='#F5F3FF';}}
+      onMouseLeave={e=>{if(!salvo)e.currentTarget.style.background='white';}}>
+      {salvo?'✓ Adicionado ao Caderno de Erros':'Adicionar ao Caderno de Erros'}
+    </button>
+  );
+}
+
+
 /* ─── COMPONENTE: APOIO LATERAL (texto/imagem) ──────────────── */
 function ApoioLateral({q,children}){
   const temApoio=q?.texto_base||q?.imagem_base;
@@ -3130,7 +3234,8 @@ function SessaoEstudos({user,plano,onConcluir,onVoltar}){
         <ApoioLateral q={q}>
           <QuestaoInterativa user={user} q={q} selecionada={selecionada} confirmada={confirmada}
             onSelect={(v)=>{if(!confirmada)setSelecionada(v);}}
-            onConfirmar={confirmarResposta} onProxima={proxima} isLast={idx+1>=questoes.length}/>
+            onConfirmar={confirmarResposta} onProxima={proxima} isLast={idx+1>=questoes.length}
+            atual={idx+1} total={questoes.length}/>
         </ApoioLateral>
         {false&&<div style={{display:"none"}}>
         </div>}
@@ -3440,7 +3545,8 @@ function TreinoSessao({user,filtro,onVoltar}){
       <ApoioLateral q={q}>
         <QuestaoInterativa user={user} q={q} selecionada={selecionada} confirmada={confirmada}
           onSelect={(v)=>{if(!confirmada)setSelecionada(v);}}
-          onConfirmar={confirmar} onProxima={proxima} isLast={idx+1>=total}/>
+          onConfirmar={confirmar} onProxima={proxima} isLast={idx+1>=total}
+          atual={idx+1} total={total}/>
       </ApoioLateral>
       </div>
     </div>
@@ -5685,7 +5791,7 @@ function Onboarding({user,onComplete,onBack}){
       await bot("Lendo o edital completo, aguarde alguns segundos...",400);setTyping(true);
       const[resp,respTexto]=await Promise.all([
         fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"gpt-4o-mini",max_tokens:4000,system:"Você é especialista em concursos públicos brasileiros. Retorne APENAS JSON válido sem texto adicional.",messages:[{role:"user",content:[{type:"document",source:{type:"base64",media_type:"application/pdf",data:base64}},{type:"text",text:PROMPT_EDITAL(orgao,cargo)}]}]})}),
-        fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"gpt-4o-mini",max_tokens:8000,system:"Extraia o conteúdo programático completo do edital. Retorne apenas o texto.",messages:[{role:"user",content:[{type:"document",source:{type:"base64",media_type:"application/pdf",data:base64}},{type:"text",text:"Extraia TODO o conteúdo programático: todos os tópicos e subtópicos de cada matéria, exatamente como estão no documento."}]}]})})
+        fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"gpt-4o-mini",max_tokens:12000,system:"Extraia o conteúdo programático completo do edital. Retorne apenas o texto.",messages:[{role:"user",content:[{type:"document",source:{type:"base64",media_type:"application/pdf",data:base64}},{type:"text",text:"Extraia TODO o conteúdo programático: todos os tópicos e subtópicos de cada matéria, exatamente como estão no documento."}]}]})})
       ]);
       const dTexto=await respTexto.json();setEditalTextoRaw(dTexto.content?.[0]?.text||"");
       const d=await resp.json();const raw=d.content?.[0]?.text||"";let dados=null;
