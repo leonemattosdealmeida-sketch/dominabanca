@@ -3464,8 +3464,6 @@ function TreinoTab({user,plano,onIniciar}){
   );
 }
 
-}
-
 /* ─── SESSÃO DE TREINO ───────────────────────────────────────── */
 function TreinoSessao({user,filtro,onVoltar}){
   const [questoes,setQuestoes]=React.useState([]);
