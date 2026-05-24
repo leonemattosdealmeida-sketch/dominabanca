@@ -21,26 +21,54 @@ async function db(queryFn, fallback=null) {
   }
 }
 
-const C = {
-  primary: "#6C3CE1",
-  primaryLight: "#8B5CF6",
-  primaryXLight: "#EDE9FE",
-  primaryDark: "#4C1D95",
-  accent: "#10B981",
-  accentLight: "#D1FAE5",
-  warning: "#F59E0B",
-  danger: "#EF4444",
-  bg: "#F8F7FF",
-  white: "#FFFFFF",
-  text: "#1E1B4B",
-  textMed: "#4C4780",
-  textLight: "#9CA3AF",
-  border: "#E5E7EB",
-  borderPurple: "#DDD6FE",
+// Tema claro
+const C_LIGHT = {
+  primary: "#6C3CE1", primaryLight: "#8B5CF6", primaryXLight: "#EDE9FE",
+  primaryDark: "#4C1D95", accent: "#10B981", accentLight: "#D1FAE5",
+  warning: "#F59E0B", danger: "#EF4444",
+  bg: "#F8F7FF", white: "#FFFFFF",
+  text: "#1E1B4B", textMed: "#4C4780", textLight: "#9CA3AF",
+  border: "#E5E7EB", borderPurple: "#DDD6FE",
   shadow: "0 2px 16px rgba(108,60,225,0.08)",
   shadowMd: "0 4px 24px rgba(108,60,225,0.13)",
   shadowLg: "0 12px 48px rgba(108,60,225,0.18)",
 };
+
+// Tema escuro
+const C_DARK = {
+  primary: "#A78BFA", primaryLight: "#C4B5FD", primaryXLight: "#2D1F5E",
+  primaryDark: "#7C3AED", accent: "#34D399", accentLight: "#064E3B",
+  warning: "#FCD34D", danger: "#F87171",
+  bg: "#0F0E1A", white: "#1A1830",
+  text: "#E5E3F4", textMed: "#A8A3C4", textLight: "#6B6880",
+  border: "#2A2845", borderPurple: "#3D2E7A",
+  shadow: "0 2px 16px rgba(0,0,0,0.4)",
+  shadowMd: "0 4px 24px rgba(0,0,0,0.5)",
+  shadowLg: "0 12px 48px rgba(0,0,0,0.6)",
+};
+
+// Estado global de dark mode (persiste no localStorage)
+let _darkMode = false;
+try { _darkMode = localStorage.getItem("db_dark_mode") === "true"; } catch(e) {}
+const _darkListeners = new Set();
+function useDarkMode() {
+  const [dark, setDark] = React.useState(_darkMode);
+  React.useEffect(() => {
+    const update = (v) => setDark(v);
+    _darkListeners.add(update);
+    return () => _darkListeners.delete(update);
+  }, []);
+  return dark;
+}
+function toggleDarkMode() {
+  _darkMode = !_darkMode;
+  try { localStorage.setItem("db_dark_mode", _darkMode); } catch(e) {}
+  document.body.style.background = _darkMode ? C_DARK.bg : C_LIGHT.bg;
+  _darkListeners.forEach(fn => fn(_darkMode));
+}
+
+// C é agora dinâmico — use useDarkMode() nos componentes
+const C = C_LIGHT; // fallback para código fora de componentes
 
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap');
@@ -62,6 +90,8 @@ const css = `
   ::-webkit-scrollbar{width:4px;}
   ::-webkit-scrollbar-thumb{background:#DDD6FE;border-radius:4px;}
   textarea,input,select,button{font-family:'Sora',sans-serif;}
+  body.dark{background:#0F0E1A!important;}
+  .db-dark-toggle{transition:all 0.3s ease;}
   .cta-btn:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(108,60,225,0.32)!important;}
   .cta-btn{transition:all 0.2s ease;}
   .feature-card:hover{transform:translateY(-4px);box-shadow:0 8px 32px rgba(108,60,225,0.14)!important;}
@@ -424,7 +454,8 @@ function Login({onBack,onCadastro,onSuccess}){
 }
 
 /* ─── CRONOGRAMA CALENDÁRIO ─────────────────────────────────────── */
-function CronogramaCalendario({plan,mats,meta,dias,totalQ,getPrevisoSemanas}){
+function CronogramaCalendario({
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;plan,mats,meta,dias,totalQ,getPrevisoSemanas}){
   const [weekOffset,setWeekOffset]=React.useState(0);
 
   /* ── distribuição de matérias por dia da semana ── */
@@ -504,9 +535,9 @@ function CronogramaCalendario({plan,mats,meta,dias,totalQ,getPrevisoSemanas}){
   /* stats chips */
   const statChips=[
     {icon:"🎯",val:dias!=null?`${dias}d`:"—",label:"até a prova"},
-    {icon:"📈",val:`${meta}q/dia`,label:"meta diária"},
+    {icon:"📈",val:`${meta} questões/dia`,label:"meta diária"},
     {icon:"🏁",val:`${getPrevisoSemanas()}sem`,label:"previsão"},
-    {icon:"📚",val:`${totalQ}q`,label:"no edital"},
+    {icon:"📚",val:`${totalQ} questões`,label:"no edital"},
   ];
 
   return(
@@ -584,11 +615,11 @@ function CronogramaCalendario({plan,mats,meta,dias,totalQ,getPrevisoSemanas}){
                         }}>
                           <div style={{fontSize:9,fontWeight:700,color:todayDay?"white":cor,letterSpacing:0.3,textTransform:"uppercase",lineHeight:1.2,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:1,WebkitBoxOrient:"vertical"}}>{m.grupo||""}</div>
                           <div style={{fontSize:10,fontWeight:600,color:todayDay?"rgba(255,255,255,0.95)":C.text,lineHeight:1.3,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{m.nome}</div>
-                          <div style={{fontSize:9,color:todayDay?"rgba(255,255,255,0.7)":C.textLight,marginTop:1}}>{m.qtd}q</div>
+                          <div style={{fontSize:9,color:todayDay?"rgba(255,255,255,0.7)":C.textLight,marginTop:1}}>{m.qtd}</div>
                         </div>
                       );
                     })}
-                    <div style={{marginTop:"auto",textAlign:"right",fontSize:10,fontWeight:700,color:todayDay?"rgba(255,255,255,0.8)":C.primary}}>≈{dayData.total}q</div>
+                    <div style={{marginTop:"auto",textAlign:"right",fontSize:10,fontWeight:700,color:todayDay?"rgba(255,255,255,0.8)":C.primary}}>≈{dayData.total}</div>
                   </div>
                 ):(
                   <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -620,7 +651,8 @@ function CronogramaCalendario({plan,mats,meta,dias,totalQ,getPrevisoSemanas}){
 }
 
 /* ─── ADMIN: SIMULADOS ──────────────────────────────────────── */
-function SimuladoAdmin({user}){
+function SimuladoAdmin({
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;user}){
   const [simulados,setSimulados]=React.useState([]);
   const [loading,setLoading]=React.useState(true);
   const [form,setForm]=React.useState(null); // null=lista, "novo"=criar, {id}=editar
@@ -762,7 +794,7 @@ function SimuladoAdmin({user}){
           {id:"info",l:"📋 Informações"},
           {id:"questoes_banco",l:`📚 Do banco (${bancoResultado.filter(q=>questoesForm.find(x=>x.id===q.id)).length}/${bancoResultado.length})`},
           {id:"questoes_nova",l:"✏️ Criar nova"},
-          {id:"preview",l:`👁 Preview (${questoesForm.length}q)`},
+          {id:"preview",l:`👁 Preview (${questoesForm.length})`},
         ].map(a=>(
           <button key={a.id} onClick={()=>setAbaForm(a.id)} style={{flex:1,padding:"11px 8px",border:"none",borderRight:`1px solid ${C.border}`,background:abaForm===a.id?C.primary:"white",color:abaForm===a.id?"white":C.textMed,fontSize:11,fontWeight:abaForm===a.id?700:500,cursor:"pointer"}}>
             {a.l}
@@ -939,7 +971,7 @@ function SimuladoAdmin({user}){
                   <div style={{flex:1}}>
                     <div style={{display:"flex",gap:8,marginBottom:6}}>
                       <span style={{background:s.ativo?"#D1FAE5":"#F3F4F6",color:s.ativo?"#065F46":C.textMed,borderRadius:100,padding:"2px 10px",fontSize:10,fontWeight:700}}>{s.ativo?"● Publicado":"● Rascunho"}</span>
-                      <span style={{background:C.primaryXLight,color:C.primary,borderRadius:100,padding:"2px 10px",fontSize:10,fontWeight:700}}>{q.length}q</span>
+                      <span style={{background:C.primaryXLight,color:C.primary,borderRadius:100,padding:"2px 10px",fontSize:10,fontWeight:700}}>{q.length}</span>
                       <span style={{background:"#FEF3C7",color:"#92400E",borderRadius:100,padding:"2px 10px",fontSize:10,fontWeight:700}}>{s.duracao_minutos}min</span>
                     </div>
                     <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:4}}>{s.titulo}</div>
@@ -964,7 +996,8 @@ function SimuladoAdmin({user}){
 }
 
 /* ─── TELA DO SIMULADO (ALUNO) ──────────────────────────────── */
-function SimuladoTela({user,simulado,inscricao,onConcluir,onVoltar}){
+function SimuladoTela({
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;user,simulado,inscricao,onConcluir,onVoltar}){
   const questoes=simulado?.questoes||[];
   const duracao=(simulado?.duracao_minutos||180)*60; // em segundos
   const [idx,setIdx]=React.useState(0);
@@ -1166,7 +1199,8 @@ function SimuladoTela({user,simulado,inscricao,onConcluir,onVoltar}){
 }
 
 /* ─── RESULTADO DO SIMULADO (ALUNO) ─────────────────────────── */
-function SimuladoResultado({resultado,simulado,onVoltar}){
+function SimuladoResultado({
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;resultado,simulado,onVoltar}){
   const {nota,acertos,erros,total,ranking,totalParticipantes,porMateria}=resultado;
   const cor=nota>=70?"#10B981":nota>=50?"#F59E0B":"#EF4444";
   const bg=nota>=70?"#F0FDF4":nota>=50?"#FFFBEB":"#FFF1F1";
@@ -1246,7 +1280,8 @@ function SimuladoResultado({resultado,simulado,onVoltar}){
 }
 
 /* ─── PAINEL ADMIN ──────────────────────────────────────────── */
-function AdminPanel({user,onBack}){
+function AdminPanel({
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;user,onBack}){
   const [abaAdmin,setAbaAdmin]=React.useState("questoes");
   const [grupos,setGrupos]=React.useState([]);
   const [selecionado,setSelecionado]=React.useState(null);
@@ -1559,7 +1594,7 @@ Responda SOMENTE com JSON válido (sem texto fora do JSON):
                   <div key={m.nome} style={{marginLeft:12}}>
                     <div style={{padding:"6px 10px",fontSize:11,fontWeight:600,color:C.textMed,display:"flex",justifyContent:"space-between"}}>
                       <span>📚 {m.nome}</span>
-                      <span style={{fontSize:10,color:C.textLight}}>{m.total}q</span>
+                      <span style={{fontSize:10,color:C.textLight}}>{m.total}</span>
                     </div>
                     {m.topicos.map(t=>(
                       <div key={t.nome} onClick={()=>loadQuestoes(g.nome,m.nome,t.nome)}
@@ -1568,7 +1603,7 @@ Responda SOMENTE com JSON válido (sem texto fora do JSON):
                           color:selecionado?.topico===t.nome&&selecionado?.materia===m.nome?C.primary:C.textMed,
                           display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                         <span>📄 {t.nome}</span>
-                        <span style={{fontSize:10,color:t.total===0?"#EF4444":C.textLight,fontWeight:t.total===0?700:400}}>{t.total===0?"⚠️ 0":t.total}q</span>
+                        <span style={{fontSize:10,color:t.total===0?"#EF4444":C.textLight,fontWeight:t.total===0?700:400}}>{t.total===0?"⚠️ 0":t.total}</span>
                       </div>
                     ))}
                   </div>
@@ -2518,7 +2553,8 @@ Responda SOMENTE com JSON: {"nivel":<1 a 5>,"comentario":"<comentário completo>
 }
 
 /* ─── COMPONENTE: QUESTÃO COM COMENTÁRIOS E REPORT ─────────── */
-function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,onProxima,isLast,atual,total}){
+function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,onProxima,isLast,atual,total,soNaoRespondidas,setSoNaoRespondidas,respondidas}){
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const ADMIN_EMAIL=import.meta.env.VITE_ADMIN_EMAIL||'';
   const [abaQ,setAbaQ]=React.useState('questao');
   const [comentarios,setComentarios]=React.useState([]);
@@ -2592,17 +2628,25 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
           <div style={{fontSize:14,fontWeight:700,color:'#fff',letterSpacing:-0.3}}>{q?.materia||'—'}</div>
           <div style={{fontSize:10,color:'rgba(255,255,255,0.4)',fontFamily:"'Courier New',monospace",letterSpacing:0.5}}>{q?.topico||q?.grupo||'—'}</div>
         </div>
-        {/* Contador */}
-        {total>0&&(
-          <div style={{display:'flex',alignItems:'center',gap:8,paddingLeft:16}}>
+        {/* Toggle Só novas + Contador */}
+        <div style={{display:'flex',alignItems:'center',gap:12,paddingLeft:16}}>
+          {setSoNaoRespondidas&&respondidas&&respondidas.size>0&&(
+            <div style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}} onClick={()=>setSoNaoRespondidas(v=>!v)}>
+              <div style={{width:32,height:18,borderRadius:100,background:soNaoRespondidas?'#A78BFA':'rgba(255,255,255,0.15)',position:'relative',transition:'background 0.2s',border:'1px solid rgba(255,255,255,0.2)'}}>
+                <div style={{width:14,height:14,borderRadius:'50%',background:'white',position:'absolute',top:1,left:soNaoRespondidas?16:1,transition:'left 0.2s',boxShadow:'0 1px 3px rgba(0,0,0,0.3)'}}/>
+              </div>
+              <span style={{fontSize:9,color:'rgba(255,255,255,0.6)',whiteSpace:'nowrap'}}>Só novas</span>
+            </div>
+          )}
+          {total>0&&(
             <div style={{textAlign:'right'}}>
               <div style={{fontSize:16,fontWeight:800,color:'#fff',lineHeight:1}}>
                 {atual}<span style={{fontSize:11,color:'rgba(255,255,255,0.35)',fontWeight:400}}>/{total}</span>
               </div>
               <div style={{fontSize:9,color:'rgba(255,255,255,0.35)',marginTop:1}}>questões</div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Barra de progresso */}
@@ -2881,7 +2925,8 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
 }
 
 /* ─── CADERNO DE ERROS BTN ──────────────────────────────────── */
-function CadernoErrosBtn({user,q}){
+function CadernoErrosBtn({
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;user,q}){
   const [salvo,setSalvo]=React.useState(false);
   const salvarErro=async()=>{
     if(!q?.id||!user?.id) return;
@@ -2906,6 +2951,7 @@ function CadernoErrosBtn({user,q}){
 
 /* ─── COMPONENTE: APOIO LATERAL (texto/imagem) ──────────────── */
 function ApoioLateral({q,children}){
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const temApoio=q?.texto_base||q?.imagem_base;
   const [abaAtiva,setAbaAtiva]=React.useState("apoio"); // "apoio" | "questao" (mobile)
   const [zoomImg,setZoomImg]=React.useState(false);
@@ -2932,7 +2978,7 @@ function ApoioLateral({q,children}){
                 <div style={{fontSize:10,color:C.textLight,marginTop:6}}>Toque para ampliar</div>
               </div>
             ):(
-              <div style={{fontSize:13,lineHeight:1.9,color:C.text,whiteSpace:"pre-wrap"}}>{q?.texto_base}</div>
+              <div style={{fontSize:13,lineHeight:1.95,color:C.text,whiteSpace:"pre-wrap",fontFamily:"'Georgia',serif"}}>{q?.texto_base}</div>
             )}
           </div>
         )}
@@ -2940,20 +2986,25 @@ function ApoioLateral({q,children}){
       </div>
 
       {/* DESKTOP: dois painéis */}
-      <div className="apoio-desktop" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"start"}}>
-        {/* Painel esquerdo: texto/imagem */}
-        <div style={{background:C.white,borderRadius:16,border:`1px solid ${C.border}`,padding:"20px",position:"sticky",top:140,maxHeight:"70vh",overflowY:"auto",boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>
-          <div style={{fontSize:11,fontWeight:700,color:C.textLight,letterSpacing:1,textTransform:"uppercase",marginBottom:12}}>
-            {q?.imagem_base?"🖼️ Imagem de apoio":"📄 Texto de apoio"}
+      <div className="apoio-desktop" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,alignItems:"start"}}>
+        {/* Painel esquerdo: texto/imagem — sticky */}
+        <div style={{background:C.white,borderRadius:16,border:`1px solid ${C.border}`,overflow:"hidden",position:"sticky",top:140,maxHeight:"75vh",display:"flex",flexDirection:"column",boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
+          {/* Header do painel */}
+          <div style={{padding:"12px 16px",borderBottom:`1px solid ${C.border}`,background:C.bg,display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+            <span style={{fontSize:14}}>{q?.imagem_base?"🖼️":"📄"}</span>
+            <span style={{fontSize:11,fontWeight:700,color:C.textLight,letterSpacing:1,textTransform:"uppercase"}}>{q?.imagem_base?"Imagem de apoio":"Texto de apoio"}</span>
           </div>
-          {q?.imagem_base?(
-            <div style={{textAlign:"center"}}>
-              <img src={q.imagem_base} alt="Apoio" onClick={()=>setZoomImg(true)} style={{maxWidth:"100%",borderRadius:8,cursor:"zoom-in",boxShadow:"0 2px 8px rgba(0,0,0,0.1)"}}/>
-              <div style={{fontSize:10,color:C.textLight,marginTop:6}}>Clique para ampliar</div>
-            </div>
-          ):(
-            <div style={{fontSize:13,lineHeight:1.9,color:C.text,whiteSpace:"pre-wrap"}}>{q?.texto_base}</div>
-          )}
+          {/* Conteúdo scrollável */}
+          <div style={{flex:1,overflowY:"auto",padding:"18px 20px"}}>
+            {q?.imagem_base?(
+              <div style={{textAlign:"center"}}>
+                <img src={q.imagem_base} alt="Apoio" onClick={()=>setZoomImg(true)} style={{maxWidth:"100%",borderRadius:8,cursor:"zoom-in",boxShadow:"0 2px 8px rgba(0,0,0,0.1)"}}/>
+                <div style={{fontSize:10,color:C.textLight,marginTop:6}}>Clique para ampliar</div>
+              </div>
+            ):(
+              <div style={{fontSize:14,lineHeight:1.95,color:C.text,whiteSpace:"pre-wrap",fontFamily:"'Georgia',serif"}}>{q?.texto_base}</div>
+            )}
+          </div>
         </div>
         {/* Painel direito: questão */}
         <div>{children}</div>
@@ -2971,6 +3022,7 @@ function ApoioLateral({q,children}){
 
 /* ─── SESSÃO DE ESTUDOS ─────────────────────────────────────── */
 function SessaoEstudos({user,plano,onConcluir,onVoltar}){
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const [fase,setFase]=React.useState("carregando"); // carregando|estudando|resultado
   const [questoes,setQuestoes]=React.useState([]);
   const [idx,setIdx]=React.useState(0);
@@ -3246,6 +3298,7 @@ function SessaoEstudos({user,plano,onConcluir,onVoltar}){
 
 /* ─── ABA TREINO ─────────────────────────────────────────────── */
 function TreinoTab({user,plano,onIniciar}){
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const [grupos,setGrupos]=React.useState([]);
   const [grupoSel,setGrupoSel]=React.useState(null);
   const [materiaSel,setMateriaSel]=React.useState(null);
@@ -3255,10 +3308,59 @@ function TreinoTab({user,plano,onIniciar}){
   const [selecionados,setSelecionados]=React.useState([]);
   const [contagemPorTopico,setContagemPorTopico]=React.useState({});
   const [detalhar,setDetalhar]=React.useState(false);
+  const [telaAtual,setTelaAtual]=React.useState("selecao"); // "selecao" | "confirmar"
+  const [subAba,setSubAba]=React.useState("filtrar"); // "filtrar" | "cadernos"
+  const [busca,setBusca]=React.useState("");
+
+  React.useEffect(()=>{if(subAba==="cadernos") carregarCadernos();},[subAba]);
+  const [cadernos,setCadernos]=React.useState([]);
+  const [loadingCadernos,setLoadingCadernos]=React.useState(false);
+  const [nomeCaderno,setNomeCaderno]=React.useState("");
   const totalSelecionado=selecionados.reduce((s,x)=>s+x.contagem,0);
   const LIMITE=4;
   const visiveis=selecionados.slice(0,LIMITE);
   const ocultos=selecionados.length-LIMITE;
+
+  const carregarCadernos=React.useCallback(async()=>{
+    setLoadingCadernos(true);
+    try{
+      const{data,error}=await supabase.from("cadernos_treino").select("*").eq("user_id",user.id).order("updated_at",{ascending:false});
+      if(!error) setCadernos(data||[]);
+    }catch(e){
+      console.error("[CarregarCadernos]",e);
+    }finally{
+      setLoadingCadernos(false);
+    }
+  },[user.id]);
+
+
+  const salvarCaderno=async(nome,topicos,total)=>{
+    try{
+      const{data,error}=await supabase.from("cadernos_treino").insert({
+        user_id:user.id,nome,topicos,total_questoes:total,
+        questoes_respondidas:[],questoes_corretas:0
+      }).select().single();
+      if(error) throw error;
+      return data;
+    }catch(e){
+      console.error("[SalvarCaderno]",e);
+      return null;
+    }
+  };
+
+  const excluirCaderno=async(id)=>{
+    try{
+      const{error}=await supabase.from("cadernos_treino").delete().eq("id",id);
+      if(!error) setCadernos(c=>c.filter(x=>x.id!==id));
+    }catch(e){console.error("[ExcluirCaderno]",e);}
+  };
+
+  const resetarCaderno=async(id)=>{
+    try{
+      const{error}=await supabase.from("cadernos_treino").update({questoes_respondidas:[],questoes_corretas:0,updated_at:new Date().toISOString()}).eq("id",id);
+      if(!error) setCadernos(c=>c.map(x=>x.id===id?{...x,questoes_respondidas:[],questoes_corretas:0}:x));
+    }catch(e){console.error("[ResetarCaderno]",e);}
+  };
 
   React.useEffect(()=>{
     (async()=>{
@@ -3326,14 +3428,163 @@ function TreinoTab({user,plano,onIniciar}){
     </div>
   );
 
+  /* ── TELA: CONFIRMAR TREINO ── */
+  if(telaAtual==="confirmar") return(
+    <div style={{fontFamily:"'Sora',sans-serif",minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column"}}>
+      {/* Nav */}
+      <div style={{background:C.white,borderBottom:`1px solid ${C.border}`,padding:"0 24px",height:60,display:"flex",alignItems:"center",gap:14,position:"sticky",top:0,zIndex:10}}>
+        <button onClick={()=>setTelaAtual("selecao")} style={{width:36,height:36,borderRadius:10,border:`1px solid ${C.border}`,background:"white",cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>←</button>
+        <div style={{fontFamily:"'Lora',serif",fontSize:16,fontWeight:700,color:C.text}}>Confirmar treino</div>
+      </div>
+
+      <div style={{flex:1,maxWidth:640,width:"100%",margin:"0 auto",padding:"28px 20px",display:"flex",flexDirection:"column",gap:16}}>
+
+        {/* Card resumo */}
+        <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:18,padding:"22px 24px",color:"white"}}>
+          <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:8}}>Treino selecionado</div>
+          <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:12}}>
+            <span style={{fontFamily:"'Lora',serif",fontSize:36,fontWeight:800}}>{totalSelecionado}</span>
+            <span style={{fontSize:14,color:"rgba(255,255,255,0.7)"}}>{totalSelecionado===1?"questão":"questões"}</span>
+          </div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {[...new Set(selecionados.map(s=>s.materia))].map(m=>(
+              <span key={m} style={{fontSize:11,background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:100,padding:"3px 10px",color:"white"}}>{m}</span>
+            ))}
+          </div>
+        </div>
+
+        {/* Tópicos detalhados */}
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+          <div style={{padding:"16px 18px",borderBottom:`1px solid ${C.border}`,background:C.bg}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.text}}>{selecionados.length} {selecionados.length===1?"tópico":"tópicos"} selecionados</div>
+          </div>
+          <div style={{maxHeight:280,overflowY:"auto"}}>
+            {selecionados.map((s,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 18px",borderBottom:i<selecionados.length-1?`1px solid ${C.border}`:"none"}}>
+                <div style={{width:28,height:28,borderRadius:8,background:C.primaryXLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:C.primary,flexShrink:0}}>{i+1}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.topico==="todas"?"Todos os tópicos":s.topico}</div>
+                  <div style={{fontSize:10,color:C.textLight,marginTop:1}}>{s.materia}</div>
+                </div>
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  <div style={{fontSize:14,fontWeight:800,color:C.primary}}>{s.contagem}</div>
+                  <div style={{fontSize:9,color:C.textLight}}>questões</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Salvar como caderno */}
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"18px 20px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+          <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:4}}>💾 Salvar como caderno de treino</div>
+          <div style={{fontSize:11,color:C.textLight,marginBottom:12}}>Salve para poder continuar de onde parou e acompanhar seu progresso.</div>
+          <input value={nomeCaderno} onChange={e=>setNomeCaderno(e.target.value)}
+            placeholder="Ex: Direito Previdenciário — INSS 2024..."
+            style={{width:"100%",padding:"10px 14px",border:`1.5px solid ${nomeCaderno?C.primary:C.border}`,borderRadius:10,fontSize:13,outline:"none",boxSizing:"border-box",fontFamily:"'Sora',sans-serif"}}/>
+        </div>
+
+        {/* Botões */}
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <button onClick={async()=>{
+            try{
+              if(nomeCaderno.trim()){
+                const cad=await salvarCaderno(nomeCaderno.trim(),selecionados,totalSelecionado);
+                onIniciar({topicos:selecionados,total:totalSelecionado,cadernoId:cad?.id||null});
+              }else{
+                onIniciar({topicos:selecionados,total:totalSelecionado});
+              }
+            }catch(e){console.error("[IniciarTreino]",e);}
+          }}
+            style={{width:"100%",padding:"15px",background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 16px rgba(108,60,225,0.3)"}}>
+            {nomeCaderno.trim()?"💾 Salvar e começar treino →":"Começar treino sem salvar →"}
+          </button>
+          <button onClick={()=>setTelaAtual("selecao")}
+            style={{width:"100%",padding:"13px",background:"white",color:C.textMed,border:`1px solid ${C.border}`,borderRadius:12,fontSize:13,fontWeight:600,cursor:"pointer"}}>
+            ← Voltar e editar seleção
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+
   return(
-    <div style={{display:"flex",flexDirection:"column",gap:20}}>
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
 
       {/* HEADER */}
-      <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:18,padding:"22px 26px",color:"white"}}>
-        <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,marginBottom:6}}>🎯 Treino livre</div>
-        <div style={{fontSize:13,color:"rgba(255,255,255,0.8)"}}>Escolha a matéria e o tópico para treinar no seu ritmo, sem limite de questões.</div>
+      <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:18,padding:"20px 24px",color:"white"}}>
+        <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,marginBottom:4}}>🎯 Treino</div>
+        <div style={{fontSize:13,color:"rgba(255,255,255,0.8)"}}>Monte seu treino por matéria, tópico ou busca direta.</div>
       </div>
+
+      {/* SUB-ABAS */}
+      <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden",display:"flex",boxShadow:"0 2px 6px rgba(0,0,0,0.04)"}}>
+        {[{id:"filtrar",icon:"🎯",l:"Filtrar questões"},{id:"cadernos",icon:"📚",l:"Cadernos salvos"}].map(a=>(
+          <button key={a.id} onClick={()=>setSubAba(a.id)}
+            style={{flex:1,padding:"13px 8px",border:"none",borderBottom:`3px solid ${subAba===a.id?C.primary:"transparent"}`,background:subAba===a.id?C.primaryXLight:"white",color:subAba===a.id?C.primary:C.textMed,fontSize:13,fontWeight:subAba===a.id?700:500,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all 0.15s"}}>
+            <span>{a.icon}</span><span>{a.l}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ── ABA CADERNOS ── */}
+      {subAba==="cadernos"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            {loadingCadernos?(
+              <div style={{display:"flex",justifyContent:"center",padding:"60px"}}>
+                <div style={{width:36,height:36,border:`4px solid ${C.primaryXLight}`,borderTop:`4px solid ${C.primary}`,borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+              </div>
+            ):cadernos.length===0?(
+              <div style={{textAlign:"center",padding:"48px 20px",background:C.white,borderRadius:16,border:`1px solid ${C.border}`}}>
+                <div style={{fontSize:40,marginBottom:12}}>📭</div>
+                <div style={{fontFamily:"'Lora',serif",fontSize:16,fontWeight:700,color:C.text,marginBottom:6}}>Nenhum caderno salvo</div>
+                <div style={{fontSize:13,color:C.textMed,marginBottom:16}}>Crie um treino, dê um nome e salve para continuar de onde parou.</div>
+                <button onClick={()=>setSubAba("filtrar")} style={{padding:"10px 20px",background:C.primary,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>Criar treino</button>
+              </div>
+            ):(
+              cadernos.map(cad=>{
+                const topicos=cad.topicos||[];
+                const respondidas=(cad.questoes_respondidas||[]).length;
+                const pct=cad.total_questoes>0?Math.round((respondidas/cad.total_questoes)*100):0;
+                const materias=[...new Set(topicos.map(t=>t.materia))];
+                return(
+                  <div key={cad.id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+                    <div style={{padding:"16px 18px",borderBottom:`1px solid ${C.border}`}}>
+                      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10,marginBottom:8}}>
+                        <div style={{fontFamily:"'Lora',serif",fontSize:15,fontWeight:700,color:C.text,flex:1}}>{cad.nome}</div>
+                        <div style={{fontSize:10,color:C.textLight,flexShrink:0}}>{new Date(cad.created_at).toLocaleDateString("pt-BR")}</div>
+                      </div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:10}}>
+                        {materias.map(m=>(
+                          <span key={m} style={{fontSize:10,background:C.primaryXLight,color:C.primary,borderRadius:100,padding:"2px 8px",fontWeight:600}}>{m}</span>
+                        ))}
+                      </div>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                        <span style={{fontSize:11,color:C.textMed}}>{respondidas} de {cad.total_questoes} questões</span>
+                        <span style={{fontSize:12,fontWeight:700,color:pct===100?"#10B981":C.primary}}>{pct}%</span>
+                      </div>
+                      <div style={{height:5,background:"#F3F4F6",borderRadius:100,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:`${pct}%`,background:pct===100?"#10B981":C.primary,borderRadius:100}}/>
+                      </div>
+                    </div>
+                    <div style={{padding:"12px 18px",display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <button onClick={()=>onIniciar({topicos:cad.topicos,total:cad.total_questoes,cadernoId:cad.id,questoesRespondidas:cad.questoes_respondidas||[]})}
+                        style={{flex:2,padding:"10px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer",boxShadow:"0 3px 10px rgba(108,60,225,0.25)"}}>
+                        {respondidas>0&&pct<100?"▶ Continuar":"▶ Começar"}
+                      </button>
+                      <button onClick={()=>resetarCaderno(cad.id)} style={{flex:1,padding:"10px",background:"white",color:C.textMed,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontWeight:600,cursor:"pointer"}}>🔄 Resetar</button>
+                      <button onClick={()=>excluirCaderno(cad.id)} style={{padding:"10px 14px",background:"white",color:"#EF4444",border:"1px solid #FECACA",borderRadius:10,fontSize:12,cursor:"pointer"}}>🗑️</button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+      )}
+
+      {/* ── ABA FILTRAR ── */}
+      {subAba==="filtrar"&&(<>
 
       {grupos.length===0?(
         <div style={{textAlign:"center",padding:"48px",background:C.white,borderRadius:18,border:`1px solid ${C.border}`}}>
@@ -3342,6 +3593,69 @@ function TreinoTab({user,plano,onIniciar}){
           <div style={{fontSize:13,color:C.textMed}}>As questões serão adicionadas pelo admin em breve.</div>
         </div>
       ):(
+        <>
+        {/* BUSCADOR */}
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:"12px 16px",boxShadow:"0 2px 6px rgba(0,0,0,0.04)",display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:16}}>🔍</span>
+          <input value={busca} onChange={e=>setBusca(e.target.value)}
+            placeholder="Buscar matéria ou tópico..."
+            style={{flex:1,border:"none",outline:"none",fontSize:13,color:C.text,background:"transparent",fontFamily:"'Sora',sans-serif"}}/>
+          {busca&&<button onClick={()=>setBusca("")} style={{background:"none",border:"none",color:C.textLight,cursor:"pointer",fontSize:16}}>✕</button>}
+        </div>
+
+        {/* Resultados da busca */}
+        {busca.trim().length>=2&&(
+          <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
+            <div style={{padding:"10px 16px",background:C.bg,borderBottom:`1px solid ${C.border}`,fontSize:11,fontWeight:700,color:C.textLight,textTransform:"uppercase",letterSpacing:1}}>
+              Resultados para "{busca}"
+            </div>
+            <div style={{maxHeight:280,overflowY:"auto"}}>
+              {(()=>{
+                const resultados=[];
+                grupos.forEach(g=>g.materias.forEach(m=>{
+                  if(m.nome.toLowerCase().includes(busca.toLowerCase())){
+                    resultados.push({tipo:"materia",grupo:g.nome,materia:m.nome,topico:"todas"});
+                  }
+                  (contagemPorTopico&&materiaSel===m.nome?Object.keys(contagemPorTopico).filter(t=>t!=="todas"):[]).forEach(t=>{
+                    if(t.toLowerCase().includes(busca.toLowerCase())) resultados.push({tipo:"topico",grupo:g.nome,materia:m.nome,topico:t});
+                  });
+                }));
+                if(resultados.length===0) return <div style={{padding:"20px",textAlign:"center",color:C.textLight,fontSize:12}}>Nenhum resultado encontrado.</div>;
+                return resultados.map((r,i)=>{
+                  const jaSel=!!selecionados.find(s=>s.materia===r.materia&&s.topico===r.topico);
+                  return(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",borderBottom:`1px solid ${C.border}`,cursor:"pointer",background:jaSel?C.primaryXLight:"white"}}
+                      onClick={async()=>{
+                        if(!jaSel){
+                          try{
+                            if(materiaSel!==r.materia) await handleMateria(r.grupo,r.materia);
+                            let q=supabase.from("questoes").select("id",{count:"exact"}).eq("ativa",true).eq("materia",r.materia);
+                            if(r.topico!=="todas") q=q.eq("topico",r.topico);
+                            const{count}=await q;
+                            setSelecionados(prev=>[...prev,{topico:r.topico,materia:r.materia,grupo:r.grupo,contagem:count||0}]);
+                          }catch(e){console.error("[BuscaAdd]",e);}
+                        }else{
+                          setSelecionados(prev=>prev.filter(s=>!(s.materia===r.materia&&s.topico===r.topico)));
+                        }
+                      }}>
+                      <span style={{fontSize:14}}>{r.tipo==="materia"?"📚":"📌"}</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:12,fontWeight:600,color:jaSel?C.primary:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                          {r.topico==="todas"?r.materia:r.topico}
+                        </div>
+                        {r.topico!=="todas"&&<div style={{fontSize:10,color:C.textLight}}>{r.materia}</div>}
+                      </div>
+                      <span style={{fontSize:12,fontWeight:700,color:jaSel?C.primary:C.textLight,background:jaSel?C.primaryXLight:C.bg,borderRadius:100,padding:"2px 8px",flexShrink:0}}>
+                        {jaSel?"✓ Adicionado":"+ Adicionar"}
+                      </span>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        )}
+
         <div style={{display:"grid",gridTemplateColumns:"240px 1fr",gap:20,alignItems:"start"}} className="treino-grid">
 
           {/* SIDEBAR — GRUPOS E MATÉRIAS */}
@@ -3427,134 +3741,135 @@ function TreinoTab({user,plano,onIniciar}){
       )}
 
       {/* PAINEL STICKY DE SELECIONADOS */}
-      {detalhar&&selecionados.length>0&&(
-          <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(15,10,40,0.85)",display:"flex",alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(4px)"}}>
-            <div style={{width:"100%",maxWidth:640,background:"white",borderRadius:"20px 20px 0 0",maxHeight:"85vh",display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 -8px 40px rgba(0,0,0,0.3)"}}>
-              {/* Header */}
-              <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
-                <div>
-                  <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>Treino selecionado</div>
-                  <div style={{display:"flex",alignItems:"baseline",gap:6}}>
-                    <span style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:800,color:"white"}}>{totalSelecionado}</span>
-                    <span style={{fontSize:12,color:"rgba(255,255,255,0.7)"}}>{totalSelecionado===1?"questão":"questões"}</span>
-                  </div>
-                </div>
-                <button onClick={()=>setDetalhar(false)}
-                  style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.25)",color:"white",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  ←
-                </button>
-              </div>
-              {/* Lista detalhada */}
-              <div style={{flex:1,overflowY:"auto",padding:"16px"}}>
-                <div style={{fontSize:11,fontWeight:700,color:C.textLight,textTransform:"uppercase",letterSpacing:1,marginBottom:12}}>
-                  {selecionados.length} {selecionados.length===1?"tópico selecionado":"tópicos selecionados"}
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                  {selecionados.map((s,i)=>(
-                    <div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",background:C.bg,borderRadius:12,border:`1px solid ${C.border}`}}>
-                      <div style={{width:32,height:32,borderRadius:10,background:C.primaryXLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,color:C.primary,flexShrink:0}}>
-                        {i+1}
-                      </div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:12,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                          {s.topico==="todas"?`Todos os tópicos`:s.topico}
-                        </div>
-                        <div style={{fontSize:11,color:C.textLight,marginTop:2}}>{s.materia}</div>
-                      </div>
-                      <div style={{textAlign:"right",flexShrink:0}}>
-                        <div style={{fontSize:16,fontWeight:800,color:C.primary}}>{s.contagem}</div>
-                        <div style={{fontSize:9,color:C.textLight}}>questões</div>
-                      </div>
-                      <button onClick={()=>removerSelecionado(i)}
-                        style={{width:28,height:28,borderRadius:"50%",background:"#FEE2E2",border:"none",color:"#EF4444",cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              {/* Footer */}
-              <div style={{padding:"14px 16px",borderTop:`1px solid ${C.border}`,display:"flex",gap:10,flexShrink:0}}>
-                <button onClick={limparTudo}
-                  style={{flex:1,padding:"12px",background:"white",color:C.textMed,border:`1px solid ${C.border}`,borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer"}}>
-                  Limpar tudo
-                </button>
-                <button onClick={()=>onIniciar({topicos:selecionados,total:totalSelecionado})}
-                  style={{flex:2,padding:"12px",background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 14px rgba(108,60,225,0.3)"}}>
-                  Começar treino →
-                </button>
-              </div>
-            </div>
-          </div>
-      )}
       {selecionados.length>0&&(
-          <div style={{position:"sticky",bottom:16,zIndex:50,marginTop:8}}>
-            <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:14,padding:"12px 16px",boxShadow:"0 8px 32px rgba(108,60,225,0.45),0 2px 8px rgba(0,0,0,0.2)"}}>
-              {/* Linha 1: total + botões */}
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:8}}>
-                <div style={{display:"flex",alignItems:"baseline",gap:6}}>
-                  <span style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:800,color:"white"}}>{totalSelecionado}</span>
-                  <span style={{fontSize:11,color:"rgba(255,255,255,0.65)"}}>{totalSelecionado===1?"questão":"questões"}</span>
+        <div style={{position:"sticky",bottom:16,zIndex:50,marginTop:8}}>
+          <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:14,boxShadow:"0 8px 32px rgba(108,60,225,0.45)",overflow:"hidden"}}>
+
+            {/* Detalhe expandido — agrupado por matéria */}
+            {detalhar&&(
+              <div style={{borderBottom:"1px solid rgba(255,255,255,0.12)",padding:"14px 16px",maxHeight:260,overflowY:"auto"}}>
+                <div style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.45)",letterSpacing:1.2,textTransform:"uppercase",marginBottom:10}}>Detalhamento por matéria</div>
+                {(()=>{
+                  const porMateria={};
+                  selecionados.forEach(s=>{
+                    if(!porMateria[s.materia]) porMateria[s.materia]={total:0,topicos:[]};
+                    porMateria[s.materia].total+=s.contagem;
+                    porMateria[s.materia].topicos.push(s);
+                  });
+                  return Object.entries(porMateria).map(([mat,dados])=>(
+                    <div key={mat} style={{marginBottom:10}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                        <span style={{fontSize:12,fontWeight:700,color:"white"}}>{mat}</span>
+                        <span style={{fontSize:11,color:"rgba(255,255,255,0.5)"}}>{dados.total} questões</span>
+                      </div>
+                      {dados.topicos.map((s,i)=>{
+                        const idxG=selecionados.indexOf(s);
+                        return(
+                          <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(255,255,255,0.07)",borderRadius:7,padding:"5px 10px",marginBottom:3}}>
+                            <span style={{fontSize:11,color:"rgba(255,255,255,0.8)"}}>{s.topico==="todas"?"Todos os tópicos":s.topico}</span>
+                            <div style={{display:"flex",alignItems:"center",gap:8}}>
+                              <span style={{fontSize:11,color:"rgba(255,255,255,0.45)"}}>{s.contagem}</span>
+                              <button onClick={()=>removerSelecionado(idxG)}
+                                style={{width:14,height:14,borderRadius:"50%",background:"rgba(255,255,255,0.12)",border:"none",color:"rgba(255,255,255,0.6)",cursor:"pointer",fontSize:9,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ));
+                })()}
+              </div>
+            )}
+
+            {/* Barra principal */}
+            <div style={{padding:"12px 16px"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:detalhar?0:8}}>
+                {/* Total + resumo por matéria */}
+                <div style={{display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0,overflow:"hidden"}}>
+                  <div style={{display:"flex",alignItems:"baseline",gap:5,flexShrink:0}}>
+                    <span style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:800,color:"white"}}>{totalSelecionado}</span>
+                    <span style={{fontSize:11,color:"rgba(255,255,255,0.55)"}}>{totalSelecionado===1?"questão":"questões"}</span>
+                  </div>
+                  {!detalhar&&(
+                    <div style={{display:"flex",gap:4,flexWrap:"nowrap",overflow:"hidden"}}>
+                      {[...new Set(selecionados.map(s=>s.materia))].slice(0,3).map(m=>{
+                        const ct=selecionados.filter(s=>s.materia===m).reduce((a,s)=>a+s.contagem,0);
+                        return(
+                          <span key={m} style={{fontSize:9,background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:100,padding:"2px 7px",color:"rgba(255,255,255,0.7)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:100}}>
+                            {m.split(' ').slice(0,2).join(' ')} {ct}
+                          </span>
+                        );
+                      })}
+                      {[...new Set(selecionados.map(s=>s.materia))].length>3&&(
+                        <span style={{fontSize:9,color:"rgba(255,255,255,0.4)",flexShrink:0}}>+{[...new Set(selecionados.map(s=>s.materia))].length-3}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div style={{display:"flex",gap:8,flexShrink:0}}>
+                {/* Botões */}
+                <div style={{display:"flex",gap:6,flexShrink:0,alignItems:"center"}}>
+                  <button onClick={()=>setDetalhar(v=>!v)}
+                    style={{padding:"5px 10px",background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.75)",border:"1px solid rgba(255,255,255,0.18)",borderRadius:7,fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>
+                    {detalhar?"Recolher":"Detalhar"}
+                  </button>
                   <button onClick={limparTudo}
-                    style={{padding:"6px 12px",background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.8)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:8,fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>
+                    style={{padding:"5px 10px",background:"transparent",color:"rgba(255,255,255,0.5)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:7,fontSize:11,cursor:"pointer",whiteSpace:"nowrap"}}>
                     Limpar
                   </button>
-                  <button onClick={()=>onIniciar({topicos:selecionados,total:totalSelecionado})}
-                    style={{padding:"6px 16px",background:"white",color:C.primary,border:"none",borderRadius:8,fontSize:12,fontWeight:800,cursor:"pointer",boxShadow:"0 2px 8px rgba(0,0,0,0.15)",whiteSpace:"nowrap"}}>
-                    Começar →
+                  <button onClick={()=>setTelaAtual("confirmar")}
+                    style={{padding:"6px 16px",background:"white",color:C.primary,border:"none",borderRadius:7,fontSize:12,fontWeight:800,cursor:"pointer",boxShadow:"0 2px 8px rgba(0,0,0,0.15)",whiteSpace:"nowrap"}}>
+                    Confirmar →
                   </button>
                 </div>
               </div>
-              {/* Linha 2: tags (máx 4) + ... + Detalhar */}
-              <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"nowrap",overflow:"hidden"}}>
-                {visiveis.map((s,i)=>(
-                  <div key={i} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.18)",borderRadius:100,padding:"3px 8px 3px 10px",flexShrink:0,maxWidth:160}}>
-                    <span style={{fontSize:10,color:"white",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                      {s.topico==="todas"?s.materia:s.topico}
-                    </span>
-                    <button onClick={()=>removerSelecionado(i)}
-                      style={{width:13,height:13,borderRadius:"50%",background:"rgba(255,255,255,0.2)",border:"none",color:"white",cursor:"pointer",fontSize:8,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                      ✕
-                    </button>
-                  </div>
-                ))}
-                {ocultos>0&&(
-                  <span style={{fontSize:11,color:"rgba(255,255,255,0.6)",flexShrink:0,marginLeft:2}}>+{ocultos} mais</span>
-                )}
-                {selecionados.length>LIMITE&&(
-                  <button onClick={()=>setDetalhar(true)}
-                    style={{marginLeft:"auto",padding:"3px 10px",background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.25)",borderRadius:100,fontSize:10,fontWeight:700,color:"white",cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>
-                    Detalhar ↑
-                  </button>
-                )}
-              </div>
             </div>
           </div>
+        </div>
       )}
+        </>
+      )}
+      </>)}
     </div>
   );
 }
 
 /* ─── SESSÃO DE TREINO ───────────────────────────────────────── */
 function TreinoSessao({user,filtro,onVoltar}){
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const [questoes,setQuestoes]=React.useState([]);
   const [idx,setIdx]=React.useState(0);
   const [selecionada,setSelecionada]=React.useState(null);
   const [confirmada,setConfirmada]=React.useState(false);
-  const [noCaderno,setNoCaderno]=React.useState(null); // null=não decidiu, true=sim, false=não
+  const [noCaderno,setNoCaderno]=React.useState(null);
   const [loading,setLoading]=React.useState(true);
   const [total,setTotal]=React.useState(0);
   const [acertos,setAcertos]=React.useState(0);
+  const [soNaoRespondidas,setSoNaoRespondidas]=React.useState(false);
+  const [questoesOriginais,setQuestoesOriginais]=React.useState([]);
+  const [respondidas,setRespondidas]=React.useState(new Set());
   const LETRAS=["A","B","C","D","E"];
 
   React.useEffect(()=>{loadQuestoes();},[]);
 
+  // Aplica filtro de não respondidas
+  React.useEffect(()=>{
+    if(!questoesOriginais.length) return;
+    if(soNaoRespondidas){
+      const filtradas=questoesOriginais.filter(q=>!respondidas.has(q.id));
+      setQuestoes(filtradas);
+      setTotal(filtradas.length);
+    }else{
+      setQuestoes(questoesOriginais);
+      setTotal(questoesOriginais.length);
+    }
+    setIdx(0);setSelecionada(null);setConfirmada(false);
+  },[soNaoRespondidas]);
+
   const loadQuestoes=async()=>{
     setLoading(true);
     let todasQuestoes=[];
-    // Suporte a múltiplos tópicos
     if(filtro.topicos&&filtro.topicos.length>0){
       for(const t of filtro.topicos){
         let q=supabase.from("questoes").select("*").eq("ativa",true).eq("materia",t.materia);
@@ -3562,18 +3877,21 @@ function TreinoSessao({user,filtro,onVoltar}){
         const{data}=await q;
         if(data) todasQuestoes=[...todasQuestoes,...data];
       }
-      // Remove duplicatas por id
       const ids=new Set();
       todasQuestoes=todasQuestoes.filter(q=>{if(ids.has(q.id))return false;ids.add(q.id);return true;});
     }else{
-      // Compatibilidade com filtro antigo (tópico único)
       let q=supabase.from("questoes").select("*").eq("ativa",true).eq("materia",filtro.materia);
       if(filtro.topico!=="todas") q=q.eq("topico",filtro.topico);
       const{data}=await q;
       todasQuestoes=data||[];
     }
-    const shuffled=todasQuestoes.sort(()=>Math.random()-0.5);
+    // Se vier com caderno, filtra questões já respondidas para mostrar por último
+    const jaRespondidas=new Set(filtro.questoesRespondidas||[]);
+    const naoRespondidas=todasQuestoes.filter(q=>!jaRespondidas.has(q.id));
+    const respondidas=todasQuestoes.filter(q=>jaRespondidas.has(q.id));
+    const shuffled=[...naoRespondidas.sort(()=>Math.random()-0.5),...respondidas.sort(()=>Math.random()-0.5)];
     setQuestoes(shuffled);
+    setQuestoesOriginais(shuffled);
     setTotal(shuffled.length);
     setLoading(false);
   };
@@ -3585,6 +3903,22 @@ function TreinoSessao({user,filtro,onVoltar}){
     if(correta) setAcertos(a=>a+1);
     setConfirmada(true);
     setNoCaderno(null);
+    // Marca como respondida
+    setRespondidas(prev=>new Set([...prev,q.id]));
+    // Salva progresso no caderno se existir
+    if(filtro.cadernoId){
+      const jaRespondidas=filtro.questoesRespondidas||[];
+      if(!jaRespondidas.includes(q.id)){
+        const novasRespondidas=[...jaRespondidas,q.id];
+        // Salva progresso sem mutar filtro diretamente
+        try{
+          await supabase.from("cadernos_treino").update({
+            questoes_respondidas:novasRespondidas,
+            updated_at:new Date().toISOString()
+          }).eq("id",filtro.cadernoId);
+        }catch(e){console.error("[CadernoProgresso]",e);}
+      }
+    }
   };
 
   const adicionarCaderno=async()=>{
@@ -3688,7 +4022,9 @@ function TreinoSessao({user,filtro,onVoltar}){
         <QuestaoInterativa user={user} q={q} selecionada={selecionada} confirmada={confirmada}
           onSelect={(v)=>{if(!confirmada)setSelecionada(v);}}
           onConfirmar={confirmar} onProxima={proxima} isLast={idx+1>=total}
-          atual={idx+1} total={total}/>
+          atual={idx+1} total={total}
+          soNaoRespondidas={soNaoRespondidas} setSoNaoRespondidas={setSoNaoRespondidas}
+          respondidas={respondidas}/>
       </ApoioLateral>
       </div>
     </div>
@@ -3697,6 +4033,7 @@ function TreinoSessao({user,filtro,onVoltar}){
 
 /* ─── ABA REVISÃO ────────────────────────────────────────────── */
 function RevisaoTab({user}){
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const [caderno,setCaderno]=React.useState([]);
   const [loading,setLoading]=React.useState(true);
   const [filtro,setFiltro]=React.useState("hoje"); // hoje | todas | dominadas
@@ -3764,7 +4101,7 @@ function RevisaoTab({user}){
       <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:18,padding:"22px 26px",color:"white",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
         <div>
           <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,marginBottom:4}}>📓 Caderno de erros</div>
-          <div style={{fontSize:13,color:"rgba(255,255,255,0.8)"}}>Revisão espaçada: 1 → 3 → 7 → 15 → 30 dias</div>
+          <div style={{fontSize:13,color:"rgba(255,255,255,0.8)"}}>Revise as questões que você errou, no momento certo.</div>
         </div>
         <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
           {[{v:"hoje",l:`Para hoje (${paraHoje.length})`},{v:"todas",l:`Todas (${todas.length})`},{v:"dominadas",l:`Dominadas (${dominadas.length})`}].map(f=>(
@@ -3903,6 +4240,7 @@ function RevisaoTab({user}){
 
 /* ─── ABA REDAÇÃO ────────────────────────────────────────────── */
 function RedacaoTab({user,plano}){
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const [fase,setFase]=React.useState("inicio"); // inicio|enviando|corrigindo|resultado|historico
   const [imagem,setImagem]=React.useState(null); // base64
   const [imagemPreview,setImagemPreview]=React.useState(null);
@@ -4110,7 +4448,7 @@ Responda SOMENTE com um JSON válido, sem texto fora do JSON, no formato:
 
           {/* Critérios */}
           <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"22px 24px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:16}}>📊 Nota por critério</div>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:16}}>Nota por critério</div>
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
               {(resultado.criterios||[]).map((c,i)=>{
                 const cor=corPorNota(c.nota,c.nota_max);
@@ -4135,17 +4473,17 @@ Responda SOMENTE com um JSON válido, sem texto fora do JSON, no formato:
           <div style={{display:"flex",flexDirection:"column",gap:14}}>
             {/* Comentário geral */}
             <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"18px 20px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-              <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:10}}>💬 Avaliação geral</div>
+              <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:10}}>Avaliação geral</div>
               <div style={{fontSize:13,color:C.text,lineHeight:1.7}}>{resultado.comentario_geral}</div>
             </div>
             {/* Pontos fortes */}
             <div style={{background:"#F0FDF4",border:"1px solid #A7F3D0",borderRadius:16,padding:"16px 18px"}}>
-              <div style={{fontSize:12,fontWeight:700,color:"#065F46",marginBottom:8}}>✅ Pontos fortes</div>
+              <div style={{fontSize:12,fontWeight:700,color:"#065F46",marginBottom:8}}>Pontos fortes</div>
               <div style={{fontSize:13,color:"#065F46",lineHeight:1.7}}>{resultado.pontos_fortes}</div>
             </div>
             {/* Pontos de melhora */}
             <div style={{background:"#FFF7ED",border:"1px solid #FED7AA",borderRadius:16,padding:"16px 18px"}}>
-              <div style={{fontSize:12,fontWeight:700,color:"#92400E",marginBottom:8}}>⚠️ Pontos de melhora</div>
+              <div style={{fontSize:12,fontWeight:700,color:"#92400E",marginBottom:8}}>Pontos de melhora</div>
               <div style={{fontSize:13,color:"#78350F",lineHeight:1.7}}>{resultado.pontos_melhora}</div>
             </div>
           </div>
@@ -4154,7 +4492,7 @@ Responda SOMENTE com um JSON válido, sem texto fora do JSON, no formato:
         {/* Transcrição */}
         {resultado.transcricao&&(
           <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"18px 22px",boxShadow:"0 2px 6px rgba(0,0,0,0.04)"}}>
-            <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:10}}>📄 Trecho transcrito pela IA</div>
+            <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:10}}>Trecho transcrito pela IA</div>
             <div style={{fontSize:13,color:C.textMed,lineHeight:1.8,fontStyle:"italic"}}>"{resultado.transcricao}..."</div>
           </div>
         )}
@@ -4230,7 +4568,7 @@ Responda SOMENTE com um JSON válido, sem texto fora do JSON, no formato:
               <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"22px 24px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,flexWrap:"wrap",gap:8}}>
                   <div>
-                    <div style={{fontSize:13,fontWeight:700,color:C.text}}>📈 Evolução da nota</div>
+                    <div style={{fontSize:13,fontWeight:700,color:C.text}}>Evolução da nota</div>
                     <div style={{fontSize:11,color:C.textLight,marginTop:2}}>Sua progressão ao longo do tempo</div>
                   </div>
                   {evolucao!==0&&(
@@ -4332,7 +4670,7 @@ Responda SOMENTE com um JSON válido, sem texto fora do JSON, no formato:
                           {/* Avaliação geral */}
                           {r.comentario_geral&&(
                             <div style={{background:"#F8F9FA",borderRadius:12,padding:"14px 16px",marginBottom:12}}>
-                              <div style={{fontSize:11,fontWeight:700,color:C.text,marginBottom:6}}>💬 Avaliação geral</div>
+                              <div style={{fontSize:11,fontWeight:700,color:C.text,marginBottom:6}}>Avaliação geral</div>
                               <div style={{fontSize:13,color:C.text,lineHeight:1.7}}>{r.comentario_geral}</div>
                             </div>
                           )}
@@ -4341,13 +4679,13 @@ Responda SOMENTE com um JSON válido, sem texto fora do JSON, no formato:
                           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}} className="evo-grid2-inner">
                             {r.pontos_fortes&&(
                               <div style={{background:"#F0FDF4",border:"1px solid #A7F3D0",borderRadius:12,padding:"12px 14px"}}>
-                                <div style={{fontSize:11,fontWeight:700,color:"#065F46",marginBottom:6}}>✅ Pontos fortes</div>
+                                <div style={{fontSize:11,fontWeight:700,color:"#065F46",marginBottom:6}}>Pontos fortes</div>
                                 <div style={{fontSize:12,color:"#065F46",lineHeight:1.6}}>{r.pontos_fortes}</div>
                               </div>
                             )}
                             {r.pontos_melhora&&(
                               <div style={{background:"#FFF7ED",border:"1px solid #FED7AA",borderRadius:12,padding:"12px 14px"}}>
-                                <div style={{fontSize:11,fontWeight:700,color:"#92400E",marginBottom:6}}>⚠️ O que melhorar</div>
+                                <div style={{fontSize:11,fontWeight:700,color:"#92400E",marginBottom:6}}>O que melhorar</div>
                                 <div style={{fontSize:12,color:"#78350F",lineHeight:1.6}}>{r.pontos_melhora}</div>
                               </div>
                             )}
@@ -4356,7 +4694,7 @@ Responda SOMENTE com um JSON válido, sem texto fora do JSON, no formato:
                           {/* Transcrição */}
                           {r.transcricao&&(
                             <div style={{background:"#F8F9FA",borderRadius:12,padding:"12px 14px",borderLeft:`3px solid ${C.primary}`}}>
-                              <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>📄 Trecho transcrito pela IA</div>
+                              <div style={{fontSize:11,fontWeight:700,color:C.textLight,marginBottom:4}}>Trecho transcrito pela IA</div>
                               <div style={{fontSize:12,color:C.textMed,lineHeight:1.7,fontStyle:"italic"}}>"{r.transcricao}..."</div>
                             </div>
                           )}
@@ -4484,6 +4822,7 @@ Responda SOMENTE com um JSON válido, sem texto fora do JSON, no formato:
 
 /* ─── TELA DE PERFIL ─────────────────────────────────────────── */
 function PerfilTab({user,plano,onBack,onPlanUpdate}){
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const [aba,setAba]=React.useState("dados");
   const [dados,setDados]=React.useState({nome:"",telefone:""});
   const [concurso,setConcurso]=React.useState({orgao:"",cargo:"",banca:"",data_prova:"",horas:14,total_questoes:400,tem_redacao:false,uf_prova:""});
@@ -4663,7 +5002,7 @@ function PerfilTab({user,plano,onBack,onPlanUpdate}){
                 <div style={{fontSize:11,fontWeight:700,color:C.primary,marginBottom:8}}>📊 Preview do recálculo</div>
                 <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
                   {[
-                    {l:"Meta diária",v:`${Math.min(80,Math.max(30,Math.round(((Number(concurso.horas)||14)/7)*18)))}q`},
+                    {l:"Meta diária",v:`${Math.min(80,Math.max(30,Math.round(((Number(concurso.horas)||14)/7)*18)))} questões`},
                     {l:"Semanas para concluir",v:`${Math.ceil((Number(concurso.total_questoes)||400)/Math.min(80,Math.max(30,Math.round(((Number(concurso.horas)||14)/7)*18)))/7)} sem`},
                   ].map(s=>(
                     <div key={s.l}>
@@ -4778,7 +5117,61 @@ function PerfilTab({user,plano,onBack,onPlanUpdate}){
 /* ─── ABA EVOLUÇÃO ──────────────────────────────────────────── */
 /* ─── ABA EVOLUÇÃO ──────────────────────────────────────────── */
 /* ─── ABA EVOLUÇÃO ──────────────────────────────────────────── */
+/* ─── COMPONENTE: INFO TOOLTIP ─────────────────────────────── */
+function InfoTooltip({texto}){
+  const [aberto,setAberto]=React.useState(false);
+  const ref=React.useRef(null);
+
+  React.useEffect(()=>{
+    if(!aberto) return;
+    const fechar=(e)=>{if(ref.current&&!ref.current.contains(e.target)) setAberto(false);};
+    document.addEventListener("mousedown",fechar);
+    return()=>document.removeEventListener("mousedown",fechar);
+  },[aberto]);
+
+  return(
+    <div ref={ref} style={{position:"relative",display:"inline-flex",alignItems:"center"}}>
+      <button
+        onClick={e=>{e.stopPropagation();setAberto(v=>!v);}}
+        style={{
+          width:16,height:16,borderRadius:"50%",
+          background:aberto?"#6C3CE1":"#E5E7EB",
+          color:aberto?"white":"#9CA3AF",
+          border:"none",cursor:"pointer",
+          fontSize:10,fontWeight:800,
+          display:"flex",alignItems:"center",justifyContent:"center",
+          lineHeight:1,flexShrink:0,
+          transition:"all 0.15s"
+        }}
+        title={texto}
+      >i</button>
+      {aberto&&(
+        <div style={{
+          position:"absolute",right:0,top:22,zIndex:999,
+          background:"#1E1B4B",color:"white",
+          borderRadius:10,padding:"10px 14px",
+          fontSize:12,lineHeight:1.6,
+          width:220,
+          boxShadow:"0 8px 24px rgba(0,0,0,0.2)",
+          animation:"fadeIn 0.15s ease"
+        }}>
+          <div style={{
+            position:"absolute",top:-5,right:6,
+            width:10,height:10,
+            background:"#1E1B4B",
+            transform:"rotate(45deg)",
+            borderRadius:2
+          }}/>
+          {texto}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function EvolucaoTab({userId,plano}){
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const [subAba,setSubAba]=React.useState("semanal");
   const [ev,setEv]=React.useState(null);
   const [sessoes,setSessoes]=React.useState([]);
@@ -4903,21 +5296,30 @@ function EvolucaoTab({userId,plano}){
         <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:"16px 18px",boxShadow:"0 2px 6px rgba(0,0,0,0.04)"}}>
           <div style={{fontSize:16,marginBottom:6}}>📝</div>
           <div style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:800,color:C.primary,lineHeight:1}}>{totalQ}</div>
-          <div style={{fontSize:10,color:C.textLight,marginTop:4}}>Questões feitas</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:4,marginTop:4}}>
+            <div style={{fontSize:10,color:C.textLight}}>Questões feitas</div>
+            <InfoTooltip texto="Total acumulado de questões que você respondeu desde que começou a usar a plataforma."/>
+          </div>
         </div>
 
         {/* Aproveitamento */}
         <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:"16px 18px",boxShadow:"0 2px 6px rgba(0,0,0,0.04)"}}>
           <div style={{fontSize:16,marginBottom:6}}>🎯</div>
           <div style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:800,color:aprov>=70?"#10B981":aprov>=50?"#F59E0B":"#EF4444",lineHeight:1}}>{aprov}%</div>
-          <div style={{fontSize:10,color:C.textLight,marginTop:4}}>Aproveitamento geral</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:4,marginTop:4}}>
+            <div style={{fontSize:10,color:C.textLight}}>Aproveitamento geral</div>
+            <InfoTooltip texto="Percentual de acertos sobre o total de questões respondidas. Acima de 70% indica bom domínio do conteúdo."/>
+          </div>
         </div>
 
         {/* Streak */}
         <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:14,padding:"16px 18px",boxShadow:"0 4px 14px rgba(108,60,225,0.25)",color:"white"}}>
           <div style={{fontSize:16,marginBottom:6}}>🔥</div>
           <div style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:800,lineHeight:1}}>{streak}</div>
-          <div style={{fontSize:10,color:"rgba(255,255,255,0.7)",marginTop:4}}>Dias consecutivos</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:4,marginTop:4}}>
+            <div style={{fontSize:10,color:"rgba(255,255,255,0.7)"}}>Dias consecutivos</div>
+            <InfoTooltip texto="Quantos dias seguidos você estudou. Nunca pule um dia — manter a sequência é fundamental para a aprovação."/>
+          </div>
           {streakMax>0&&<div style={{fontSize:9,color:"rgba(255,255,255,0.5)",marginTop:2}}>Recorde: {streakMax}d</div>}
         </div>
 
@@ -4925,7 +5327,10 @@ function EvolucaoTab({userId,plano}){
         <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:"16px 18px",boxShadow:"0 2px 6px rgba(0,0,0,0.04)"}}>
           <div style={{fontSize:16,marginBottom:6}}>📚</div>
           <div style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:800,color:C.primary,lineHeight:1}}>{pctEdital}%</div>
-          <div style={{fontSize:10,color:C.textLight,marginTop:4}}>do edital coberto</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:4,marginTop:4}}>
+            <div style={{fontSize:10,color:C.textLight}}>do edital coberto</div>
+            <InfoTooltip texto="Percentual do total de questões do seu edital que você já praticou. Calculado com base no total configurado no seu plano de estudos."/>
+          </div>
           <div style={{marginTop:6,height:4,background:"#F3F4F6",borderRadius:100}}>
             <div style={{height:"100%",width:`${pctEdital}%`,background:C.primary,borderRadius:100}}/>
           </div>
@@ -4948,12 +5353,12 @@ function EvolucaoTab({userId,plano}){
           </div>
           <div style={{display:"flex",gap:16,flexShrink:0}}>
             <div style={{textAlign:"center"}}>
-              <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:800,color:noRitmo?"#10B981":"#F59E0B"}}>{ritmoAtual}q</div>
+              <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:800,color:noRitmo?"#10B981":"#F59E0B"}}>{ritmoAtual}</div>
               <div style={{fontSize:9,color:"#9CA3AF",marginTop:2}}>ritmo atual/sem</div>
             </div>
             <div style={{width:1,background:"#E5E7EB"}}/>
             <div style={{textAlign:"center"}}>
-              <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:800,color:C.primary}}>{ritmoNecessario}q</div>
+              <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:800,color:C.primary}}>{ritmoNecessario}</div>
               <div style={{fontSize:9,color:"#9CA3AF",marginTop:2}}>necessário/sem</div>
             </div>
             {semanasRitmoAtual&&(
@@ -4993,14 +5398,14 @@ function EvolucaoTab({userId,plano}){
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}} className="evo-grid2-inner">
                 <div style={{background:C.bg,borderRadius:12,padding:"16px 20px"}}>
                   <div style={{fontSize:11,color:C.textLight,fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Esta semana</div>
-                  <div style={{fontFamily:"'Lora',serif",fontSize:28,fontWeight:800,color:C.primary}}>{qSemana}q</div>
+                  <div style={{fontFamily:"'Lora',serif",fontSize:28,fontWeight:800,color:C.primary}}>{qSemana}</div>
                   <div style={{fontSize:11,fontWeight:700,marginTop:4,color:diffSemana>0?"#10B981":diffSemana<0?"#EF4444":"#9CA3AF"}}>
                     {diffSemana===0?"igual à anterior":diffSemana>0?`▲ +${diffSemana} vs semana passada`:`▼ ${Math.abs(diffSemana)} vs semana passada`}
                   </div>
                 </div>
                 <div style={{background:C.bg,borderRadius:12,padding:"16px 20px"}}>
                   <div style={{fontSize:11,color:C.textLight,fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Meta semanal</div>
-                  <div style={{fontFamily:"'Lora',serif",fontSize:28,fontWeight:800,color:C.text}}>{meta*5}q</div>
+                  <div style={{fontFamily:"'Lora',serif",fontSize:28,fontWeight:800,color:C.text}}>{meta*5}</div>
                   <div style={{marginTop:8,height:6,background:"#E5E7EB",borderRadius:100}}>
                     <div style={{height:"100%",width:`${Math.min(100,Math.round((qSemana/(meta*5))*100))}%`,background:C.primary,borderRadius:100}}/>
                   </div>
@@ -5070,7 +5475,7 @@ function EvolucaoTab({userId,plano}){
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
                               <span style={{fontSize:12,fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.nome}</span>
-                              <span style={{fontSize:10,color:C.textMed,flexShrink:0,marginLeft:6}}>{m.acertos}/{m.feitas}q</span>
+                              <span style={{fontSize:10,color:C.textMed,flexShrink:0,marginLeft:6}}>{m.acertos}/{m.feitas}</span>
                             </div>
                             <div style={{height:7,background:"#F3F4F6",borderRadius:100}}>
                               <div style={{height:"100%",width:`${m.pct}%`,background:cor,borderRadius:100}}/>
@@ -5176,6 +5581,8 @@ function EvolucaoTab({userId,plano}){
 
 /* ─── DASHBOARD ─────────────────────────────────────────────────── */
 function Dashboard({user,onLogout}){
+  const dark=useDarkMode();
+  const C=dark?C_DARK:C_LIGHT;
   const [tab,setTab]=React.useState("cronograma");
   const [plan,setPlan]=React.useState(null);
   const [loading,setLoading]=React.useState(true);
@@ -5196,13 +5603,32 @@ function Dashboard({user,onLogout}){
   },[menuAberto]);
 
   React.useEffect(()=>{
+    document.body.style.background = dark ? C_DARK.bg : C_LIGHT.bg;
+    document.body.style.transition = "background 0.3s ease";
+  },[dark]);
+
+  const [evolucaoData,setEvolucaoData]=React.useState(null);
+  const [alunoData,setAlunoData]=React.useState(null);
+
+  React.useEffect(()=>{
     (async()=>{
       try{
-        const{data,error}=await supabase.from("onboarding").select("*").eq("user_id",user.id).maybeSingle();
-        if(!error && data) setPlan(data);
-        // Atualiza último acesso (silenciosamente, sem travar se falhar)
+        // Carrega tudo em paralelo
+        const[
+          {data:onbData,error:onbErr},
+          {data:evData},
+          {data:alunoInfo},
+        ]=await Promise.all([
+          supabase.from("onboarding").select("*").eq("user_id",user.id).maybeSingle(),
+          supabase.from("evolucao").select("*").eq("user_id",user.id).maybeSingle(),
+          supabase.from("alunos").select("streak_atual,streak_maximo,ultimo_acesso").eq("id",user.id).maybeSingle(),
+        ]);
+        if(!onbErr && onbData) setPlan(onbData);
+        if(evData) setEvolucaoData(evData);
+        if(alunoInfo) setAlunoData(alunoInfo);
+        // Atualiza último acesso
         supabase.from("alunos").update({ultimo_acesso:new Date().toISOString()}).eq("id",user.id).then(()=>{});
-        // Verifica simulado ativo próximo (próximas 48h ou em andamento)
+        // Verifica simulado ativo próximo
         const agora=new Date();
         const em48h=new Date(agora.getTime()+48*60*60*1000);
         const{data:simAtivo}=await supabase.from("simulados").select("*").eq("ativo",true)
@@ -5213,7 +5639,7 @@ function Dashboard({user,onLogout}){
             .select("*").eq("simulado_id",simAtivo.id).eq("user_id",user.id).maybeSingle();
           setInscricaoAtiva(insc);
         }
-      }catch(e){}
+      }catch(e){console.error("[Dashboard load]",e);}
       setLoading(false);
     })();
   },[]);
@@ -5319,7 +5745,7 @@ function Dashboard({user,onLogout}){
     if(pctDia>=30) return{titulo:`📈 Você já evoluiu hoje`,sub:`${questoesHoje} feitas. Mais ${restam} e você fecha a meta.`,cor:"#6C3CE1",bg:"#F5F3FF",border:"#DDD6FE"};
     if(streakN>=7) return{titulo:`🔥 ${streakN} dias seguidos!`,sub:"Sua sequência está forte. Não quebre agora.",cor:"#F59E0B",bg:"#FFFBEB",border:"#FDE68A"};
     if(streakN>=3) return{titulo:`💪 ${streakN} dias consecutivos`,sub:"Sua sequência está viva hoje. Continue.",cor:"#6C3CE1",bg:"#F5F3FF",border:"#DDD6FE"};
-    if(totalFeitas>0&&aprovGeral>0) return{titulo:`📊 Aproveitamento geral: ${aprovGeral}%`,sub:"Você está mais perto da aprovação do que ontem.",cor:"#6C3CE1",bg:"#F5F3FF",border:"#DDD6FE"};
+    if(totalFeitas>0&&aprovGeral>0) return{titulo:`Aproveitamento geral: ${aprovGeral}%`,sub:"Você está mais perto da aprovação do que ontem.",cor:"#6C3CE1",bg:"#F5F3FF",border:"#DDD6FE"};
     if(dias!=null&&dias>0) return{titulo:`🎯 ${dias} dias para a prova`,sub:`Meta de hoje: ${meta} questões. Comece agora.`,cor:"#6C3CE1",bg:"#F5F3FF",border:"#DDD6FE"};
     return{titulo:`🚀 Bora, ${getNomeAluno()}!`,sub:`Meta de hoje: ${meta} questões. Cada uma conta.`,cor:"#6C3CE1",bg:"#F5F3FF",border:"#DDD6FE"};
   };
@@ -5395,6 +5821,12 @@ function Dashboard({user,onLogout}){
                       </button>
                     )}
                     <div style={{height:1,background:C.border,margin:"6px 0"}}/>
+                    <div style={{height:1,background:C.border,margin:"4px 0"}}/>
+                    <button onClick={()=>{toggleDarkMode();setMenuAberto(false);}}
+                      style={{width:"100%",padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,textAlign:"left",fontSize:13,color:C.text,cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontWeight:500}}>
+                      <span style={{fontSize:16}}>{dark?"☀️":"🌙"}</span> {dark?"Modo claro":"Modo escuro"}
+                    </button>
+                    <div style={{height:1,background:C.border,margin:"4px 0"}}/>
                     <button onClick={()=>{setMenuAberto(false);onLogout();}}
                       style={{width:"100%",padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,textAlign:"left",fontSize:13,color:"#EF4444",cursor:"pointer",display:"flex",alignItems:"center",gap:10,fontWeight:600}}>
                       <span style={{fontSize:16}}>🚪</span> Sair
@@ -5442,7 +5874,7 @@ function Dashboard({user,onLogout}){
 
             {/* HERO DINÂMICO */}
             {(()=>{
-              const hero=getHeroMessage(dias,meta,0,null);
+              const hero=getHeroMessage(dias,meta,alunoData?.streak_atual||0,evolucaoData);
               return(
                 <div style={{background:hero.bg,border:`2px solid ${hero.border}`,borderRadius:20,padding:"22px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
                   <div style={{flex:1,minWidth:200}}>
@@ -5480,10 +5912,13 @@ function Dashboard({user,onLogout}){
                 const cor=pct>=100?"#10B981":pct>=50?C.primary:"#F59E0B";
                 return(
                   <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"20px 22px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-                    <div style={{fontSize:11,fontWeight:700,color:C.textLight,letterSpacing:1.2,textTransform:"uppercase",marginBottom:10}}>⚡ Progresso hoje</div>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                      <div style={{fontSize:11,fontWeight:700,color:C.textLight,letterSpacing:1.2,textTransform:"uppercase"}}>Progresso hoje</div>
+                      <InfoTooltip texto="Acompanha quantas questões você já respondeu hoje em relação à sua meta diária. A meta é calculada com base nas horas de estudo semanais que você configurou."/>
+                    </div>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:8}}>
                       <span style={{fontSize:26,fontWeight:800,color:cor,fontFamily:"'Lora',serif"}}>{pct}%</span>
-                      <span style={{fontSize:11,color:C.textMed,fontWeight:600}}>{feitas}/{meta}q</span>
+                      <span style={{fontSize:11,color:C.textMed,fontWeight:600}}>{feitas}/{meta}</span>
                     </div>
                     <div style={{height:6,background:"#F3F4F6",borderRadius:100,overflow:"hidden",marginBottom:10}}>
                       <div style={{height:"100%",width:`${pct||2}%`,background:cor,borderRadius:100,transition:"width 1s ease"}}/>
@@ -5494,9 +5929,12 @@ function Dashboard({user,onLogout}){
               })()}
               {/* Card: Sequência */}
               <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:16,padding:"20px 22px",boxShadow:"0 4px 16px rgba(108,60,225,0.25)",color:"white"}}>
-                <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.2,textTransform:"uppercase",marginBottom:10}}>🔥 Ritmo de estudos</div>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.2,textTransform:"uppercase"}}>Ritmo de estudos</div>
+                  <InfoTooltip texto="Mostra sua sequência de dias consecutivos estudando. Manter o ritmo diário é o principal fator de aprovação em concursos."/>
+                </div>
                 <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:8}}>
-                  <span style={{fontSize:26,fontWeight:800,fontFamily:"'Lora',serif"}}>0</span>
+                  <span style={{fontSize:26,fontWeight:800,fontFamily:"'Lora',serif"}}>{alunoData?.streak_atual||0}</span>
                   <span style={{fontSize:11,color:"rgba(255,255,255,0.7)"}}>dias consecutivos</span>
                 </div>
                 <div style={{display:"flex",gap:4,marginTop:6}}>
@@ -5635,12 +6073,15 @@ function Dashboard({user,onLogout}){
 
                 {/* EVOLUÇÃO — comparação consigo mesmo */}
                 <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:18,padding:"22px 20px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
-                  <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:4}}>📈 Sua evolução</div>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+                    <div style={{fontSize:12,fontWeight:700,color:C.text}}>Sua evolução</div>
+                    <InfoTooltip texto="Compara seu desempenho atual com períodos anteriores. Questões hoje vs. ontem, semana atual vs. semana passada e aproveitamento geral."/>
+                  </div>
                   <div style={{fontSize:10,color:C.textLight,marginBottom:14}}>Você vs. você mesmo</div>
                   {[
-                    {label:"Questões hoje",atual:0,antes:0,unidade:"q",icone:"📝"},
-                    {label:"Esta semana",atual:0,antes:0,unidade:"q",icone:"📅"},
-                    {label:"Aproveitamento",atual:0,antes:0,unidade:"%",icone:"🎯"},
+                    {label:"Questões hoje",atual:evolucaoData?.questoes_hoje||0,antes:evolucaoData?.questoes_ontem||0,unidade:"",icone:"📝"},
+                    {label:"Esta semana",atual:evolucaoData?.questoes_semana||0,antes:evolucaoData?.questoes_semana_anterior||0,unidade:"",icone:"📅"},
+                    {label:"Aproveitamento",atual:evolucaoData?.aproveitamento_geral||0,antes:evolucaoData?.aproveitamento_anterior||0,unidade:"%",icone:"🎯"},
                   ].map((item,i)=>{
                     const diff=item.atual-item.antes;
                     const subindo=diff>0;
@@ -5658,7 +6099,7 @@ function Dashboard({user,onLogout}){
                     );
                   })}
                   <div style={{marginTop:12,padding:"10px 12px",background:"#F0FDF4",border:"1px solid #A7F3D0",borderRadius:10,fontSize:11,color:"#065F46",fontWeight:600,textAlign:"center"}}>
-                    🤖 {meta>0?`Mantendo ${meta}q/dia → fecha em ${getPrevisoSemanas()} semanas`:"Configure seu plano"}
+                    🤖 {meta>0?`Mantendo ${meta} questões/dia → fecha em ${getPrevisoSemanas()} semanas`:"Configure seu plano"}
                   </div>
                 </div>
 
@@ -5852,7 +6293,7 @@ const ObConfirmarTopicos=({grupos,onConfirm})=>{
       <div style={{background:"white",border:"1.5px solid #E8E8F0",borderRadius:14,overflow:"hidden",marginBottom:12}}>
         <div style={{background:"linear-gradient(135deg,#5B4FCF,#7C6FE0)",padding:"12px 16px"}}>
           <div style={{fontSize:14,fontWeight:800,color:"white"}}>{mat.nome}</div>
-          <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",marginTop:2}}>{mat.questoes}q · {topicos.length} tópicos</div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",marginTop:2}}>{mat.questoes} · {topicos.length} tópicos</div>
         </div>
         <div style={{padding:"12px 14px",maxHeight:300,overflowY:"auto"}}>
           {topicos.map((t,i)=>(
