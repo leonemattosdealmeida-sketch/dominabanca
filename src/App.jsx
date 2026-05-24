@@ -2626,17 +2626,58 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
   return(
     <div style={{display:'flex',flexDirection:'column',minHeight:'100%'}}>
 
-      {/* ── METADATA STRIP — compacto e profissional ── */}
-      <div style={{background:C.white,padding:'8px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',borderRadius:'16px 16px 0 0'}}>
-        {numQ&&<span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:4,background:C.bg,color:C.textMed,border:`1px solid ${C.border}`,fontFamily:"'Courier New',monospace",letterSpacing:0.3}}>{numQ}</span>}
-        {q?.banca&&<span style={{fontSize:10,color:C.textMed}}>{q.banca}</span>}
-        {q?.banca&&q?.fonte&&<span style={{color:C.border,fontSize:10}}>·</span>}
-        {q?.fonte&&<span style={{fontSize:10,color:C.textMed}}>{q.fonte}</span>}
-        {q?.ano&&<><span style={{color:C.border,fontSize:10}}>·</span><span style={{fontSize:10,color:C.textMed}}>{q.ano}</span></>}
-        <span style={{fontSize:10,fontWeight:600,padding:'2px 8px',borderRadius:4,background:`${C.primary}10`,color:C.primary}}>
-          {q?.tipo==='certo_errado'?'C/E':'Múltipla escolha'}
-        </span>
-        {q?.nivel&&<span style={{marginLeft:'auto',fontSize:10,fontWeight:600,color:nivelCor}}>{nivelLabel}</span>}
+      {/* ── METADATA — profissional, denso, limpo ── */}
+      <div style={{background:C.white,borderBottom:`1px solid ${C.border}`,borderRadius:'16px 16px 0 0',overflow:'hidden'}}>
+        {/* Linha 1: progresso + stats da sessão */}
+        <div style={{padding:'10px 16px',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',borderBottom:`1px solid ${C.border}`}}>
+          {/* Contador principal */}
+          <div style={{display:'flex',alignItems:'baseline',gap:4,flexShrink:0}}>
+            <span style={{fontSize:15,fontWeight:800,color:C.text}}>{atual||1}</span>
+            <span style={{fontSize:11,color:C.textLight}}>de {total||'—'}</span>
+          </div>
+          {/* Separador */}
+          <div style={{width:1,height:14,background:C.border,flexShrink:0}}/>
+          {/* Matéria */}
+          {q?.materia&&(
+            <div style={{display:'flex',alignItems:'center',gap:4,minWidth:0}}>
+              <span style={{fontSize:10,color:C.textLight,flexShrink:0}}>Matéria:</span>
+              <span style={{fontSize:11,fontWeight:600,color:C.primary,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:180}}>{q.materia}</span>
+            </div>
+          )}
+          {/* Separador */}
+          {q?.topico&&<div style={{width:1,height:14,background:C.border,flexShrink:0}}/>}
+          {/* Tópico */}
+          {q?.topico&&(
+            <div style={{display:'flex',alignItems:'center',gap:4,minWidth:0,flex:1}}>
+              <span style={{fontSize:10,color:C.textLight,flexShrink:0}}>Assunto:</span>
+              <span style={{fontSize:11,fontWeight:500,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.topico}</span>
+            </div>
+          )}
+          {/* Nível */}
+          {q?.nivel&&(
+            <span style={{marginLeft:'auto',fontSize:10,fontWeight:700,color:nivelCor,background:nivelCor+'15',padding:'2px 8px',borderRadius:100,flexShrink:0}}>
+              {nivelLabel}
+            </span>
+          )}
+        </div>
+        {/* Linha 2: código + banca + concurso + tipo */}
+        <div style={{padding:'6px 16px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:C.bg}}>
+          {numQ&&(
+            <span style={{fontSize:10,fontWeight:700,color:C.primary,fontFamily:"'Courier New',monospace",letterSpacing:0.5}}>
+              #{numQ}
+            </span>
+          )}
+          {(q?.banca||q?.fonte||q?.ano)&&(
+            <div style={{display:'flex',alignItems:'center',gap:5,minWidth:0,flex:1}}>
+              <span style={{fontSize:10,color:C.textMed,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                {[q?.banca,q?.fonte,q?.ano].filter(Boolean).join(' · ')}
+              </span>
+            </div>
+          )}
+          <span style={{marginLeft:'auto',fontSize:10,fontWeight:600,color:q?.tipo==='certo_errado'?'#0369A1':'#7C3AED',background:q?.tipo==='certo_errado'?'#EFF6FF':'#F5F3FF',padding:'2px 8px',borderRadius:100,flexShrink:0}}>
+            {q?.tipo==='certo_errado'?'Certo ou Errado':'Múltipla Escolha'}
+          </span>
+        </div>
       </div>
 
 
