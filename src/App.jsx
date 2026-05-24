@@ -3249,10 +3249,12 @@ function TreinoTab({user,plano,onIniciar}){
   const [grupos,setGrupos]=React.useState([]);
   const [grupoSel,setGrupoSel]=React.useState(null);
   const [materiaSel,setMateriaSel]=React.useState(null);
-  const [topicoSel,setTopicoSel]=React.useState(null);
-  const [contagem,setContagem]=React.useState(0);
   const [loading,setLoading]=React.useState(true);
   const [buscando,setBuscando]=React.useState(false);
+  // Seleção múltipla: [{topico, materia, grupo, contagem}]
+  const [selecionados,setSelecionados]=React.useState([]);
+  const [contagemPorTopico,setContagemPorTopico]=React.useState({});
+  const totalSelecionado=selecionados.reduce((s,x)=>s+x.contagem,0);
 
   React.useEffect(()=>{
     (async()=>{
@@ -3278,24 +3280,41 @@ function TreinoTab({user,plano,onIniciar}){
   const handleMateria=async(grupo,materia)=>{
     setGrupoSel(grupo);
     setMateriaSel(materia);
-    setTopicoSel(null);
-    setContagem(0);
-  };
-
-  const handleTopico=async(topico)=>{
-    setTopicoSel(topico);
+    setContagemPorTopico({});
+    // Busca contagem de cada tópico desta matéria de uma vez
     setBuscando(true);
-    const q=supabase.from("questoes").select("id",{count:"exact"}).eq("ativa",true).eq("materia",materiaSel);
-    if(topico!=="todas") q.eq("topico",topico);
-    const{count}=await q;
-    setContagem(count||0);
+    const{data}=await supabase.from("questoes").select("topico").eq("ativa",true).eq("materia",materia);
+    if(data){
+      const ct={};
+      data.forEach(q=>{ct[q.topico]=(ct[q.topico]||0)+1;});
+      ct["todas"]=data.length;
+      setContagemPorTopico(ct);
+    }
     setBuscando(false);
   };
 
+  const toggleTopico=async(topico)=>{
+    const key=`${materiaSel}||${topico}`;
+    const jaExiste=selecionados.find(s=>s.materia===materiaSel&&s.topico===topico);
+    if(jaExiste){
+      // Remove
+      setSelecionados(prev=>prev.filter(s=>!(s.materia===materiaSel&&s.topico===topico)));
+    }else{
+      // Adiciona
+      const contagem=contagemPorTopico[topico]||0;
+      setSelecionados(prev=>[...prev,{topico,materia:materiaSel,grupo:grupoSel,contagem}]);
+    }
+  };
+
+  const removerSelecionado=(idx)=>{
+    setSelecionados(prev=>prev.filter((_,i)=>i!==idx));
+  };
+
+  const limparTudo=()=>setSelecionados([]);
+
   const grupoAtual=grupos.find(g=>g.nome===grupoSel);
   const materiaAtual=grupoAtual?.materias.find(m=>m.nome===materiaSel);
-
-  const podeIniciar=materiaSel&&topicoSel&&contagem>0;
+  const podeIniciar=selecionados.length>0&&totalSelecionado>0;
 
   if(loading)return(
     <div style={{display:"flex",justifyContent:"center",padding:"60px"}}>
@@ -3353,72 +3372,90 @@ function TreinoTab({user,plano,onIniciar}){
               </div>
             ):(
               <>
-                {/* TÓPICOS */}
+                {/* TÓPICOS com seleção múltipla */}
                 <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"22px 24px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-                  {/* Header */}
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:8}}>
                     <div>
                       <div style={{fontFamily:"'Lora',serif",fontSize:16,fontWeight:700,color:C.text}}>{materiaSel}</div>
-                      <div style={{fontSize:11,color:C.textLight,marginTop:2}}>{materiaAtual?.topicos?.length||0} tópicos disponíveis</div>
+                      <div style={{fontSize:11,color:C.textLight,marginTop:2}}>{materiaAtual?.topicos?.length||0} tópicos · clique para selecionar</div>
                     </div>
-                    <button onClick={()=>handleTopico("todas")}
-                      style={{padding:"10px 18px",border:`2px solid ${topicoSel==="todas"?C.primary:C.border}`,borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer",background:topicoSel==="todas"?C.primary:"white",color:topicoSel==="todas"?"white":C.primary,transition:"all 0.15s",boxShadow:topicoSel==="todas"?"0 4px 12px rgba(108,60,225,0.25)":"none",display:"flex",alignItems:"center",gap:6}}>
-                      📚 Treinar todos os tópicos
+                    {buscando&&<div style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:C.textMed}}><div style={{width:12,height:12,border:`2px solid ${C.primary}`,borderTop:"2px solid transparent",borderRadius:"50%",animation:"spin 0.6s linear infinite"}}/>Carregando...</div>}
+                  </div>
+                  <div style={{height:1,background:C.border,marginBottom:14}}/>
+                  {/* Opção: todos */}
+                  {!buscando&&(
+                    <button onClick={()=>toggleTopico("todas")}
+                      style={{width:"100%",padding:"12px 16px",border:`1.5px solid ${selecionados.find(s=>s.materia===materiaSel&&s.topico==="todas")?C.primary:C.border}`,borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer",background:selecionados.find(s=>s.materia===materiaSel&&s.topico==="todas")?C.primaryXLight:"white",color:selecionados.find(s=>s.materia===materiaSel&&s.topico==="todas")?C.primary:C.text,transition:"all 0.15s",textAlign:"left",display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                      <span style={{width:22,height:22,borderRadius:6,background:selecionados.find(s=>s.materia===materiaSel&&s.topico==="todas")?C.primary:"#F3F4F6",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>
+                        {selecionados.find(s=>s.materia===materiaSel&&s.topico==="todas")?"✓":"📚"}
+                      </span>
+                      <span style={{flex:1}}>Todos os tópicos</span>
+                      <span style={{fontSize:11,fontWeight:700,color:C.primary,background:C.primaryXLight,borderRadius:100,padding:"2px 8px"}}>{contagemPorTopico["todas"]||0}q</span>
                     </button>
-                  </div>
-                  <div style={{height:1,background:C.border,marginBottom:16}}/>
+                  )}
                   {/* Lista de tópicos */}
-                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                    {materiaAtual?.topicos.map((t,i)=>{
-                      const sel=topicoSel===t;
-                      return(
-                        <button key={t} onClick={()=>handleTopico(t)}
-                          style={{padding:"11px 16px",border:`1.5px solid ${sel?C.primary:C.border}`,borderRadius:10,fontSize:12,fontWeight:sel?700:400,cursor:"pointer",background:sel?C.primaryXLight:"white",color:sel?C.primary:C.text,transition:"all 0.15s",textAlign:"left",display:"flex",alignItems:"center",gap:10}}
-                          onMouseEnter={e=>{if(!sel){e.currentTarget.style.borderColor=C.primary;e.currentTarget.style.background="#FAFAFA";}}}
-                          onMouseLeave={e=>{if(!sel){e.currentTarget.style.borderColor=C.border;e.currentTarget.style.background="white";}}}>
-                          <span style={{width:22,height:22,borderRadius:6,background:sel?C.primary:C.bg,border:`1px solid ${sel?C.primary:C.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:sel?"white":C.textLight,flexShrink:0}}>
-                            {i+1}
-                          </span>
-                          <span style={{flex:1,lineHeight:1.4}}>{t}</span>
-                          {sel&&<span style={{fontSize:14,color:C.primary,flexShrink:0}}>✓</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {!buscando&&(
+                    <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                      {materiaAtual?.topicos.map((t,i)=>{
+                        const sel=!!selecionados.find(s=>s.materia===materiaSel&&s.topico===t);
+                        const ct=contagemPorTopico[t]||0;
+                        return(
+                          <button key={t} onClick={()=>ct>0&&toggleTopico(t)}
+                            disabled={ct===0}
+                            style={{padding:"11px 16px",border:`1.5px solid ${sel?C.primary:C.border}`,borderRadius:10,fontSize:12,fontWeight:sel?700:400,cursor:ct===0?"not-allowed":"pointer",background:sel?C.primaryXLight:"white",color:sel?C.primary:ct===0?C.textLight:C.text,transition:"all 0.15s",textAlign:"left",display:"flex",alignItems:"center",gap:10,opacity:ct===0?0.5:1}}
+                            onMouseEnter={e=>{if(!sel&&ct>0){e.currentTarget.style.borderColor=C.primary;e.currentTarget.style.background="#FAFAFA";}}}
+                            onMouseLeave={e=>{if(!sel&&ct>0){e.currentTarget.style.borderColor=C.border;e.currentTarget.style.background="white";}}}>
+                            <span style={{width:22,height:22,borderRadius:6,background:sel?C.primary:"#F3F4F6",border:`1px solid ${sel?C.primary:C.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:sel?"white":C.textLight,flexShrink:0}}>
+                              {sel?"✓":i+1}
+                            </span>
+                            <span style={{flex:1,lineHeight:1.4}}>{t}</span>
+                            <span style={{fontSize:11,fontWeight:700,color:sel?C.primary:C.textLight,background:sel?C.primaryXLight:"#F3F4F6",borderRadius:100,padding:"2px 8px",flexShrink:0}}>{ct}q</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-
-                {/* PAINEL DE INÍCIO */}
-                {topicoSel&&(
-                  <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"20px 22px",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-                    {buscando?(
-                      <div style={{display:"flex",alignItems:"center",gap:10,color:C.textMed,fontSize:13}}>
-                        <div style={{width:16,height:16,border:`2px solid ${C.primary}`,borderTop:"2px solid transparent",borderRadius:"50%",animation:"spin 0.6s linear infinite"}}/>
-                        Contando questões...
-                      </div>
-                    ):(
-                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
-                        <div>
-                          <div style={{fontSize:11,color:C.textLight,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>Pronto para treinar</div>
-                          <div style={{fontFamily:"'Lora',serif",fontSize:18,fontWeight:700,color:C.text,marginBottom:4}}>
-                            {materiaSel} {topicoSel!=="todas"?`· ${topicoSel}`:"· Todos os tópicos"}
-                          </div>
-                          <div style={{display:"flex",alignItems:"center",gap:6}}>
-                            <span style={{fontSize:24,fontWeight:800,color:contagem>0?C.primary:"#EF4444",fontFamily:"'Lora',serif"}}>{contagem}</span>
-                            <span style={{fontSize:12,color:C.textMed}}>questões disponíveis</span>
-                          </div>
-                        </div>
-                        <button
-                          onClick={()=>podeIniciar&&onIniciar({grupo:grupoSel,materia:materiaSel,topico:topicoSel,total:contagem})}
-                          disabled={!podeIniciar}
-                          style={{padding:"14px 28px",background:podeIniciar?`linear-gradient(135deg,${C.primary},${C.primaryLight})`:"#E5E7EB",color:podeIniciar?"white":C.textLight,border:"none",borderRadius:12,fontSize:14,fontWeight:800,cursor:podeIniciar?"pointer":"not-allowed",boxShadow:podeIniciar?"0 4px 14px rgba(108,60,225,0.3)":"none",transition:"all 0.2s"}}>
-                          {contagem===0?"Sem questões":"Começar treino →"}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* PAINEL DE SELECIONADOS — aparece quando há tópicos selecionados */}
+      {selecionados.length>0&&(
+        <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:18,padding:"20px 24px",boxShadow:"0 4px 20px rgba(108,60,225,0.3)"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:10}}>
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>Treino selecionado</div>
+              <div style={{display:"flex",alignItems:"baseline",gap:8}}>
+                <span style={{fontFamily:"'Lora',serif",fontSize:28,fontWeight:800,color:"white"}}>{totalSelecionado}</span>
+                <span style={{fontSize:13,color:"rgba(255,255,255,0.7)"}}>questões no total</span>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={limparTudo}
+                style={{padding:"9px 16px",background:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.8)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                Limpar tudo
+              </button>
+              <button onClick={()=>onIniciar({topicos:selecionados,total:totalSelecionado})}
+                style={{padding:"9px 22px",background:"white",color:C.primary,border:"none",borderRadius:8,fontSize:13,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 12px rgba(0,0,0,0.2)"}}>
+                Começar treino →
+              </button>
+            </div>
+          </div>
+          {/* Tags dos selecionados */}
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {selecionados.map((s,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"center",gap:6,background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:100,padding:"4px 10px 4px 12px"}}>
+                <span style={{fontSize:11,color:"white",fontWeight:600}}>{s.topico==="todas"?`${s.materia} (todos)`:s.topico}</span>
+                <span style={{fontSize:10,color:"rgba(255,255,255,0.6)",marginLeft:2}}>{s.contagem}q</span>
+                <button onClick={()=>removerSelecionado(i)}
+                  style={{width:16,height:16,borderRadius:"50%",background:"rgba(255,255,255,0.2)",border:"none",color:"white",cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginLeft:2}}>
+                  ✕
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -3442,10 +3479,26 @@ function TreinoSessao({user,filtro,onVoltar}){
 
   const loadQuestoes=async()=>{
     setLoading(true);
-    let q=supabase.from("questoes").select("*").eq("ativa",true).eq("materia",filtro.materia);
-    if(filtro.topico!=="todas") q=q.eq("topico",filtro.topico);
-    const{data}=await q.order("created_at",{ascending:false});
-    const shuffled=(data||[]).sort(()=>Math.random()-0.5);
+    let todasQuestoes=[];
+    // Suporte a múltiplos tópicos
+    if(filtro.topicos&&filtro.topicos.length>0){
+      for(const t of filtro.topicos){
+        let q=supabase.from("questoes").select("*").eq("ativa",true).eq("materia",t.materia);
+        if(t.topico!=="todas") q=q.eq("topico",t.topico);
+        const{data}=await q;
+        if(data) todasQuestoes=[...todasQuestoes,...data];
+      }
+      // Remove duplicatas por id
+      const ids=new Set();
+      todasQuestoes=todasQuestoes.filter(q=>{if(ids.has(q.id))return false;ids.add(q.id);return true;});
+    }else{
+      // Compatibilidade com filtro antigo (tópico único)
+      let q=supabase.from("questoes").select("*").eq("ativa",true).eq("materia",filtro.materia);
+      if(filtro.topico!=="todas") q=q.eq("topico",filtro.topico);
+      const{data}=await q;
+      todasQuestoes=data||[];
+    }
+    const shuffled=todasQuestoes.sort(()=>Math.random()-0.5);
     setQuestoes(shuffled);
     setTotal(shuffled.length);
     setLoading(false);
