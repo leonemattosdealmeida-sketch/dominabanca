@@ -4021,50 +4021,81 @@ function TreinoSessao({user,filtro,onVoltar}){
 
   return(
     <div style={{display:"flex",flexDirection:"column",gap:0}}>
-      {/* HEADER DA SESSÃO — único, limpo, profissional */}
-      <div style={{background:"white",borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,zIndex:10,maxWidth:960,width:"100%",margin:"0 auto"}}>
-        <div style={{display:"flex",alignItems:"center",gap:0,height:52,padding:"0 4px"}}>
-          {/* Sair */}
-          <button onClick={onVoltar}
-            style={{height:"100%",padding:"0 16px",background:"none",border:"none",borderRight:`1px solid ${C.border}`,color:C.textMed,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:6,whiteSpace:"nowrap",fontFamily:"'Sora',sans-serif",transition:"color 0.15s"}}
-            onMouseEnter={e=>e.currentTarget.style.color=C.text}
-            onMouseLeave={e=>e.currentTarget.style.color=C.textMed}>
-            ← Sair
-          </button>
-          {/* Matéria e tópico */}
-          <div style={{flex:1,padding:"0 16px",minWidth:0}}>
-            <div style={{fontSize:13,fontWeight:700,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-              {(filtro.topicos&&filtro.topicos.length>0)
-                ? [...new Set(filtro.topicos.map(t=>t.materia))].join(', ')
-                : filtro.materia||'Treino livre'}
-            </div>
-            {(filtro.topicos?.length===1||filtro.topico)&&(
-              <div style={{fontSize:11,color:C.textLight,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                {filtro.topicos?.[0]?.topico!=="todas"?filtro.topicos?.[0]?.topico:filtro.topico!=="todas"?filtro.topico:"Todos os tópicos"}
+      {/* HEADER DA SESSÃO — roxo, informativo, profissional */}
+      {(()=>{
+        const materias=[...new Set((filtro.topicos||[]).map(t=>t.materia).filter(Boolean))];
+        const nMaterias=materias.length;
+        const pct=total>0?Math.round(((idx+1)/total)*100):0;
+        const acertoPct=idx>0?Math.round((acertos/idx)*100):0;
+        return(
+          <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,position:"sticky",top:0,zIndex:10,boxShadow:"0 2px 16px rgba(108,60,225,0.25)"}}>
+            <div style={{maxWidth:960,margin:"0 auto",padding:"14px 20px"}}>
+
+              {/* Linha 1: Sair + matérias + stats + toggle */}
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
+                {/* Sair */}
+                <button onClick={onVoltar}
+                  style={{padding:"5px 12px",background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.2)",color:"rgba(255,255,255,0.85)",fontSize:12,borderRadius:7,cursor:"pointer",flexShrink:0,fontFamily:"'Sora',sans-serif",transition:"background 0.15s"}}
+                  onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.2)"}
+                  onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.12)"}>
+                  ← Sair
+                </button>
+
+                {/* Matérias como tags */}
+                <div style={{flex:1,display:"flex",gap:5,flexWrap:"nowrap",overflow:"hidden",alignItems:"center"}}>
+                  {(nMaterias>0?materias:filtro.materia?[filtro.materia]:[]).slice(0,3).map((m,i)=>(
+                    <span key={i} style={{fontSize:11,fontWeight:600,color:"white",background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:100,padding:"3px 10px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:160}}>
+                      {m}
+                    </span>
+                  ))}
+                  {(nMaterias>3)&&<span style={{fontSize:10,color:"rgba(255,255,255,0.5)",flexShrink:0}}>+{nMaterias-3}</span>}
+                </div>
+
+                {/* Stats inline */}
+                <div style={{display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+                  {idx>0&&(
+                    <>
+                      <div style={{textAlign:"center"}}>
+                        <div style={{fontSize:13,fontWeight:800,color:"#A7F3D0",lineHeight:1}}>{acertos}</div>
+                        <div style={{fontSize:9,color:"rgba(255,255,255,0.45)",marginTop:1}}>acertos</div>
+                      </div>
+                      <div style={{textAlign:"center"}}>
+                        <div style={{fontSize:13,fontWeight:800,color:"#FCA5A5",lineHeight:1}}>{idx-acertos}</div>
+                        <div style={{fontSize:9,color:"rgba(255,255,255,0.45)",marginTop:1}}>erros</div>
+                      </div>
+                      <div style={{width:1,height:24,background:"rgba(255,255,255,0.15)"}}/>
+                    </>
+                  )}
+                  <div style={{textAlign:"center"}}>
+                    <div style={{fontSize:15,fontWeight:800,color:"white",lineHeight:1}}>{idx+1}<span style={{fontSize:11,fontWeight:400,color:"rgba(255,255,255,0.5)"}}>/{total}</span></div>
+                    <div style={{fontSize:9,color:"rgba(255,255,255,0.45)",marginTop:1}}>questão</div>
+                  </div>
+                </div>
+
+                {/* Toggle só novas */}
+                {soNaoRespondidas!==undefined&&respondidas&&respondidas.size>0&&(
+                  <div style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",flexShrink:0,borderLeft:"1px solid rgba(255,255,255,0.15)",paddingLeft:12}}
+                    onClick={()=>setSoNaoRespondidas(v=>!v)}>
+                    <div style={{width:26,height:14,borderRadius:100,background:soNaoRespondidas?"#A78BFA":"rgba(255,255,255,0.2)",position:"relative",transition:"background 0.2s",flexShrink:0}}>
+                      <div style={{width:10,height:10,borderRadius:"50%",background:"white",position:"absolute",top:2,left:soNaoRespondidas?14:2,transition:"left 0.2s"}}/>
+                    </div>
+                    <span style={{fontSize:9,color:"rgba(255,255,255,0.6)",whiteSpace:"nowrap"}}>Só novas</span>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-          {/* Toggle só novas */}
-          {soNaoRespondidas!==undefined&&respondidas&&respondidas.size>0&&(
-            <div style={{display:"flex",alignItems:"center",gap:6,padding:"0 12px",borderLeft:`1px solid ${C.border}`,cursor:"pointer",height:"100%"}}
-              onClick={()=>setSoNaoRespondidas(v=>!v)}>
-              <div style={{width:28,height:16,borderRadius:100,background:soNaoRespondidas?C.primary:C.border,position:"relative",transition:"background 0.2s",flexShrink:0}}>
-                <div style={{width:12,height:12,borderRadius:"50%",background:"white",position:"absolute",top:2,left:soNaoRespondidas?14:2,transition:"left 0.2s",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}}/>
+
+              {/* Linha 2: barra de progresso com % */}
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div style={{flex:1,height:4,background:"rgba(255,255,255,0.15)",borderRadius:100,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${pct}%`,background:"linear-gradient(90deg,#A78BFA,#C4B5FD)",borderRadius:100,transition:"width 0.4s ease"}}/>
+                </div>
+                <span style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.6)",flexShrink:0,minWidth:32,textAlign:"right"}}>{pct}%</span>
               </div>
-              <span style={{fontSize:10,color:C.textMed,whiteSpace:"nowrap"}}>Só novas</span>
+
             </div>
-          )}
-          {/* Contador */}
-          <div style={{padding:"0 16px",borderLeft:`1px solid ${C.border}`,height:"100%",display:"flex",alignItems:"center",flexShrink:0}}>
-            <span style={{fontSize:13,fontWeight:700,color:C.text}}>{idx+1}</span>
-            <span style={{fontSize:11,color:C.textLight}}>/{total}</span>
           </div>
-        </div>
-        {/* Barra de progresso fina */}
-        <div style={{height:2,background:C.border}}>
-          <div style={{height:"100%",width:`${total>0?((idx+1)/total)*100:0}%`,background:C.primary,transition:"width 0.4s ease"}}/>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* QUESTÃO */}
       <div style={{maxWidth:960,width:"100%",margin:"0 auto"}}>
