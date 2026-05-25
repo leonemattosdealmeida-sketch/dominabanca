@@ -402,7 +402,7 @@ function Landing({ onCadastro, onLogin }) {
       <section id="redação" style={{background:`linear-gradient(135deg, ${C.primaryDark} 0%, ${C.primary} 60%, ${C.primaryLight} 100%)`,padding:"88px 28px"}}>
         <div style={{maxWidth:1000,margin:"0 auto",display:"grid",gridTemplateColumns:"1fr 1fr",gap:64,alignItems:"center"}} className="redacao-grid">
           <div>
-            <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:2.5,textTransform:"uppercase",marginBottom:16}}>Prova discursiva e redação</div>
+            <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.95)",letterSpacing:2.5,textTransform:"uppercase",marginBottom:16}}>Prova discursiva e redação</div>
             <h2 style={{fontFamily:"'Lora',serif",fontSize:"clamp(24px,3vw,40px)",fontWeight:700,color:"white",lineHeight:1.25,marginBottom:20}}>Correção com o olhar da banca</h2>
             <p style={{fontSize:16,color:"rgba(255,255,255,0.8)",lineHeight:1.8,marginBottom:24}}>Escreva sua redação ou prova discursiva à mão, como no dia da prova. Fotografe e envie. A IA avalia com os critérios exatos do seu edital.</p>
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
@@ -1280,7 +1280,7 @@ resultado,simulado,onVoltar}){
 
         {/* Nota principal */}
         <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:20,padding:"32px",textAlign:"center",color:"white"}}>
-          <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:8}}>{simulado?.titulo}</div>
+          <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.95)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:8}}>{simulado?.titulo}</div>
           <div style={{fontFamily:"'Lora',serif",fontSize:56,fontWeight:800,lineHeight:1}}>{nota}%</div>
           <div style={{fontSize:13,color:"rgba(255,255,255,0.8)",marginTop:6}}>{acertos} acertos de {total} questões</div>
           <div style={{marginTop:16,display:"flex",gap:12,justifyContent:"center"}}>
@@ -2397,7 +2397,7 @@ Responda SOMENTE com JSON: {"nivel":<1 a 5>,"comentario":"<comentário completo>
         <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:18,padding:"18px 24px",color:"white",marginBottom:16}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
             <div>
-              <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>Revisando questões</div>
+              <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.95)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:4}}>Revisando questões</div>
               <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:800}}>Questão {idx+1} de {total}</div>
             </div>
             <div style={{display:"flex",gap:16,flexShrink:0}}>
@@ -3708,7 +3708,7 @@ function TreinoTab({user,plano,onIniciar}){
 
         {/* Card resumo */}
         <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:18,padding:"22px 24px",color:"white"}}>
-          <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:8}}>Treino selecionado</div>
+          <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.95)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:8}}>Treino selecionado</div>
           <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:12}}>
             <span style={{fontFamily:"'Lora',serif",fontSize:36,fontWeight:800}}>{totalSelecionado}</span>
             <span style={{fontSize:14,color:"rgba(255,255,255,0.7)"}}>{totalSelecionado===1?"questão":"questões"}</span>
@@ -4375,46 +4375,46 @@ function TreinoSessao({user,filtro,onVoltar}){
 
                   {/* Sair */}
                   <button onClick={onVoltar}
-                    style={{padding:"0 14px",height:"100%",background:"none",border:"none",borderRight:"1px solid rgba(255,255,255,0.12)",color:"rgba(255,255,255,0.75)",fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"'Sora',sans-serif",display:"flex",alignItems:"center",gap:5,transition:"color 0.15s",flexShrink:0,marginRight:10}}
+                    style={{padding:"0 14px",height:"100%",background:"none",border:"none",borderRight:"1px solid rgba(255,255,255,0.25)",color:"rgba(255,255,255,0.9)",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Sora',sans-serif",display:"flex",alignItems:"center",gap:5,transition:"color 0.15s",flexShrink:0,marginRight:10}}
                     onMouseEnter={e=>e.currentTarget.style.color="white"}
-                    onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.75)"}>
+                    onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.9)"}>
                     <span style={{fontSize:16,lineHeight:1}}>←</span>
                     <span>Sair</span>
                   </button>
 
                   {/* Grupo: setas questão */}
-                  <div style={{display:"flex",alignItems:"center",background:"rgba(255,255,255,0.08)",borderRadius:9,border:"1px solid rgba(255,255,255,0.15)",overflow:"hidden",flexShrink:0}}>
+                  <div style={{display:"flex",alignItems:"center",background:"rgba(255,255,255,0.15)",borderRadius:9,border:"1px solid rgba(255,255,255,0.35)",overflow:"hidden",flexShrink:0}}>
                     <button onClick={()=>{if(idx>0){setIdx(i=>i-1);setSelecionada(null);setConfirmada(false);}}}
                       disabled={idx===0}
                       title="Questão anterior"
-                      style={{width:36,height:36,background:"none",border:"none",borderRight:"1px solid rgba(255,255,255,0.12)",color:idx===0?"rgba(255,255,255,0.25)":"white",cursor:idx===0?"not-allowed":"pointer",fontSize:18,fontWeight:300,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      style={{width:36,height:36,background:"none",border:"none",borderRight:"1px solid rgba(255,255,255,0.25)",color:idx===0?"rgba(255,255,255,0.3)":"#FFFFFF",cursor:idx===0?"not-allowed":"pointer",fontSize:18,fontWeight:300,display:"flex",alignItems:"center",justifyContent:"center"}}>
                       ‹
                     </button>
-                    <div style={{padding:"0 10px",fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",whiteSpace:"nowrap",minWidth:44,textAlign:"center"}}>
+                    <div style={{padding:"0 10px",fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.95)",whiteSpace:"nowrap",minWidth:44,textAlign:"center"}}>
                       {idx+1}/{total}
                     </div>
                     <button onClick={()=>{if(idx<total-1){setIdx(i=>i+1);setSelecionada(null);setConfirmada(false);}}}
                       disabled={idx>=total-1}
                       title="Próxima questão"
-                      style={{width:36,height:36,background:"none",border:"none",borderLeft:"1px solid rgba(255,255,255,0.12)",color:idx>=total-1?"rgba(255,255,255,0.25)":"white",cursor:idx>=total-1?"not-allowed":"pointer",fontSize:18,fontWeight:300,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      style={{width:36,height:36,background:"none",border:"none",borderLeft:"1px solid rgba(255,255,255,0.25)",color:idx>=total-1?"rgba(255,255,255,0.3)":"#FFFFFF",cursor:idx>=total-1?"not-allowed":"pointer",fontSize:18,fontWeight:300,display:"flex",alignItems:"center",justifyContent:"center"}}>
                       ›
                     </button>
                   </div>
 
                   {/* Grupo: setas matéria */}
                   {materias.length>1&&(
-                    <div style={{display:"flex",alignItems:"center",background:"rgba(255,255,255,0.05)",borderRadius:9,border:"1px solid rgba(255,255,255,0.1)",overflow:"hidden",flexShrink:0,marginLeft:6}}>
+                    <div style={{display:"flex",alignItems:"center",background:"rgba(255,255,255,0.12)",borderRadius:9,border:"1px solid rgba(255,255,255,0.3)",overflow:"hidden",flexShrink:0,marginLeft:6}}>
                       <button onClick={()=>irParaMateria(-1)} disabled={mIdx<=0}
                         title="Matéria anterior"
-                        style={{width:36,height:36,background:"none",border:"none",borderRight:"1px solid rgba(255,255,255,0.08)",color:mIdx<=0?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.65)",cursor:mIdx<=0?"not-allowed":"pointer",fontSize:18,fontWeight:300,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                        style={{width:36,height:36,background:"none",border:"none",borderRight:"1px solid rgba(255,255,255,0.22)",color:mIdx<=0?"rgba(255,255,255,0.3)":"rgba(255,255,255,0.95)",cursor:mIdx<=0?"not-allowed":"pointer",fontSize:18,fontWeight:300,display:"flex",alignItems:"center",justifyContent:"center"}}>
                         ‹
                       </button>
-                      <div style={{padding:"0 8px",fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.4)",whiteSpace:"nowrap",textAlign:"center",letterSpacing:0.5,textTransform:"uppercase"}}>
+                      <div style={{padding:"0 8px",fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.9)",whiteSpace:"nowrap",textAlign:"center",letterSpacing:0.5,textTransform:"uppercase"}}>
                         Mat.
                       </div>
                       <button onClick={()=>irParaMateria(1)} disabled={mIdx>=materias.length-1}
                         title="Próxima matéria"
-                        style={{width:36,height:36,background:"none",border:"none",borderLeft:"1px solid rgba(255,255,255,0.08)",color:mIdx>=materias.length-1?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.65)",cursor:mIdx>=materias.length-1?"not-allowed":"pointer",fontSize:18,fontWeight:300,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                        style={{width:36,height:36,background:"none",border:"none",borderLeft:"1px solid rgba(255,255,255,0.22)",color:mIdx>=materias.length-1?"rgba(255,255,255,0.3)":"rgba(255,255,255,0.95)",cursor:mIdx>=materias.length-1?"not-allowed":"pointer",fontSize:18,fontWeight:300,display:"flex",alignItems:"center",justifyContent:"center"}}>
                         ›
                       </button>
                     </div>
@@ -4430,13 +4430,13 @@ function TreinoSessao({user,filtro,onVoltar}){
                   </div>
 
                   {/* Erros */}
-                  <div className="sessao-stats-item" style={{padding:"0 10px",borderLeft:"1px solid rgba(255,255,255,0.08)",textAlign:"center",flexShrink:0}}>
+                  <div className="sessao-stats-item" style={{padding:"0 10px",borderLeft:"1px solid rgba(255,255,255,0.22)",textAlign:"center",flexShrink:0}}>
                     <div style={{fontSize:16,fontWeight:800,color:"#FCA5A5",lineHeight:1}}>{erros}</div>
                     <div style={{fontSize:7,color:"rgba(255,255,255,0.35)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>erros</div>
                   </div>
 
                   {/* Tempo */}
-                  <div className="sessao-stats-item" style={{padding:"0 10px",borderLeft:"1px solid rgba(255,255,255,0.08)",textAlign:"center",flexShrink:0}}>
+                  <div className="sessao-stats-item" style={{padding:"0 10px",borderLeft:"1px solid rgba(255,255,255,0.22)",textAlign:"center",flexShrink:0}}>
                     <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.75)",lineHeight:1,fontFamily:"'Courier New',monospace",letterSpacing:1}}>{fmtTempo(tempoSeg)}</div>
                     <div style={{fontSize:7,color:"rgba(255,255,255,0.35)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>tempo</div>
                   </div>
@@ -4986,7 +4986,7 @@ Responda SOMENTE com um JSON válido, sem texto fora do JSON, no formato:
         {/* Header resultado */}
         <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:18,padding:"24px 28px",color:"white",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:16}}>
           <div>
-            <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:6}}>Correção concluída · {banca}</div>
+            <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.95)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:6}}>Correção concluída · {banca}</div>
             <div style={{fontFamily:"'Lora',serif",fontSize:22,fontWeight:700,marginBottom:4}}>{resultado.tema}</div>
             <div style={{fontSize:13,color:"rgba(255,255,255,0.8)"}}>Corrida por IA com critérios da banca {banca}</div>
           </div>
@@ -5609,7 +5609,7 @@ function PerfilTab({user,plano,onBack,onPlanUpdate}){
           <div style={{display:"flex",flexDirection:"column",gap:16}}>
             {/* Card plano atual */}
             <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:18,padding:"28px",color:"white",boxShadow:"0 4px 20px rgba(108,60,225,0.3)"}}>
-              <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:12}}>Plano atual</div>
+              <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.95)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:12}}>Plano atual</div>
               <div style={{fontFamily:"'Lora',serif",fontSize:28,fontWeight:800,marginBottom:8}}>{planoInfo.l}</div>
               <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
                 <div style={{background:"rgba(255,255,255,0.15)",borderRadius:100,padding:"5px 14px",fontSize:12,fontWeight:700}}>
@@ -6484,7 +6484,7 @@ function Dashboard({user,onLogout}){
               {/* Card: Sequência */}
               <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,borderRadius:16,padding:"20px 22px",boxShadow:"0 4px 16px rgba(108,60,225,0.25)",color:"white"}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                  <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.2,textTransform:"uppercase"}}>Ritmo de estudos</div>
+                  <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.95)",letterSpacing:1.2,textTransform:"uppercase"}}>Ritmo de estudos</div>
                   <InfoTooltip texto="Mostra sua sequência de dias consecutivos estudando. Manter o ritmo diário é o principal fator de aprovação em concursos."/>
                 </div>
                 <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:8}}>
