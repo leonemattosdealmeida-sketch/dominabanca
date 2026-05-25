@@ -3866,7 +3866,19 @@ function TreinoSessao({user,filtro,onVoltar}){
   const [soNaoRespondidas,setSoNaoRespondidas]=React.useState(false);
   const [questoesOriginais,setQuestoesOriginais]=React.useState([]);
   const [respondidas,setRespondidas]=React.useState(new Set());
+  const [detalharSessao,setDetalharSessao]=React.useState(false);
+  const [tempoSeg,setTempoSeg]=React.useState(0);
   const LETRAS=["A","B","C","D","E"];
+
+  React.useEffect(()=>{
+    const t=setInterval(()=>setTempoSeg(s=>s+1),1000);
+    return()=>clearInterval(t);
+  },[]);
+
+  const fmtTempo=(s)=>{
+    const m=Math.floor(s/60);const ss=s%60;
+    return String(m).padStart(2,'0')+':'+String(ss).padStart(2,'0');
+  };
 
   React.useEffect(()=>{loadQuestoes();},[]);
 
@@ -4023,20 +4035,10 @@ function TreinoSessao({user,filtro,onVoltar}){
     <div style={{display:"flex",flexDirection:"column",gap:0}}>
       {/* HEADER DA SESSÃO */}
       {(()=>{
-        const [detalharSessao,setDetalharSessao]=React.useState(false);
-        const [tempoSeg,setTempoSeg]=React.useState(0);
-        React.useEffect(()=>{
-          const t=setInterval(()=>setTempoSeg(s=>s+1),1000);
-          return()=>clearInterval(t);
-        },[]);
-        const fmtTempo=(s)=>{
-          const m=Math.floor(s/60);const ss=s%60;
-          return `${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
-        };
         const pct=total>0?Math.round(((idx+1)/total)*100):0;
         const topicosAgrupados=(()=>{
           const map={};
-          (filtro.topicos||[]).forEach(t=>{
+          ((filtro&&filtro.topicos)||[]).forEach(t=>{
             const key=t.materia||'—';
             if(!map[key]) map[key]={total:0,topicos:[]};
             map[key].total+=t.contagem||0;
@@ -4044,7 +4046,7 @@ function TreinoSessao({user,filtro,onVoltar}){
           });
           return map;
         })();
-        const nTopicos=(filtro.topicos||[]).length;
+        const nTopicos=((filtro&&filtro.topicos)||[]).length;
 
         return(
           <>
@@ -4084,7 +4086,7 @@ function TreinoSessao({user,filtro,onVoltar}){
 
                   {/* Erros */}
                   <div style={{padding:"0 14px",borderLeft:"1px solid rgba(255,255,255,0.1)",textAlign:"center",flexShrink:0}}>
-                    <div style={{fontSize:18,fontWeight:800,color:"#FCA5A5",lineHeight:1}}>{Math.max(0,idx-(acertos+(confirmada?0:0)))}</div>
+                    <div style={{fontSize:18,fontWeight:800,color:"#FCA5A5",lineHeight:1}}>{Math.max(0,(confirmada?idx+1:idx)-acertos)}</div>
                     <div style={{fontSize:8,color:"rgba(255,255,255,0.4)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>erros</div>
                   </div>
 
@@ -4127,7 +4129,7 @@ function TreinoSessao({user,filtro,onVoltar}){
                           {/* Tópicos */}
                           <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                             {dados.topicos.map((t,i)=>{
-                              const topicIdx=questoes.findIndex(q=>t.topico==="todas"?q.materia===t.materia:q.topico===t.topico);
+                              const topicIdx=questoes.findIndex(q=>t&&(t.topico==="todas"?q.materia===t.materia:q.topico===t.topico));
                               const isAtual=questoes[idx]&&(t.topico==="todas"?questoes[idx].materia===t.materia:questoes[idx].topico===t.topico);
                               return(
                                 <button key={i}
