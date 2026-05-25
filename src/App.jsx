@@ -4021,79 +4021,140 @@ function TreinoSessao({user,filtro,onVoltar}){
 
   return(
     <div style={{display:"flex",flexDirection:"column",gap:0}}>
-      {/* HEADER DA SESSÃO — roxo, informativo, profissional */}
+      {/* HEADER DA SESSÃO */}
       {(()=>{
-        const materias=[...new Set((filtro.topicos||[]).map(t=>t.materia).filter(Boolean))];
-        const nMaterias=materias.length;
+        const [detalharSessao,setDetalharSessao]=React.useState(false);
+        const [tempoSeg,setTempoSeg]=React.useState(0);
+        React.useEffect(()=>{
+          const t=setInterval(()=>setTempoSeg(s=>s+1),1000);
+          return()=>clearInterval(t);
+        },[]);
+        const fmtTempo=(s)=>{
+          const m=Math.floor(s/60);const ss=s%60;
+          return `${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+        };
         const pct=total>0?Math.round(((idx+1)/total)*100):0;
-        const acertoPct=idx>0?Math.round((acertos/idx)*100):0;
+        const topicosAgrupados=(()=>{
+          const map={};
+          (filtro.topicos||[]).forEach(t=>{
+            const key=t.materia||'—';
+            if(!map[key]) map[key]={total:0,topicos:[]};
+            map[key].total+=t.contagem||0;
+            map[key].topicos.push(t);
+          });
+          return map;
+        })();
+        const nTopicos=(filtro.topicos||[]).length;
+
         return(
-          <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,position:"sticky",top:0,zIndex:10,boxShadow:"0 2px 16px rgba(108,60,225,0.25)"}}>
-            <div style={{maxWidth:960,margin:"0 auto",padding:"14px 20px"}}>
+          <>
+            {/* Barra principal */}
+            <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,position:"sticky",top:0,zIndex:20,boxShadow:"0 2px 20px rgba(108,60,225,0.3)"}}>
+              <div style={{maxWidth:960,margin:"0 auto",padding:"0 20px"}}>
+                <div style={{display:"flex",alignItems:"center",height:56,gap:0}}>
 
-              {/* Linha 1: Sair + matérias + stats + toggle */}
-              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
-                {/* Sair */}
-                <button onClick={onVoltar}
-                  style={{padding:"5px 12px",background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.2)",color:"rgba(255,255,255,0.85)",fontSize:12,borderRadius:7,cursor:"pointer",flexShrink:0,fontFamily:"'Sora',sans-serif",transition:"background 0.15s"}}
-                  onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.2)"}
-                  onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.12)"}>
-                  ← Sair
-                </button>
+                  {/* ← Sair */}
+                  <button onClick={onVoltar}
+                    style={{height:"100%",padding:"0 16px",background:"none",border:"none",borderRight:"1px solid rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.6)",fontSize:12,cursor:"pointer",fontFamily:"'Sora',sans-serif",display:"flex",alignItems:"center",gap:5,transition:"color 0.15s",flexShrink:0}}
+                    onMouseEnter={e=>e.currentTarget.style.color="white"}
+                    onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.6)"}>
+                    ← Sair
+                  </button>
 
-                {/* Matérias como tags */}
-                <div style={{flex:1,display:"flex",gap:5,flexWrap:"nowrap",overflow:"hidden",alignItems:"center"}}>
-                  {(nMaterias>0?materias:filtro.materia?[filtro.materia]:[]).slice(0,3).map((m,i)=>(
-                    <span key={i} style={{fontSize:11,fontWeight:600,color:"white",background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:100,padding:"3px 10px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:160}}>
-                      {m}
+                  {/* Espaço central — clique para detalhar */}
+                  <button onClick={()=>setDetalharSessao(v=>!v)}
+                    style={{flex:1,height:"100%",background:"none",border:"none",cursor:"pointer",padding:"0 16px",display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:11,color:"rgba(255,255,255,0.45)",fontWeight:500,whiteSpace:"nowrap"}}>
+                      {nTopicos>0?`${nTopicos} ${nTopicos===1?"tópico":"tópicos"}`:"Treino livre"}
                     </span>
-                  ))}
-                  {(nMaterias>3)&&<span style={{fontSize:10,color:"rgba(255,255,255,0.5)",flexShrink:0}}>+{nMaterias-3}</span>}
-                </div>
+                    <span style={{fontSize:10,color:"rgba(255,255,255,0.25)"}}>·</span>
+                    <span style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.7)",background:"rgba(255,255,255,0.08)",borderRadius:100,padding:"2px 10px",border:"1px solid rgba(255,255,255,0.12)"}}>
+                      {detalharSessao?"Recolher ↑":"Detalhar ↓"}
+                    </span>
+                  </button>
 
-                {/* Stats inline */}
-                <div style={{display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
-                  {idx>0&&(
-                    <>
-                      <div style={{textAlign:"center"}}>
-                        <div style={{fontSize:13,fontWeight:800,color:"#A7F3D0",lineHeight:1}}>{acertos}</div>
-                        <div style={{fontSize:9,color:"rgba(255,255,255,0.45)",marginTop:1}}>acertos</div>
-                      </div>
-                      <div style={{textAlign:"center"}}>
-                        <div style={{fontSize:13,fontWeight:800,color:"#FCA5A5",lineHeight:1}}>{idx-acertos}</div>
-                        <div style={{fontSize:9,color:"rgba(255,255,255,0.45)",marginTop:1}}>erros</div>
-                      </div>
-                      <div style={{width:1,height:24,background:"rgba(255,255,255,0.15)"}}/>
-                    </>
-                  )}
-                  <div style={{textAlign:"center"}}>
-                    <div style={{fontSize:15,fontWeight:800,color:"white",lineHeight:1}}>{idx+1}<span style={{fontSize:11,fontWeight:400,color:"rgba(255,255,255,0.5)"}}>/{total}</span></div>
-                    <div style={{fontSize:9,color:"rgba(255,255,255,0.45)",marginTop:1}}>questão</div>
+                  {/* Separador */}
+                  <div style={{width:1,height:28,background:"rgba(255,255,255,0.1)",flexShrink:0}}/>
+
+                  {/* Acertos */}
+                  <div style={{padding:"0 14px",textAlign:"center",flexShrink:0}}>
+                    <div style={{fontSize:18,fontWeight:800,color:"#6EE7B7",lineHeight:1}}>{acertos}</div>
+                    <div style={{fontSize:8,color:"rgba(255,255,255,0.4)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>acertos</div>
                   </div>
-                </div>
 
-                {/* Toggle só novas */}
-                {soNaoRespondidas!==undefined&&respondidas&&respondidas.size>0&&(
-                  <div style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",flexShrink:0,borderLeft:"1px solid rgba(255,255,255,0.15)",paddingLeft:12}}
-                    onClick={()=>setSoNaoRespondidas(v=>!v)}>
-                    <div style={{width:26,height:14,borderRadius:100,background:soNaoRespondidas?"#A78BFA":"rgba(255,255,255,0.2)",position:"relative",transition:"background 0.2s",flexShrink:0}}>
-                      <div style={{width:10,height:10,borderRadius:"50%",background:"white",position:"absolute",top:2,left:soNaoRespondidas?14:2,transition:"left 0.2s"}}/>
+                  {/* Erros */}
+                  <div style={{padding:"0 14px",borderLeft:"1px solid rgba(255,255,255,0.1)",textAlign:"center",flexShrink:0}}>
+                    <div style={{fontSize:18,fontWeight:800,color:"#FCA5A5",lineHeight:1}}>{Math.max(0,idx-(acertos+(confirmada?0:0)))}</div>
+                    <div style={{fontSize:8,color:"rgba(255,255,255,0.4)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>erros</div>
+                  </div>
+
+                  {/* Tempo */}
+                  <div style={{padding:"0 14px",borderLeft:"1px solid rgba(255,255,255,0.1)",textAlign:"center",flexShrink:0}}>
+                    <div style={{fontSize:16,fontWeight:700,color:"rgba(255,255,255,0.85)",lineHeight:1,fontFamily:"'Courier New',monospace",letterSpacing:1}}>{fmtTempo(tempoSeg)}</div>
+                    <div style={{fontSize:8,color:"rgba(255,255,255,0.4)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>tempo</div>
+                  </div>
+
+                  {/* Separador + Contador */}
+                  <div style={{padding:"0 14px",borderLeft:"1px solid rgba(255,255,255,0.1)",textAlign:"center",flexShrink:0}}>
+                    <div style={{fontSize:16,fontWeight:800,color:"white",lineHeight:1}}>
+                      {idx+1}<span style={{fontSize:11,fontWeight:400,color:"rgba(255,255,255,0.4)"}}>/{total}</span>
                     </div>
-                    <span style={{fontSize:9,color:"rgba(255,255,255,0.6)",whiteSpace:"nowrap"}}>Só novas</span>
+                    <div style={{fontSize:8,color:"rgba(255,255,255,0.4)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>questão</div>
                   </div>
-                )}
-              </div>
 
-              {/* Linha 2: barra de progresso com % */}
-              <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <div style={{flex:1,height:4,background:"rgba(255,255,255,0.15)",borderRadius:100,overflow:"hidden"}}>
-                  <div style={{height:"100%",width:`${pct}%`,background:"linear-gradient(90deg,#A78BFA,#C4B5FD)",borderRadius:100,transition:"width 0.4s ease"}}/>
                 </div>
-                <span style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.6)",flexShrink:0,minWidth:32,textAlign:"right"}}>{pct}%</span>
-              </div>
 
+                {/* Barra de progresso */}
+                <div style={{height:2,background:"rgba(255,255,255,0.1)",margin:"0 -20px"}}>
+                  <div style={{height:"100%",width:`${pct}%`,background:"linear-gradient(90deg,#A78BFA,#C4B5FD)",transition:"width 0.4s ease"}}/>
+                </div>
+              </div>
             </div>
-          </div>
+
+            {/* Painel detalhar — expande abaixo do header */}
+            {detalharSessao&&(
+              <div style={{background:"#1E1B4B",boxShadow:"0 8px 32px rgba(0,0,0,0.4)",position:"sticky",top:58,zIndex:19}}>
+                <div style={{maxWidth:960,margin:"0 auto",padding:"16px 20px"}}>
+                  <div style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:12}}>
+                    Caderno de treino — {total} questões
+                  </div>
+                  {Object.entries(topicosAgrupados).length>0?(
+                    <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                      {Object.entries(topicosAgrupados).map(([mat,dados])=>(
+                        <div key={mat}>
+                          {/* Matéria */}
+                          <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.7)",marginBottom:6}}>{mat}</div>
+                          {/* Tópicos */}
+                          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                            {dados.topicos.map((t,i)=>{
+                              const topicIdx=questoes.findIndex(q=>t.topico==="todas"?q.materia===t.materia:q.topico===t.topico);
+                              const isAtual=questoes[idx]&&(t.topico==="todas"?questoes[idx].materia===t.materia:questoes[idx].topico===t.topico);
+                              return(
+                                <button key={i}
+                                  onClick={()=>{
+                                    if(topicIdx>-1){setIdx(topicIdx);setSelecionada(null);setConfirmada(false);}
+                                    setDetalharSessao(false);
+                                  }}
+                                  style={{padding:"6px 12px",background:isAtual?"rgba(167,139,250,0.25)":"rgba(255,255,255,0.06)",border:`1px solid ${isAtual?"rgba(167,139,250,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:8,cursor:"pointer",display:"flex",alignItems:"center",gap:8,transition:"all 0.15s"}}
+                                  onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.12)"}
+                                  onMouseLeave={e=>e.currentTarget.style.background=isAtual?"rgba(167,139,250,0.25)":"rgba(255,255,255,0.06)"}>
+                                  {isAtual&&<div style={{width:6,height:6,borderRadius:"50%",background:"#A78BFA",flexShrink:0}}/>}
+                                  <span style={{fontSize:11,color:"rgba(255,255,255,0.8)",fontWeight:isAtual?700:400}}>{t.topico==="todas"?"Todos os tópicos":t.topico}</span>
+                                  <span style={{fontSize:10,color:"rgba(255,255,255,0.35)"}}>{t.contagem||0}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ):(
+                    <div style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>Treino livre sem filtro de tópicos.</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
         );
       })()}
 
