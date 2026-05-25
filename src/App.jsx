@@ -2797,21 +2797,25 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
                     </button>
                   )}
                 </div>
-                {/* Caderno de erros */}
-                {errou&&(
-                  <CadernoErrosBtn user={user} q={q}/>
-                )}
-                {/* Próxima */}
-                <button onClick={onProxima}
-                  style={{width:'100%',padding:'16px',borderRadius:12,
-                    background:'linear-gradient(135deg,#1A1045,#7C3AED)',
-                    color:'#fff',border:'none',cursor:'pointer',
-                    fontSize:15,fontWeight:700,fontFamily:"'Sora',sans-serif",
-                    letterSpacing:0.3,transition:'opacity .2s'}}
-                  onMouseEnter={e=>e.currentTarget.style.opacity='0.9'}
-                  onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
-                  {isLast?'Ver resultado 🏆':'Próxima questão →'}
-                </button>
+                {/* Ações pós-resposta */}
+                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                  {/* Ver explicação */}
+                  {!acertou&&abaQ!=='comentario_plataforma'&&(
+                    <button onClick={()=>setAbaQ('comentario_plataforma')}
+                      style={{flex:1,padding:'11px 14px',borderRadius:10,background:'white',color:C.text,border:`1px solid ${C.border}`,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:"'Sora',sans-serif",display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+                      💡 Ver explicação
+                    </button>
+                  )}
+                  {/* Caderno de erros */}
+                  {errou&&<CadernoErrosBtn user={user} q={q}/>}
+                  {/* Próxima — só aparece se for o fim da sessão */}
+                  {isLast&&(
+                    <button onClick={onProxima}
+                      style={{flex:2,padding:'11px 14px',borderRadius:10,background:`linear-gradient(135deg,#1A1045,${C.primary})`,color:'white',border:'none',cursor:'pointer',fontSize:13,fontWeight:700,fontFamily:"'Sora',sans-serif"}}>
+                      Ver resultado
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -2945,15 +2949,15 @@ user,q}){
   };
   return(
     <button onClick={salvarErro} disabled={salvo}
-      style={{width:'100%',padding:'13px',borderRadius:12,marginBottom:12,
-        border:salvo?`2px solid ${C.border}`:'2px solid #1A1045',
-        background:salvo?'#F9FAFB':'white',color:salvo?C.textLight:'#1A1045',
-        fontSize:13,fontWeight:700,fontFamily:"'Sora',sans-serif",
+      style={{flex:1,padding:'11px 14px',borderRadius:10,
+        border:`1px solid ${C.border}`,
+        background:salvo?C.bg:'white',color:salvo?C.textLight:C.text,
+        fontSize:13,fontWeight:600,fontFamily:"'Sora',sans-serif",
         cursor:salvo?'default':'pointer',transition:'all .2s',
-        display:'flex',alignItems:'center',justifyContent:'center',gap:8}}
-      onMouseEnter={e=>{if(!salvo)e.currentTarget.style.background='#F5F3FF';}}
+        display:'flex',alignItems:'center',justifyContent:'center',gap:6}}
+      onMouseEnter={e=>{if(!salvo)e.currentTarget.style.background=C.primaryXLight;}}
       onMouseLeave={e=>{if(!salvo)e.currentTarget.style.background='white';}}>
-      {salvo?'✓ Adicionado ao Caderno de Erros':'Adicionar ao Caderno de Erros'}
+      {salvo?'✓ Adicionado':'📌 Salvar erro'}
     </button>
   );
 }
@@ -3046,6 +3050,18 @@ function SessaoEstudos({user,plano,onConcluir,onVoltar}){
 
   // Carrega questões baseadas no plano do dia
   React.useEffect(()=>{loadQuestoes();},[]);
+
+  // Navega para a próxima/anterior matéria
+  const irParaMateria=(direcao)=>{
+    const materias=[...new Set(questoes.map(q=>q.materia).filter(Boolean))];
+    const materiaAtual=questoes[idx]?.materia;
+    const mIdx=materias.indexOf(materiaAtual);
+    const novoMIdx=mIdx+direcao;
+    if(novoMIdx<0||novoMIdx>=materias.length) return;
+    const novaMateria=materias[novoMIdx];
+    const primeiraQ=questoes.findIndex(q=>q.materia===novaMateria);
+    if(primeiraQ>-1){setIdx(primeiraQ);setSelecionada(null);setConfirmada(false);}
+  };
 
   const loadQuestoes=async()=>{
     setFase("carregando");
@@ -3896,6 +3912,18 @@ function TreinoSessao({user,filtro,onVoltar}){
     setIdx(0);setSelecionada(null);setConfirmada(false);
   },[soNaoRespondidas]);
 
+  // Navega para a próxima/anterior matéria
+  const irParaMateria=(direcao)=>{
+    const materias=[...new Set(questoes.map(q=>q.materia).filter(Boolean))];
+    const materiaAtual=questoes[idx]?.materia;
+    const mIdx=materias.indexOf(materiaAtual);
+    const novoMIdx=mIdx+direcao;
+    if(novoMIdx<0||novoMIdx>=materias.length) return;
+    const novaMateria=materias[novoMIdx];
+    const primeiraQ=questoes.findIndex(q=>q.materia===novaMateria);
+    if(primeiraQ>-1){setIdx(primeiraQ);setSelecionada(null);setConfirmada(false);}
+  };
+
   const loadQuestoes=async()=>{
     setLoading(true);
     let todasQuestoes=[];
@@ -4036,6 +4064,9 @@ function TreinoSessao({user,filtro,onVoltar}){
       {/* HEADER DA SESSÃO */}
       {(()=>{
         const pct=total>0?Math.round(((idx+1)/total)*100):0;
+        const materias=[...new Set(questoes.map(q=>q.materia).filter(Boolean))];
+        const materiaAtual=questoes[idx]?.materia;
+        const mIdx=materias.indexOf(materiaAtual);
         const topicosAgrupados=(()=>{
           const map={};
           ((filtro&&filtro.topicos)||[]).forEach(t=>{
@@ -4044,115 +4075,178 @@ function TreinoSessao({user,filtro,onVoltar}){
             map[key].total+=t.contagem||0;
             map[key].topicos.push(t);
           });
+          // Se não tem filtro.topicos, agrupa do array de questões
+          if(!((filtro&&filtro.topicos)||[]).length){
+            questoes.forEach(q=>{
+              const key=q.materia||'—';
+              if(!map[key]) map[key]={total:0,topicos:[]};
+              map[key].total++;
+            });
+          }
           return map;
         })();
-        const nTopicos=((filtro&&filtro.topicos)||[]).length;
+        const temMenu=Object.keys(topicosAgrupados).length>0;
+        const erros=Math.max(0,(confirmada?idx+1:idx)-acertos);
 
         return(
           <>
-            {/* Barra principal */}
+            {/* ── BARRA PRINCIPAL ── */}
             <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,position:"sticky",top:0,zIndex:20,boxShadow:"0 2px 20px rgba(108,60,225,0.3)"}}>
-              <div style={{maxWidth:960,margin:"0 auto",padding:"0 20px"}}>
-                <div style={{display:"flex",alignItems:"center",height:56,gap:0}}>
+              <div style={{maxWidth:960,margin:"0 auto"}}>
 
-                  {/* ← Sair */}
+                {/* Linha 1: menu | sair | setas questão | setas matéria | stats | tempo | contador */}
+                <div style={{display:"flex",alignItems:"center",height:52,padding:"0 12px",gap:0}}>
+
+                  {/* ☰ Menu (3 barras) */}
+                  {temMenu&&(
+                    <button onClick={()=>setDetalharSessao(v=>!v)}
+                      style={{width:38,height:38,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,background:detalharSessao?"rgba(255,255,255,0.15)":"none",border:detalharSessao?"1px solid rgba(255,255,255,0.2)":"1px solid transparent",borderRadius:8,cursor:"pointer",flexShrink:0,transition:"all 0.15s",marginRight:4}}>
+                      {[0,1,2].map(i=>(
+                        <div key={i} style={{width:i===1?12:16,height:1.5,background:"rgba(255,255,255,0.7)",borderRadius:1,transition:"width 0.15s"}}/>
+                      ))}
+                    </button>
+                  )}
+
+                  {/* Sair */}
                   <button onClick={onVoltar}
-                    style={{height:"100%",padding:"0 16px",background:"none",border:"none",borderRight:"1px solid rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.6)",fontSize:12,cursor:"pointer",fontFamily:"'Sora',sans-serif",display:"flex",alignItems:"center",gap:5,transition:"color 0.15s",flexShrink:0}}
-                    onMouseEnter={e=>e.currentTarget.style.color="white"}
-                    onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.6)"}>
-                    ← Sair
+                    style={{padding:"0 12px",height:"100%",background:"none",border:"none",borderRight:"1px solid rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.5)",fontSize:12,cursor:"pointer",fontFamily:"'Sora',sans-serif",display:"flex",alignItems:"center",gap:4,transition:"color 0.15s",flexShrink:0,marginRight:8}}
+                    onMouseEnter={e=>e.currentTarget.style.color="rgba(255,255,255,0.9)"}
+                    onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.5)"}>
+                    <span style={{fontSize:14}}>←</span>
+                    <span>Sair</span>
                   </button>
 
-                  {/* Espaço central — clique para detalhar */}
-                  <button onClick={()=>setDetalharSessao(v=>!v)}
-                    style={{flex:1,height:"100%",background:"none",border:"none",cursor:"pointer",padding:"0 16px",display:"flex",alignItems:"center",gap:8}}>
-                    <span style={{fontSize:11,color:"rgba(255,255,255,0.45)",fontWeight:500,whiteSpace:"nowrap"}}>
-                      {nTopicos>0?`${nTopicos} ${nTopicos===1?"tópico":"tópicos"}`:"Treino livre"}
-                    </span>
-                    <span style={{fontSize:10,color:"rgba(255,255,255,0.25)"}}>·</span>
-                    <span style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.7)",background:"rgba(255,255,255,0.08)",borderRadius:100,padding:"2px 10px",border:"1px solid rgba(255,255,255,0.12)"}}>
-                      {detalharSessao?"Recolher ↑":"Detalhar ↓"}
-                    </span>
-                  </button>
+                  {/* Setas questão */}
+                  <div style={{display:"flex",alignItems:"center",gap:2,flexShrink:0}}>
+                    <button onClick={()=>{if(idx>0){setIdx(i=>i-1);setSelecionada(null);setConfirmada(false);}}}
+                      disabled={idx===0}
+                      title="Questão anterior"
+                      style={{width:30,height:30,borderRadius:7,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",color:idx===0?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.75)",cursor:idx===0?"not-allowed":"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
+                      onMouseEnter={e=>{if(idx>0)e.currentTarget.style.background="rgba(255,255,255,0.16)";}}
+                      onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.08)"}>
+                      ‹
+                    </button>
+                    <button onClick={()=>{if(idx<total-1){setIdx(i=>i+1);setSelecionada(null);setConfirmada(false);}}}
+                      disabled={idx>=total-1}
+                      title="Próxima questão"
+                      style={{width:30,height:30,borderRadius:7,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",color:idx>=total-1?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.75)",cursor:idx>=total-1?"not-allowed":"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
+                      onMouseEnter={e=>{if(idx<total-1)e.currentTarget.style.background="rgba(255,255,255,0.16)";}}
+                      onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.08)"}>
+                      ›
+                    </button>
+                  </div>
 
-                  {/* Separador */}
-                  <div style={{width:1,height:28,background:"rgba(255,255,255,0.1)",flexShrink:0}}/>
+                  {/* Setas matéria */}
+                  {materias.length>1&&(
+                    <div style={{display:"flex",alignItems:"center",gap:2,marginLeft:6,flexShrink:0}}>
+                      <button onClick={()=>irParaMateria(-1)} disabled={mIdx<=0}
+                        title="Matéria anterior"
+                        style={{width:30,height:30,borderRadius:7,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",color:mIdx<=0?"rgba(255,255,255,0.15)":"rgba(255,255,255,0.5)",cursor:mIdx<=0?"not-allowed":"pointer",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:1,transition:"all 0.15s"}}
+                        onMouseEnter={e=>{if(mIdx>0)e.currentTarget.style.background="rgba(255,255,255,0.12)";}}
+                        onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.05)"}>
+                        <span style={{fontSize:12}}>‹</span><span style={{fontSize:7,letterSpacing:-0.5}}>M</span>
+                      </button>
+                      <button onClick={()=>irParaMateria(1)} disabled={mIdx>=materias.length-1}
+                        title="Próxima matéria"
+                        style={{width:30,height:30,borderRadius:7,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",color:mIdx>=materias.length-1?"rgba(255,255,255,0.15)":"rgba(255,255,255,0.5)",cursor:mIdx>=materias.length-1?"not-allowed":"pointer",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:1,transition:"all 0.15s"}}
+                        onMouseEnter={e=>{if(mIdx<materias.length-1)e.currentTarget.style.background="rgba(255,255,255,0.12)";}}
+                        onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.05)"}>
+                        <span style={{fontSize:7,letterSpacing:-0.5}}>M</span><span style={{fontSize:12}}>›</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Flex spacer */}
+                  <div style={{flex:1}}/>
 
                   {/* Acertos */}
-                  <div style={{padding:"0 14px",textAlign:"center",flexShrink:0}}>
-                    <div style={{fontSize:18,fontWeight:800,color:"#6EE7B7",lineHeight:1}}>{acertos}</div>
-                    <div style={{fontSize:8,color:"rgba(255,255,255,0.4)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>acertos</div>
+                  <div style={{padding:"0 10px",textAlign:"center",flexShrink:0}}>
+                    <div style={{fontSize:16,fontWeight:800,color:"#6EE7B7",lineHeight:1}}>{acertos}</div>
+                    <div style={{fontSize:7,color:"rgba(255,255,255,0.35)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>acertos</div>
                   </div>
 
                   {/* Erros */}
-                  <div style={{padding:"0 14px",borderLeft:"1px solid rgba(255,255,255,0.1)",textAlign:"center",flexShrink:0}}>
-                    <div style={{fontSize:18,fontWeight:800,color:"#FCA5A5",lineHeight:1}}>{Math.max(0,(confirmada?idx+1:idx)-acertos)}</div>
-                    <div style={{fontSize:8,color:"rgba(255,255,255,0.4)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>erros</div>
+                  <div style={{padding:"0 10px",borderLeft:"1px solid rgba(255,255,255,0.08)",textAlign:"center",flexShrink:0}}>
+                    <div style={{fontSize:16,fontWeight:800,color:"#FCA5A5",lineHeight:1}}>{erros}</div>
+                    <div style={{fontSize:7,color:"rgba(255,255,255,0.35)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>erros</div>
                   </div>
 
                   {/* Tempo */}
-                  <div style={{padding:"0 14px",borderLeft:"1px solid rgba(255,255,255,0.1)",textAlign:"center",flexShrink:0}}>
-                    <div style={{fontSize:16,fontWeight:700,color:"rgba(255,255,255,0.85)",lineHeight:1,fontFamily:"'Courier New',monospace",letterSpacing:1}}>{fmtTempo(tempoSeg)}</div>
-                    <div style={{fontSize:8,color:"rgba(255,255,255,0.4)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>tempo</div>
+                  <div style={{padding:"0 10px",borderLeft:"1px solid rgba(255,255,255,0.08)",textAlign:"center",flexShrink:0}}>
+                    <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.75)",lineHeight:1,fontFamily:"'Courier New',monospace",letterSpacing:1}}>{fmtTempo(tempoSeg)}</div>
+                    <div style={{fontSize:7,color:"rgba(255,255,255,0.35)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>tempo</div>
                   </div>
 
-                  {/* Separador + Contador */}
-                  <div style={{padding:"0 14px",borderLeft:"1px solid rgba(255,255,255,0.1)",textAlign:"center",flexShrink:0}}>
-                    <div style={{fontSize:16,fontWeight:800,color:"white",lineHeight:1}}>
-                      {idx+1}<span style={{fontSize:11,fontWeight:400,color:"rgba(255,255,255,0.4)"}}>/{total}</span>
+                  {/* Contador */}
+                  <div style={{padding:"0 10px 0 10px",borderLeft:"1px solid rgba(255,255,255,0.08)",textAlign:"center",flexShrink:0}}>
+                    <div style={{fontSize:15,fontWeight:800,color:"white",lineHeight:1}}>
+                      {idx+1}<span style={{fontSize:10,fontWeight:400,color:"rgba(255,255,255,0.35)"}}>/{total}</span>
                     </div>
-                    <div style={{fontSize:8,color:"rgba(255,255,255,0.4)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>questão</div>
+                    <div style={{fontSize:7,color:"rgba(255,255,255,0.35)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>questão</div>
                   </div>
-
                 </div>
 
                 {/* Barra de progresso */}
-                <div style={{height:2,background:"rgba(255,255,255,0.1)",margin:"0 -20px"}}>
-                  <div style={{height:"100%",width:`${pct}%`,background:"linear-gradient(90deg,#A78BFA,#C4B5FD)",transition:"width 0.4s ease"}}/>
+                <div style={{height:2,background:"rgba(255,255,255,0.08)"}}>
+                  <div style={{height:"100%",width:`${pct}%`,background:"rgba(167,139,250,0.8)",transition:"width 0.4s ease"}}/>
                 </div>
               </div>
             </div>
 
-            {/* Painel detalhar — expande abaixo do header */}
+            {/* ── MENU DE QUESTÕES (expande abaixo) ── */}
             {detalharSessao&&(
-              <div style={{background:"#1E1B4B",boxShadow:"0 8px 32px rgba(0,0,0,0.4)",position:"sticky",top:58,zIndex:19}}>
-                <div style={{maxWidth:960,margin:"0 auto",padding:"16px 20px"}}>
-                  <div style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:1.5,textTransform:"uppercase",marginBottom:12}}>
-                    Caderno de treino — {total} questões
-                  </div>
-                  {Object.entries(topicosAgrupados).length>0?(
-                    <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                      {Object.entries(topicosAgrupados).map(([mat,dados])=>(
-                        <div key={mat}>
-                          {/* Matéria */}
-                          <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.7)",marginBottom:6}}>{mat}</div>
-                          {/* Tópicos */}
-                          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                            {dados.topicos.map((t,i)=>{
-                              const topicIdx=questoes.findIndex(q=>t&&(t.topico==="todas"?q.materia===t.materia:q.topico===t.topico));
-                              const isAtual=questoes[idx]&&(t.topico==="todas"?questoes[idx].materia===t.materia:questoes[idx].topico===t.topico);
-                              return(
-                                <button key={i}
-                                  onClick={()=>{
-                                    if(topicIdx>-1){setIdx(topicIdx);setSelecionada(null);setConfirmada(false);}
-                                    setDetalharSessao(false);
-                                  }}
-                                  style={{padding:"6px 12px",background:isAtual?"rgba(167,139,250,0.25)":"rgba(255,255,255,0.06)",border:`1px solid ${isAtual?"rgba(167,139,250,0.5)":"rgba(255,255,255,0.1)"}`,borderRadius:8,cursor:"pointer",display:"flex",alignItems:"center",gap:8,transition:"all 0.15s"}}
-                                  onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.12)"}
-                                  onMouseLeave={e=>e.currentTarget.style.background=isAtual?"rgba(167,139,250,0.25)":"rgba(255,255,255,0.06)"}>
-                                  {isAtual&&<div style={{width:6,height:6,borderRadius:"50%",background:"#A78BFA",flexShrink:0}}/>}
-                                  <span style={{fontSize:11,color:"rgba(255,255,255,0.8)",fontWeight:isAtual?700:400}}>{t.topico==="todas"?"Todos os tópicos":t.topico}</span>
-                                  <span style={{fontSize:10,color:"rgba(255,255,255,0.35)"}}>{t.contagem||0}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
+              <div style={{background:"#13102E",position:"sticky",top:54,zIndex:19,boxShadow:"0 8px 24px rgba(0,0,0,0.5)"}}>
+                <div style={{maxWidth:960,margin:"0 auto",padding:"16px 20px 20px"}}>
+                  {/* Header do menu */}
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+                    <div>
+                      <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.85)"}}>{total} questões</div>
+                      <div style={{fontSize:10,color:"rgba(255,255,255,0.35)",marginTop:2}}>{acertos} acertos · {erros} erros · {fmtTempo(tempoSeg)}</div>
                     </div>
-                  ):(
-                    <div style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>Treino livre sem filtro de tópicos.</div>
-                  )}
+                    <button onClick={()=>setDetalharSessao(false)}
+                      style={{width:28,height:28,borderRadius:6,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.5)",cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      ✕
+                    </button>
+                  </div>
+                  {/* Matérias e tópicos */}
+                  <div style={{display:"flex",flexDirection:"column",gap:14}}>
+                    {Object.entries(topicosAgrupados).map(([mat,dados])=>{
+                      const qsDaMateria=questoes.filter(q=>q.materia===mat);
+                      const primeiraQ=questoes.findIndex(q=>q.materia===mat);
+                      const estaAqui=materiaAtual===mat;
+                      return(
+                        <div key={mat}>
+                          {/* Linha da matéria — clicável */}
+                          <button onClick={()=>{if(primeiraQ>-1){setIdx(primeiraQ);setSelecionada(null);setConfirmada(false);}setDetalharSessao(false);}}
+                            style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:estaAqui?"rgba(167,139,250,0.15)":"rgba(255,255,255,0.04)",border:`1px solid ${estaAqui?"rgba(167,139,250,0.3)":"rgba(255,255,255,0.06)"}`,borderRadius:10,cursor:"pointer",marginBottom:8,textAlign:"left"}}>
+                            {estaAqui&&<div style={{width:6,height:6,borderRadius:"50%",background:"#A78BFA",flexShrink:0}}/>}
+                            <div style={{flex:1}}>
+                              <div style={{fontSize:12,fontWeight:700,color:estaAqui?"#C4B5FD":"rgba(255,255,255,0.8)"}}>{mat}</div>
+                            </div>
+                            <div style={{fontSize:11,color:"rgba(255,255,255,0.35)",flexShrink:0}}>{qsDaMateria.length} questões</div>
+                          </button>
+                          {/* Tópicos da matéria */}
+                          {((filtro&&filtro.topicos)||[]).filter(t=>t.materia===mat).length>0&&(
+                            <div style={{display:"flex",flexWrap:"wrap",gap:5,paddingLeft:8}}>
+                              {((filtro&&filtro.topicos)||[]).filter(t=>t.materia===mat).map((t,i)=>{
+                                const topicIdx=questoes.findIndex(q=>t.topico==="todas"?q.materia===t.materia:q.topico===t.topico);
+                                const isTopicAtual=questoes[idx]&&(t.topico==="todas"?questoes[idx].materia===t.materia:questoes[idx].topico===t.topico);
+                                const qsTopico=questoes.filter(q=>t.topico==="todas"?q.materia===t.materia:q.topico===t.topico).length;
+                                return(
+                                  <button key={i}
+                                    onClick={()=>{if(topicIdx>-1){setIdx(topicIdx);setSelecionada(null);setConfirmada(false);}setDetalharSessao(false);}}
+                                    style={{padding:"4px 10px",background:isTopicAtual?"rgba(167,139,250,0.2)":"rgba(255,255,255,0.04)",border:`1px solid ${isTopicAtual?"rgba(167,139,250,0.35)":"rgba(255,255,255,0.06)"}`,borderRadius:100,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+                                    <span style={{fontSize:10,color:isTopicAtual?"#C4B5FD":"rgba(255,255,255,0.55)",fontWeight:isTopicAtual?600:400}}>{t.topico==="todas"?"Todos":t.topico}</span>
+                                    <span style={{fontSize:9,color:"rgba(255,255,255,0.25)"}}>{qsTopico}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             )}
