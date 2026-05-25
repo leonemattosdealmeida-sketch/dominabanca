@@ -3884,6 +3884,8 @@ function TreinoSessao({user,filtro,onVoltar}){
   const [respondidas,setRespondidas]=React.useState(new Set());
   const [detalharSessao,setDetalharSessao]=React.useState(false);
   const [tempoSeg,setTempoSeg]=React.useState(0);
+  const [filtroMenu,setFiltroMenu]=React.useState("materia");
+  const [ordemMenu,setOrdemMenu]=React.useState("asc");
   const LETRAS=["A","B","C","D","E"];
 
   React.useEffect(()=>{
@@ -4097,61 +4099,59 @@ function TreinoSessao({user,filtro,onVoltar}){
                 {/* Linha 1: menu | sair | setas questão | setas matéria | stats | tempo | contador */}
                 <div style={{display:"flex",alignItems:"center",height:52,padding:"0 12px",gap:0}}>
 
-                  {/* ☰ Menu (3 barras) */}
+                  {/* ☰ Menu */}
                   {temMenu&&(
                     <button onClick={()=>setDetalharSessao(v=>!v)}
-                      style={{width:38,height:38,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,background:detalharSessao?"rgba(255,255,255,0.15)":"none",border:detalharSessao?"1px solid rgba(255,255,255,0.2)":"1px solid transparent",borderRadius:8,cursor:"pointer",flexShrink:0,transition:"all 0.15s",marginRight:4}}>
-                      {[0,1,2].map(i=>(
-                        <div key={i} style={{width:i===1?12:16,height:1.5,background:"rgba(255,255,255,0.7)",borderRadius:1,transition:"width 0.15s"}}/>
-                      ))}
+                      style={{width:40,height:40,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5,background:detalharSessao?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:9,cursor:"pointer",flexShrink:0,transition:"all 0.15s",marginRight:6}}>
+                      <div style={{width:16,height:2,background:"white",borderRadius:2}}/>
+                      <div style={{width:11,height:2,background:"white",borderRadius:2}}/>
+                      <div style={{width:16,height:2,background:"white",borderRadius:2}}/>
                     </button>
                   )}
 
                   {/* Sair */}
                   <button onClick={onVoltar}
-                    style={{padding:"0 12px",height:"100%",background:"none",border:"none",borderRight:"1px solid rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.5)",fontSize:12,cursor:"pointer",fontFamily:"'Sora',sans-serif",display:"flex",alignItems:"center",gap:4,transition:"color 0.15s",flexShrink:0,marginRight:8}}
-                    onMouseEnter={e=>e.currentTarget.style.color="rgba(255,255,255,0.9)"}
-                    onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.5)"}>
-                    <span style={{fontSize:14}}>←</span>
+                    style={{padding:"0 14px",height:"100%",background:"none",border:"none",borderRight:"1px solid rgba(255,255,255,0.12)",color:"rgba(255,255,255,0.75)",fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"'Sora',sans-serif",display:"flex",alignItems:"center",gap:5,transition:"color 0.15s",flexShrink:0,marginRight:10}}
+                    onMouseEnter={e=>e.currentTarget.style.color="white"}
+                    onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.75)"}>
+                    <span style={{fontSize:16,lineHeight:1}}>←</span>
                     <span>Sair</span>
                   </button>
 
-                  {/* Setas questão */}
-                  <div style={{display:"flex",alignItems:"center",gap:2,flexShrink:0}}>
+                  {/* Grupo: setas questão */}
+                  <div style={{display:"flex",alignItems:"center",background:"rgba(255,255,255,0.08)",borderRadius:9,border:"1px solid rgba(255,255,255,0.15)",overflow:"hidden",flexShrink:0}}>
                     <button onClick={()=>{if(idx>0){setIdx(i=>i-1);setSelecionada(null);setConfirmada(false);}}}
                       disabled={idx===0}
                       title="Questão anterior"
-                      style={{width:30,height:30,borderRadius:7,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",color:idx===0?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.75)",cursor:idx===0?"not-allowed":"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
-                      onMouseEnter={e=>{if(idx>0)e.currentTarget.style.background="rgba(255,255,255,0.16)";}}
-                      onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.08)"}>
+                      style={{width:36,height:36,background:"none",border:"none",borderRight:"1px solid rgba(255,255,255,0.12)",color:idx===0?"rgba(255,255,255,0.25)":"white",cursor:idx===0?"not-allowed":"pointer",fontSize:18,fontWeight:300,display:"flex",alignItems:"center",justifyContent:"center"}}>
                       ‹
                     </button>
+                    <div style={{padding:"0 10px",fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",whiteSpace:"nowrap",minWidth:44,textAlign:"center"}}>
+                      {idx+1}/{total}
+                    </div>
                     <button onClick={()=>{if(idx<total-1){setIdx(i=>i+1);setSelecionada(null);setConfirmada(false);}}}
                       disabled={idx>=total-1}
                       title="Próxima questão"
-                      style={{width:30,height:30,borderRadius:7,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",color:idx>=total-1?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.75)",cursor:idx>=total-1?"not-allowed":"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}
-                      onMouseEnter={e=>{if(idx<total-1)e.currentTarget.style.background="rgba(255,255,255,0.16)";}}
-                      onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.08)"}>
+                      style={{width:36,height:36,background:"none",border:"none",borderLeft:"1px solid rgba(255,255,255,0.12)",color:idx>=total-1?"rgba(255,255,255,0.25)":"white",cursor:idx>=total-1?"not-allowed":"pointer",fontSize:18,fontWeight:300,display:"flex",alignItems:"center",justifyContent:"center"}}>
                       ›
                     </button>
                   </div>
 
-                  {/* Setas matéria */}
+                  {/* Grupo: setas matéria */}
                   {materias.length>1&&(
-                    <div style={{display:"flex",alignItems:"center",gap:2,marginLeft:6,flexShrink:0}}>
+                    <div style={{display:"flex",alignItems:"center",background:"rgba(255,255,255,0.05)",borderRadius:9,border:"1px solid rgba(255,255,255,0.1)",overflow:"hidden",flexShrink:0,marginLeft:6}}>
                       <button onClick={()=>irParaMateria(-1)} disabled={mIdx<=0}
                         title="Matéria anterior"
-                        style={{width:30,height:30,borderRadius:7,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",color:mIdx<=0?"rgba(255,255,255,0.15)":"rgba(255,255,255,0.5)",cursor:mIdx<=0?"not-allowed":"pointer",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:1,transition:"all 0.15s"}}
-                        onMouseEnter={e=>{if(mIdx>0)e.currentTarget.style.background="rgba(255,255,255,0.12)";}}
-                        onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.05)"}>
-                        <span style={{fontSize:12}}>‹</span><span style={{fontSize:7,letterSpacing:-0.5}}>M</span>
+                        style={{width:36,height:36,background:"none",border:"none",borderRight:"1px solid rgba(255,255,255,0.08)",color:mIdx<=0?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.65)",cursor:mIdx<=0?"not-allowed":"pointer",fontSize:18,fontWeight:300,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                        ‹
                       </button>
+                      <div style={{padding:"0 8px",fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.4)",whiteSpace:"nowrap",textAlign:"center",letterSpacing:0.5,textTransform:"uppercase"}}>
+                        Mat.
+                      </div>
                       <button onClick={()=>irParaMateria(1)} disabled={mIdx>=materias.length-1}
                         title="Próxima matéria"
-                        style={{width:30,height:30,borderRadius:7,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",color:mIdx>=materias.length-1?"rgba(255,255,255,0.15)":"rgba(255,255,255,0.5)",cursor:mIdx>=materias.length-1?"not-allowed":"pointer",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:1,transition:"all 0.15s"}}
-                        onMouseEnter={e=>{if(mIdx<materias.length-1)e.currentTarget.style.background="rgba(255,255,255,0.12)";}}
-                        onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.05)"}>
-                        <span style={{fontSize:7,letterSpacing:-0.5}}>M</span><span style={{fontSize:12}}>›</span>
+                        style={{width:36,height:36,background:"none",border:"none",borderLeft:"1px solid rgba(255,255,255,0.08)",color:mIdx>=materias.length-1?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.65)",cursor:mIdx>=materias.length-1?"not-allowed":"pointer",fontSize:18,fontWeight:300,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                        ›
                       </button>
                     </div>
                   )}
@@ -4177,13 +4177,7 @@ function TreinoSessao({user,filtro,onVoltar}){
                     <div style={{fontSize:7,color:"rgba(255,255,255,0.35)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>tempo</div>
                   </div>
 
-                  {/* Contador */}
-                  <div style={{padding:"0 10px 0 10px",borderLeft:"1px solid rgba(255,255,255,0.08)",textAlign:"center",flexShrink:0}}>
-                    <div style={{fontSize:15,fontWeight:800,color:"white",lineHeight:1}}>
-                      {idx+1}<span style={{fontSize:10,fontWeight:400,color:"rgba(255,255,255,0.35)"}}>/{total}</span>
-                    </div>
-                    <div style={{fontSize:7,color:"rgba(255,255,255,0.35)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>questão</div>
-                  </div>
+
                 </div>
 
                 {/* Barra de progresso */}
@@ -4193,60 +4187,118 @@ function TreinoSessao({user,filtro,onVoltar}){
               </div>
             </div>
 
-            {/* ── MENU DE QUESTÕES (expande abaixo) ── */}
+            {/* ── MENU DE QUESTÕES — fundo branco, filtros, lista vertical ── */}
             {detalharSessao&&(
-              <div style={{background:"#13102E",position:"sticky",top:54,zIndex:19,boxShadow:"0 8px 24px rgba(0,0,0,0.5)"}}>
-                <div style={{maxWidth:960,margin:"0 auto",padding:"16px 20px 20px"}}>
-                  {/* Header do menu */}
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-                    <div>
-                      <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.85)"}}>{total} questões</div>
-                      <div style={{fontSize:10,color:"rgba(255,255,255,0.35)",marginTop:2}}>{acertos} acertos · {erros} erros · {fmtTempo(tempoSeg)}</div>
+              <div style={{background:"white",position:"sticky",top:54,zIndex:19,boxShadow:"0 4px 24px rgba(0,0,0,0.15)",borderBottom:`1px solid ${C.border}`}}>
+                <div style={{maxWidth:960,margin:"0 auto",padding:"0"}}>
+
+                  {/* Header */}
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 20px",borderBottom:`1px solid ${C.border}`}}>
+                    <div style={{display:"flex",alignItems:"center",gap:16}}>
+                      <div>
+                        <span style={{fontSize:13,fontWeight:700,color:C.text}}>{total} questões</span>
+                        <span style={{fontSize:11,color:C.textLight,marginLeft:10}}>{acertos} acertos · {erros} erros · {fmtTempo(tempoSeg)}</span>
+                      </div>
                     </div>
                     <button onClick={()=>setDetalharSessao(false)}
-                      style={{width:28,height:28,borderRadius:6,background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.5)",cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      style={{width:28,height:28,borderRadius:6,background:C.bg,border:`1px solid ${C.border}`,color:C.textLight,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>
                       ✕
                     </button>
                   </div>
-                  {/* Matérias e tópicos */}
-                  <div style={{display:"flex",flexDirection:"column",gap:14}}>
-                    {Object.entries(topicosAgrupados).map(([mat,dados])=>{
-                      const qsDaMateria=questoes.filter(q=>q.materia===mat);
-                      const primeiraQ=questoes.findIndex(q=>q.materia===mat);
-                      const estaAqui=materiaAtual===mat;
-                      return(
-                        <div key={mat}>
-                          {/* Linha da matéria — clicável */}
-                          <button onClick={()=>{if(primeiraQ>-1){setIdx(primeiraQ);setSelecionada(null);setConfirmada(false);}setDetalharSessao(false);}}
-                            style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:estaAqui?"rgba(167,139,250,0.15)":"rgba(255,255,255,0.04)",border:`1px solid ${estaAqui?"rgba(167,139,250,0.3)":"rgba(255,255,255,0.06)"}`,borderRadius:10,cursor:"pointer",marginBottom:8,textAlign:"left"}}>
-                            {estaAqui&&<div style={{width:6,height:6,borderRadius:"50%",background:"#A78BFA",flexShrink:0}}/>}
-                            <div style={{flex:1}}>
-                              <div style={{fontSize:12,fontWeight:700,color:estaAqui?"#C4B5FD":"rgba(255,255,255,0.8)"}}>{mat}</div>
-                            </div>
-                            <div style={{fontSize:11,color:"rgba(255,255,255,0.35)",flexShrink:0}}>{qsDaMateria.length} questões</div>
-                          </button>
-                          {/* Tópicos da matéria */}
-                          {((filtro&&filtro.topicos)||[]).filter(t=>t.materia===mat).length>0&&(
-                            <div style={{display:"flex",flexWrap:"wrap",gap:5,paddingLeft:8}}>
-                              {((filtro&&filtro.topicos)||[]).filter(t=>t.materia===mat).map((t,i)=>{
-                                const topicIdx=questoes.findIndex(q=>t.topico==="todas"?q.materia===t.materia:q.topico===t.topico);
-                                const isTopicAtual=questoes[idx]&&(t.topico==="todas"?questoes[idx].materia===t.materia:questoes[idx].topico===t.topico);
-                                const qsTopico=questoes.filter(q=>t.topico==="todas"?q.materia===t.materia:q.topico===t.topico).length;
-                                return(
-                                  <button key={i}
-                                    onClick={()=>{if(topicIdx>-1){setIdx(topicIdx);setSelecionada(null);setConfirmada(false);}setDetalharSessao(false);}}
-                                    style={{padding:"4px 10px",background:isTopicAtual?"rgba(167,139,250,0.2)":"rgba(255,255,255,0.04)",border:`1px solid ${isTopicAtual?"rgba(167,139,250,0.35)":"rgba(255,255,255,0.06)"}`,borderRadius:100,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
-                                    <span style={{fontSize:10,color:isTopicAtual?"#C4B5FD":"rgba(255,255,255,0.55)",fontWeight:isTopicAtual?600:400}}>{t.topico==="todas"?"Todos":t.topico}</span>
-                                    <span style={{fontSize:9,color:"rgba(255,255,255,0.25)"}}>{qsTopico}</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
+
+                  {/* Filtros */}
+                  {(()=>{
+                    // Agrupa por matéria com contagem
+                    const porMateria={};
+                    questoes.forEach(q=>{
+                      const m=q.materia||"—";
+                      if(!porMateria[m]) porMateria[m]={count:0,topicos:{}};
+                      porMateria[m].count++;
+                      const t=q.topico||"—";
+                      if(!porMateria[m].topicos[t]) porMateria[m].topicos[t]=0;
+                      porMateria[m].topicos[t]++;
+                    });
+
+                    // Ordena conforme filtro
+                    let entradasOrdenadas=Object.entries(porMateria);
+                    if(filtroMenu==="quantidade"){
+                      entradasOrdenadas=entradasOrdenadas.sort(([,a],[,b])=>ordemMenu==="asc"?a.count-b.count:b.count-a.count);
+                    }else if(filtroMenu==="materia"){
+                      entradasOrdenadas=entradasOrdenadas.sort(([a],[b])=>ordemMenu==="asc"?a.localeCompare(b):b.localeCompare(a));
+                    }
+
+                    return(
+                      <>
+                        {/* Barra de filtros */}
+                        <div style={{display:"flex",alignItems:"center",gap:6,padding:"8px 20px",borderBottom:`1px solid ${C.border}`,background:C.bg,flexWrap:"wrap"}}>
+                          <span style={{fontSize:10,fontWeight:700,color:C.textLight,textTransform:"uppercase",letterSpacing:0.8,marginRight:4}}>Ordenar por</span>
+                          {[
+                            {id:"materia",l:"Matéria e Assunto"},
+                            {id:"quantidade",l:"Quantidade"},
+                          ].map(f=>(
+                            <button key={f.id} onClick={()=>{if(filtroMenu===f.id)setOrdemMenu(o=>o==="asc"?"desc":"asc");else setFiltroMenu(f.id);}}
+                              style={{padding:"4px 10px",borderRadius:6,border:`1px solid ${filtroMenu===f.id?C.primary:C.border}`,background:filtroMenu===f.id?C.primaryXLight:"white",color:filtroMenu===f.id?C.primary:C.textMed,fontSize:11,fontWeight:filtroMenu===f.id?700:400,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                              {f.l}
+                              {filtroMenu===f.id&&<span style={{fontSize:10}}>{ordemMenu==="asc"?"↑":"↓"}</span>}
+                            </button>
+                          ))}
                         </div>
-                      );
-                    })}
-                  </div>
+
+                        {/* Lista de matérias */}
+                        <div style={{maxHeight:320,overflowY:"auto"}}>
+                          {entradasOrdenadas.map(([mat,dados],mi)=>{
+                            const primeiraQ=questoes.findIndex(q=>q.materia===mat);
+                            const estaAqui=materiaAtual===mat;
+                            const topicosOrdenados=Object.entries(dados.topicos).sort(([,a],[,b])=>b-a);
+                            return(
+                              <div key={mat} style={{borderBottom:mi<entradasOrdenadas.length-1?`1px solid ${C.border}`:"none"}}>
+                                {/* Linha matéria */}
+                                <button onClick={()=>{if(primeiraQ>-1){setIdx(primeiraQ);setSelecionada(null);setConfirmada(false);}setDetalharSessao(false);}}
+                                  style={{width:"100%",display:"flex",alignItems:"center",padding:"11px 20px",background:estaAqui?C.primaryXLight:"white",border:"none",cursor:"pointer",textAlign:"left",transition:"background 0.1s"}}
+                                  onMouseEnter={e=>e.currentTarget.style.background=estaAqui?C.primaryXLight:C.bg}
+                                  onMouseLeave={e=>e.currentTarget.style.background=estaAqui?C.primaryXLight:"white"}>
+                                  {/* Indicador atual */}
+                                  <div style={{width:3,height:32,borderRadius:2,background:estaAqui?C.primary:"transparent",marginRight:12,flexShrink:0}}/>
+                                  <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontSize:13,fontWeight:estaAqui?700:600,color:estaAqui?C.primary:C.text}}>{mat}</div>
+                                    <div style={{fontSize:10,color:C.textLight,marginTop:1}}>
+                                      {topicosOrdenados.length} tópico{topicosOrdenados.length!==1?"s":""}
+                                    </div>
+                                  </div>
+                                  <div style={{fontSize:12,fontWeight:700,color:estaAqui?C.primary:C.textMed,flexShrink:0}}>{dados.count}</div>
+                                  <span style={{fontSize:11,color:C.textLight,marginLeft:2,flexShrink:0}}>questões</span>
+                                  <span style={{fontSize:12,color:C.textLight,marginLeft:10,flexShrink:0}}>›</span>
+                                </button>
+                                {/* Tópicos da matéria — linha fina abaixo */}
+                                {topicosOrdenados.length>0&&(
+                                  <div style={{padding:"0 20px 10px 35px",display:"flex",flexDirection:"column",gap:1,background:estaAqui?C.primaryXLight:"white"}}>
+                                    {topicosOrdenados.slice(0,5).map(([top,cnt],ti)=>{
+                                      const topicIdx=questoes.findIndex(q=>q.materia===mat&&q.topico===top);
+                                      const isTopicAtual=questoes[idx]?.materia===mat&&questoes[idx]?.topico===top;
+                                      return(
+                                        <button key={ti}
+                                          onClick={()=>{if(topicIdx>-1){setIdx(topicIdx);setSelecionada(null);setConfirmada(false);}setDetalharSessao(false);}}
+                                          style={{display:"flex",alignItems:"center",gap:8,padding:"4px 8px",background:"none",border:"none",cursor:"pointer",borderRadius:6,textAlign:"left",transition:"background 0.1s"}}
+                                          onMouseEnter={e=>e.currentTarget.style.background=C.border}
+                                          onMouseLeave={e=>e.currentTarget.style.background="none"}>
+                                          {isTopicAtual&&<div style={{width:4,height:4,borderRadius:"50%",background:C.primary,flexShrink:0}}/>}
+                                          <span style={{fontSize:11,color:isTopicAtual?C.primary:C.textMed,flex:1,fontWeight:isTopicAtual?600:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{top}</span>
+                                          <span style={{fontSize:10,color:C.textLight,flexShrink:0}}>{cnt}</span>
+                                        </button>
+                                      );
+                                    })}
+                                    {topicosOrdenados.length>5&&(
+                                      <span style={{fontSize:10,color:C.textLight,padding:"2px 8px"}}>+{topicosOrdenados.length-5} tópicos</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             )}
