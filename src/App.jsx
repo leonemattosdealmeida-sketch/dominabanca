@@ -3583,34 +3583,67 @@ function TreinoTab({user,plano,onIniciar}){
                 const topicos=cad.topicos||[];
                 const respondidas=(cad.questoes_respondidas||[]).length;
                 const pct=cad.total_questoes>0?Math.round((respondidas/cad.total_questoes)*100):0;
-                const materias=[...new Set(topicos.map(t=>t.materia))];
+                const materias=[...new Set(topicos.map(t=>t.materia).filter(Boolean))];
+                const concluido=pct===100;
+                const emAndamento=respondidas>0&&!concluido;
                 return(
-                  <div key={cad.id} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,0.04)"}}>
-                    <div style={{padding:"16px 18px",borderBottom:`1px solid ${C.border}`}}>
-                      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10,marginBottom:8}}>
-                        <div style={{fontFamily:"'Lora',serif",fontSize:15,fontWeight:700,color:C.text,flex:1}}>{cad.nome}</div>
-                        <div style={{fontSize:10,color:C.textLight,flexShrink:0}}>{new Date(cad.created_at).toLocaleDateString("pt-BR")}</div>
+                  <div key={cad.id} style={{background:C.white,border:`1px solid ${concluido?"#A7F3D0":C.border}`,borderRadius:14,overflow:"hidden",boxShadow:"0 1px 6px rgba(0,0,0,0.05)",transition:"box-shadow 0.2s"}}
+                    onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.09)"}
+                    onMouseLeave={e=>e.currentTarget.style.boxShadow="0 1px 6px rgba(0,0,0,0.05)"}>
+
+                    {/* Barra de progresso no topo */}
+                    <div style={{height:3,background:"#F3F4F6"}}>
+                      <div style={{height:"100%",width:`${pct}%`,background:concluido?"#10B981":C.primary,transition:"width 0.4s"}}/>
+                    </div>
+
+                    <div style={{padding:"16px 18px"}}>
+                      {/* Linha 1: nome + data */}
+                      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,marginBottom:10}}>
+                        <div style={{fontFamily:"'Lora',serif",fontSize:15,fontWeight:700,color:C.text,lineHeight:1.4,flex:1}}>{cad.nome}</div>
+                        <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                          {concluido&&<span style={{fontSize:10,fontWeight:700,color:"#10B981",background:"#D1FAE5",borderRadius:100,padding:"2px 8px"}}>Concluído</span>}
+                          {emAndamento&&<span style={{fontSize:10,fontWeight:600,color:C.primary,background:C.primaryXLight,borderRadius:100,padding:"2px 8px"}}>Em andamento</span>}
+                          <span style={{fontSize:10,color:C.textLight}}>{new Date(cad.created_at).toLocaleDateString("pt-BR")}</span>
+                        </div>
                       </div>
-                      <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:10}}>
-                        {materias.map(m=>(
-                          <span key={m} style={{fontSize:10,background:C.primaryXLight,color:C.primary,borderRadius:100,padding:"2px 8px",fontWeight:600}}>{m}</span>
-                        ))}
-                      </div>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
-                        <span style={{fontSize:11,color:C.textMed}}>{respondidas} de {cad.total_questoes} questões</span>
-                        <span style={{fontSize:12,fontWeight:700,color:pct===100?"#10B981":C.primary}}>{pct}%</span>
-                      </div>
-                      <div style={{height:5,background:"#F3F4F6",borderRadius:100,overflow:"hidden"}}>
-                        <div style={{height:"100%",width:`${pct}%`,background:pct===100?"#10B981":C.primary,borderRadius:100}}/>
+
+                      {/* Linha 2: matérias */}
+                      {materias.length>0&&(
+                        <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:12}}>
+                          {materias.map(m=>(
+                            <span key={m} style={{fontSize:10,color:C.textMed,background:C.bg,border:`1px solid ${C.border}`,borderRadius:4,padding:"2px 8px"}}>{m}</span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Linha 3: progresso */}
+                      <div style={{display:"flex",alignItems:"center",gap:12}}>
+                        <div style={{flex:1,height:4,background:"#F3F4F6",borderRadius:100,overflow:"hidden"}}>
+                          <div style={{height:"100%",width:`${pct}%`,background:concluido?"#10B981":C.primary,borderRadius:100,transition:"width 0.4s"}}/>
+                        </div>
+                        <div style={{display:"flex",alignItems:"baseline",gap:4,flexShrink:0}}>
+                          <span style={{fontSize:11,color:C.textMed}}>{respondidas}/{cad.total_questoes}</span>
+                          <span style={{fontSize:12,fontWeight:800,color:concluido?"#10B981":C.primary}}>{pct}%</span>
+                        </div>
                       </div>
                     </div>
-                    <div style={{padding:"12px 18px",display:"flex",gap:8,flexWrap:"wrap"}}>
+
+                    {/* Rodapé: ações */}
+                    <div style={{padding:"10px 18px",borderTop:`1px solid ${C.border}`,background:C.bg,display:"flex",gap:8,alignItems:"center"}}>
                       <button onClick={()=>onIniciar({topicos:cad.topicos,total:cad.total_questoes,cadernoId:cad.id,questoesRespondidas:cad.questoes_respondidas||[]})}
-                        style={{flex:2,padding:"10px",background:`linear-gradient(135deg,${C.primary},${C.primaryLight})`,color:"white",border:"none",borderRadius:10,fontSize:12,fontWeight:700,cursor:"pointer",boxShadow:"0 3px 10px rgba(108,60,225,0.25)"}}>
-                        {respondidas>0&&pct<100?"▶ Continuar":"▶ Começar"}
+                        style={{flex:1,padding:"9px 16px",background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,color:"white",border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,boxShadow:"0 2px 8px rgba(108,60,225,0.25)"}}>
+                        {concluido?"Refazer":emAndamento?"Continuar →":"Começar →"}
                       </button>
-                      <button onClick={()=>resetarCaderno(cad.id)} style={{flex:1,padding:"10px",background:"white",color:C.textMed,border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontWeight:600,cursor:"pointer"}}>🔄 Resetar</button>
-                      <button onClick={()=>excluirCaderno(cad.id)} style={{padding:"10px 14px",background:"white",color:"#EF4444",border:"1px solid #FECACA",borderRadius:10,fontSize:12,cursor:"pointer"}}>🗑️</button>
+                      <button onClick={()=>resetarCaderno(cad.id)}
+                        title="Resetar progresso"
+                        style={{padding:"9px 14px",background:"white",color:C.textMed,border:`1px solid ${C.border}`,borderRadius:8,fontSize:11,fontWeight:500,cursor:"pointer",whiteSpace:"nowrap"}}>
+                        Resetar
+                      </button>
+                      <button onClick={()=>excluirCaderno(cad.id)}
+                        title="Excluir caderno"
+                        style={{width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",background:"white",color:"#EF4444",border:"1px solid #FECACA",borderRadius:8,cursor:"pointer",fontSize:13,flexShrink:0}}>
+                        ×
+                      </button>
                     </div>
                   </div>
                 );
