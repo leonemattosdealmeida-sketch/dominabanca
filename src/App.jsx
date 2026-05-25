@@ -2967,62 +2967,160 @@ user,q}){
 function ApoioLateral({q,children}){
   const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const temApoio=q?.texto_base||q?.imagem_base;
-  const [abaAtiva,setAbaAtiva]=React.useState("apoio"); // "apoio" | "questao" (mobile)
+  const [abaAtiva,setAbaAtiva]=React.useState("apoio");
   const [zoomImg,setZoomImg]=React.useState(false);
+  // Ferramentas de leitura
+  const [fontSize,setFontSize]=React.useState(14); // 12-20
+  const [lineHeight,setLineHeight]=React.useState(1.95); // 1.6-2.4
+  const [sepia,setSepia]=React.useState(false);
+  const [modoLeitura,setModoLeitura]=React.useState(false);
+  const [highlights,setHighlights]=React.useState([]); // [{start,end}]
+  const textRef=React.useRef(null);
+
+  const addHighlight=()=>{
+    const sel=window.getSelection();
+    if(!sel||sel.rangeCount===0||sel.isCollapsed) return;
+    const range=sel.getRangeAt(0);
+    const container=textRef.current;
+    if(!container||!container.contains(range.commonAncestorContainer)) return;
+    const text=q?.texto_base||"";
+    const preRange=document.createRange();
+    preRange.setStart(container,0);
+    preRange.setEnd(range.startContainer,range.startOffset);
+    const start=preRange.toString().length;
+    const end=start+range.toString().length;
+    if(start<end) setHighlights(h=>[...h,{start,end}]);
+    sel.removeAllRanges();
+  };
+
+  const renderTextoComHighlight=(texto)=>{
+    if(!highlights.length) return texto;
+    // Mescla intervalos sobrepostos
+    const merged=[...highlights].sort((a,b)=>a.start-b.start);
+    const result=[];
+    let last=0;
+    merged.forEach(({start,end})=>{
+      if(start>last) result.push(<span key={`t${last}`}>{texto.slice(last,start)}</span>);
+      result.push(<mark key={`h${start}`} style={{background:"#FEF08A",borderRadius:2,padding:"0 1px"}}>{texto.slice(start,end)}</mark>);
+      last=Math.max(last,end);
+    });
+    if(last<texto.length) result.push(<span key={`t${last}`}>{texto.slice(last)}</span>);
+    return result;
+  };
 
   if(!temApoio) return <>{children}</>;
 
+  const ToolBtn=({onClick,active,title,children})=>(
+    <button onClick={onClick} title={title}
+      style={{width:28,height:28,borderRadius:6,border:`1px solid ${active?C.primary:C.border}`,background:active?C.primaryXLight:"white",color:active?C.primary:C.textMed,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,transition:"all 0.15s"}}>
+      {children}
+    </button>
+  );
+
+  const painelTexto=(
+    <div style={{background:sepia?"#FDFAF3":"white",borderRadius:modoLeitura?0:16,border:modoLeitura?"none":`1px solid ${C.border}`,overflow:"hidden",display:"flex",flexDirection:"column",boxShadow:modoLeitura?"none":"0 2px 12px rgba(0,0,0,0.06)"}}>
+      {/* Toolbar */}
+      <div style={{padding:"8px 14px",borderBottom:`1px solid ${C.border}`,background:sepia?"#F5F0E4":C.bg,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",flexShrink:0}}>
+        <span style={{fontSize:10,fontWeight:700,color:C.textLight,letterSpacing:0.8,textTransform:"uppercase",marginRight:2}}>
+          {q?.imagem_base?"Imagem de apoio":"Texto de apoio"}
+        </span>
+        <div style={{flex:1}}/>
+        {/* Tamanho da fonte */}
+        <div style={{display:"flex",alignItems:"center",gap:2}}>
+          <ToolBtn onClick={()=>setFontSize(f=>Math.max(11,f-1))} title="Diminuir fonte">A-</ToolBtn>
+          <span style={{fontSize:10,color:C.textLight,minWidth:18,textAlign:"center"}}>{fontSize}</span>
+          <ToolBtn onClick={()=>setFontSize(f=>Math.min(22,f+1))} title="Aumentar fonte">A+</ToolBtn>
+        </div>
+        {/* Espaçamento */}
+        <ToolBtn onClick={()=>setLineHeight(l=>l>2?1.6:l+0.2)} active={lineHeight>1.95} title="Espaçamento entre linhas">
+          ≡
+        </ToolBtn>
+        {/* Marcador — ativa seleção */}
+        <ToolBtn onClick={addHighlight} title="Marcar trecho selecionado (selecione o texto primeiro)">
+          <span style={{background:"#FEF08A",padding:"0 2px",borderRadius:2}}>M</span>
+        </ToolBtn>
+        {/* Limpar marcações */}
+        {highlights.length>0&&(
+          <ToolBtn onClick={()=>setHighlights([])} title="Limpar marcações">
+            ✕
+          </ToolBtn>
+        )}
+        {/* Sepia */}
+        <ToolBtn onClick={()=>setSepia(s=>!s)} active={sepia} title="Modo sépia">☕</ToolBtn>
+        {/* Modo leitura */}
+        {!modoLeitura&&(
+          <ToolBtn onClick={()=>setModoLeitura(true)} title="Modo leitura (tela cheia)">⤢</ToolBtn>
+        )}
+      </div>
+      {/* Conteúdo */}
+      <div ref={textRef} style={{flex:1,overflowY:"auto",padding:"20px 22px",userSelect:"text"}}
+        onMouseUp={()=>{const s=window.getSelection();if(s&&!s.isCollapsed){}}}> 
+        {q?.imagem_base?(
+          <div style={{textAlign:"center"}}>
+            <img src={q.imagem_base} alt="Apoio" onClick={()=>setZoomImg(true)} style={{maxWidth:"100%",borderRadius:8,cursor:"zoom-in",boxShadow:"0 2px 8px rgba(0,0,0,0.1)"}}/>
+            <div style={{fontSize:10,color:C.textLight,marginTop:6}}>Clique para ampliar</div>
+          </div>
+        ):(
+          <div style={{fontSize,lineHeight,color:sepia?"#3D2B1F":C.text,fontFamily:"'Georgia',serif",whiteSpace:"pre-wrap"}}>
+            {renderTextoComHighlight(q?.texto_base||"")}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return(
     <>
-      {/* MOBILE: abas */}
+      {/* MOBILE */}
       <div className="apoio-mobile">
         <div style={{display:"flex",background:C.white,borderRadius:12,border:`1px solid ${C.border}`,overflow:"hidden",marginBottom:14}}>
-          {[{id:"apoio",l:q?.imagem_base?"🖼️ Imagem":"📄 Texto"},{id:"questao",l:"❓ Questão"}].map(a=>(
+          {[{id:"apoio",l:q?.imagem_base?"Imagem":"Texto de apoio"},{id:"questao",l:"Questão"}].map(a=>(
             <button key={a.id} onClick={()=>setAbaAtiva(a.id)}
-              style={{flex:1,padding:"11px",border:"none",background:abaAtiva===a.id?C.primary:"white",color:abaAtiva===a.id?"white":C.textMed,fontSize:12,fontWeight:700,cursor:"pointer",transition:"all 0.15s"}}>
+              style={{flex:1,padding:"10px",border:"none",background:abaAtiva===a.id?C.primary:"white",color:abaAtiva===a.id?"white":C.textMed,fontSize:12,fontWeight:700,cursor:"pointer",transition:"all 0.15s"}}>
               {a.l}
             </button>
           ))}
         </div>
         {abaAtiva==="apoio"&&(
-          <div style={{background:C.white,borderRadius:14,padding:"16px",border:`1px solid ${C.border}`,marginBottom:14,maxHeight:"45vh",overflowY:"auto"}}>
-            {q?.imagem_base?(
-              <div style={{textAlign:"center"}}>
-                <img src={q.imagem_base} alt="Apoio" onClick={()=>setZoomImg(true)} style={{maxWidth:"100%",borderRadius:8,cursor:"zoom-in"}}/>
-                <div style={{fontSize:10,color:C.textLight,marginTop:6}}>Toque para ampliar</div>
-              </div>
-            ):(
-              <div style={{fontSize:13,lineHeight:1.95,color:C.text,whiteSpace:"pre-wrap",fontFamily:"'Georgia',serif"}}>{q?.texto_base}</div>
-            )}
-          </div>
+          <div style={{marginBottom:14,maxHeight:"50vh",overflowY:"auto"}}>{painelTexto}</div>
         )}
         {abaAtiva==="questao"&&children}
       </div>
 
-      {/* DESKTOP: dois painéis */}
+      {/* DESKTOP */}
       <div className="apoio-desktop" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,alignItems:"start"}}>
-        {/* Painel esquerdo: texto/imagem — sticky */}
-        <div style={{background:C.white,borderRadius:16,border:`1px solid ${C.border}`,overflow:"hidden",position:"sticky",top:140,maxHeight:"75vh",display:"flex",flexDirection:"column",boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
-          {/* Header do painel */}
-          <div style={{padding:"12px 16px",borderBottom:`1px solid ${C.border}`,background:C.bg,display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-            <span style={{fontSize:14}}>{q?.imagem_base?"🖼️":"📄"}</span>
-            <span style={{fontSize:11,fontWeight:700,color:C.textLight,letterSpacing:1,textTransform:"uppercase"}}>{q?.imagem_base?"Imagem de apoio":"Texto de apoio"}</span>
-          </div>
-          {/* Conteúdo scrollável */}
-          <div style={{flex:1,overflowY:"auto",padding:"18px 20px"}}>
-            {q?.imagem_base?(
-              <div style={{textAlign:"center"}}>
-                <img src={q.imagem_base} alt="Apoio" onClick={()=>setZoomImg(true)} style={{maxWidth:"100%",borderRadius:8,cursor:"zoom-in",boxShadow:"0 2px 8px rgba(0,0,0,0.1)"}}/>
-                <div style={{fontSize:10,color:C.textLight,marginTop:6}}>Clique para ampliar</div>
-              </div>
-            ):(
-              <div style={{fontSize:14,lineHeight:1.95,color:C.text,whiteSpace:"pre-wrap",fontFamily:"'Georgia',serif"}}>{q?.texto_base}</div>
-            )}
-          </div>
+        <div style={{position:"sticky",top:80,maxHeight:"80vh",display:"flex",flexDirection:"column"}}>
+          {painelTexto}
         </div>
-        {/* Painel direito: questão */}
         <div>{children}</div>
       </div>
+
+      {/* Modo leitura — tela cheia */}
+      {modoLeitura&&(
+        <div style={{position:"fixed",inset:0,zIndex:500,background:sepia?"#FDFAF3":"white",display:"flex",flexDirection:"column"}}>
+          <div style={{padding:"10px 20px",borderBottom:`1px solid ${C.border}`,background:sepia?"#F5F0E4":C.bg,display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:12,fontWeight:700,color:C.textMed,flex:1}}>Modo leitura</span>
+            <div style={{display:"flex",gap:4}}>
+              <ToolBtn onClick={()=>setFontSize(f=>Math.max(11,f-1))} title="Diminuir">A-</ToolBtn>
+              <span style={{fontSize:10,color:C.textLight,alignSelf:"center",minWidth:18,textAlign:"center"}}>{fontSize}</span>
+              <ToolBtn onClick={()=>setFontSize(f=>Math.min(22,f+1))} title="Aumentar">A+</ToolBtn>
+              <ToolBtn onClick={()=>setLineHeight(l=>l>2?1.6:l+0.2)} active={lineHeight>1.95}>≡</ToolBtn>
+              <ToolBtn onClick={addHighlight}><span style={{background:"#FEF08A",padding:"0 2px",borderRadius:2}}>M</span></ToolBtn>
+              {highlights.length>0&&<ToolBtn onClick={()=>setHighlights([])}>✕</ToolBtn>}
+              <ToolBtn onClick={()=>setSepia(s=>!s)} active={sepia}>☕</ToolBtn>
+            </div>
+            <button onClick={()=>setModoLeitura(false)}
+              style={{padding:"6px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:"white",color:C.text,fontSize:12,fontWeight:600,cursor:"pointer",marginLeft:8}}>
+              Fechar
+            </button>
+          </div>
+          <div ref={textRef} style={{flex:1,overflowY:"auto",padding:"40px",maxWidth:720,margin:"0 auto",width:"100%"}}>
+            <div style={{fontSize,lineHeight,color:sepia?"#3D2B1F":C.text,fontFamily:"'Georgia',serif",whiteSpace:"pre-wrap"}}>
+              {renderTextoComHighlight(q?.texto_base||"")}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal zoom imagem */}
       {zoomImg&&(
