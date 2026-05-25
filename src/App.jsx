@@ -86,10 +86,12 @@ const css = `
   @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
   *{box-sizing:border-box;margin:0;padding:0;}
   html{scroll-behavior:smooth;}
-  body{background:#F8F7FF;}
+  body{background:#F8F7FF;overflow-x:hidden;}
+  html{overflow-x:hidden;}
   ::-webkit-scrollbar{width:4px;}
   ::-webkit-scrollbar-thumb{background:#DDD6FE;border-radius:4px;}
   textarea,input,select,button{font-family:'Sora',sans-serif;}
+  @media(max-width:768px){input,select,textarea{font-size:16px!important;}}
   body.dark{background:#0F0E1A!important;}
   .db-dark-toggle{transition:all 0.3s ease;}
   .cta-btn:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(108,60,225,0.32)!important;}
@@ -102,30 +104,67 @@ const css = `
   .plan-card:hover{transform:translateY(-3px);}
   .plan-card{transition:all 0.2s ease;}
   @media(max-width:768px){
+    /* Navegação */
     .nav-desktop{display:none!important;}
     .logo-img{width:44px!important;height:44px!important;}
     .logo-name{font-size:16px!important;}
     .logo-sub{font-size:8px!important;}
+
+    /* Grids → coluna única */
     .stats-grid{grid-template-columns:1fr!important;}
     .cal-grid{grid-template-columns:repeat(4,1fr)!important;}
     .dash-grid{grid-template-columns:1fr!important;}
-    .hero-stats{flex-direction:column!important;}
     .top-cards{grid-template-columns:1fr!important;}
     .evo-grid{grid-template-columns:1fr 1fr!important;}
     .evo-grid2{grid-template-columns:1fr!important;}
     .evo-grid2-inner{grid-template-columns:1fr!important;}
     .treino-grid{grid-template-columns:1fr!important;}
     .form-grid-3{grid-template-columns:1fr!important;}
+
+    /* Admin */
     .admin-layout{flex-direction:column!important;}
-    .admin-sidebar{width:100%!important;max-height:200px!important;}
+    .admin-sidebar{width:100%!important;max-height:none!important;}
+
+    /* Texto de apoio: mostra aba mobile, esconde desktop */
     .apoio-desktop{display:none!important;}
     .apoio-mobile{display:block!important;}
+
+    /* Landing page */
+    .hero-stats{flex-direction:column!important;}
     .hero-section{grid-template-columns:1fr!important;padding:40px 16px 32px!important;}
     .redacao-grid{grid-template-columns:1fr!important;}
     .plans-grid{grid-template-columns:1fr!important;}
     .footer-inner{flex-direction:column!important;gap:32px!important;}
     .hero-btns{flex-direction:column!important;}
     .hero-btns button{width:100%!important;text-align:center!important;}
+
+    /* Header da sessão de treino: compacta os stats */
+    .sessao-stats{gap:6px!important;}
+    .sessao-stats-item{padding:0 8px!important;}
+    .sessao-stats-num{font-size:14px!important;}
+
+    /* Questão: padding menor */
+    .questao-card{padding:14px!important;}
+    .questao-enunc{font-size:14px!important;}
+
+    /* Botões de ação pós-resposta */
+    .acoes-pos-resp{flex-direction:column!important;}
+
+    /* Menu hamburguer: painel ocupa toda a tela */
+    .sessao-menu-painel{position:fixed!important;top:0!important;left:0!important;right:0!important;bottom:0!important;max-height:100vh!important;overflow-y:auto!important;}
+
+    /* Toolbar do texto de apoio: fonte menor */
+    .apoio-toolbar span{font-size:9px!important;}
+
+    /* Cadernos: cards full width */
+    .cadernos-grid{grid-template-columns:1fr!important;}
+
+    /* Tabs da área do aluno: labels curtos */
+    .tab-label{display:none!important;}
+    .tab-icon{display:inline!important;}
+
+    /* Painel sticky do treino */
+    .treino-sticky{border-radius:0!important;position:fixed!important;bottom:0!important;left:0!important;right:0!important;}
   }
   @media(min-width:769px){
     .hero-section{display:grid!important;grid-template-columns:1fr 1fr!important;gap:64px!important;align-items:center!important;padding:88px 28px 72px!important;}
@@ -135,6 +174,32 @@ const css = `
     .how-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:20px!important;}
     .demo-show{display:block!important;}
     .demo-mobile{display:none!important;}
+  }
+  /* Mobile extra: até 480px */
+  @media(max-width:480px){
+    /* Header sessão: esconde labels, mostra só números */
+    .sessao-header-label{display:none!important;}
+    /* Setas: menores */
+    .sessao-seta{width:28px!important;height:28px!important;font-size:15px!important;}
+    /* Botão sair: só ícone */
+    .sessao-sair-txt{display:none!important;}
+    /* Stats: mais compactos */
+    .sessao-stats-item{padding:0 6px!important;}
+    .sessao-stats-num{font-size:13px!important;}
+    /* Enunciado da questão: fonte menor */
+    .questao-enunc-wrap{font-size:14px!important;line-height:1.7!important;}
+    /* Alternativas: padding menor */
+    .alternativa-btn{padding:10px 12px!important;}
+    /* Tabs da questão: só ícone */
+    .q-tab-label{display:none!important;}
+    /* Metadata strip: só o essencial */
+    .meta-extra{display:none!important;}
+  }
+  /* Scrollbar mais fina no mobile */
+  @media(max-width:768px){
+    ::-webkit-scrollbar{width:2px;}
+    /* Impede zoom em inputs */
+    input,select,textarea{font-size:16px;}
   }
 `;
 
@@ -1088,7 +1153,7 @@ user,simulado,inscricao,onConcluir,onVoltar}){
   );
 
   return(
-    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column"}}>
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",overflowX:"hidden"}}>
       {/* BARRA SUPERIOR */}
       <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,padding:"14px 20px",position:"sticky",top:0,zIndex:100}}>
         <div style={{maxWidth:720,margin:"0 auto"}}>
@@ -2562,6 +2627,16 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
   const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const ADMIN_EMAIL=import.meta.env.VITE_ADMIN_EMAIL||'';
   const [abaQ,setAbaQ]=React.useState('questao');
+  // Ferramentas do enunciado
+  const [enuncFontSize,setEnuncFontSize]=React.useState(16);
+  const [enuncSpacing,setEnuncSpacing]=React.useState(1.8);
+  const [enuncHighlights,setEnuncHighlights]=React.useState([]);
+  const enuncRef=React.useRef(null);
+
+  // Reseta ferramentas ao mudar de questão
+  React.useEffect(()=>{
+    setEnuncHighlights([]);
+  },[q?.id]);
   const [comentarios,setComentarios]=React.useState([]);
   const [loadingC,setLoadingC]=React.useState(false);
   const [novoComentario,setNovoComentario]=React.useState('');
@@ -2711,10 +2786,62 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
                 {q.texto_base}
               </div>
             )}
-            {/* Enunciado */}
-            <p style={{fontSize:16,lineHeight:1.8,color:'#111827',margin:'0 0 24px 0',fontFamily:"'Georgia',serif"}}>
-              {q?.enunciado}
-            </p>
+            {/* Enunciado com ferramentas de leitura */}
+            {(()=>{
+              return(
+                <div style={{marginBottom:24}}>
+                  {/* Micro toolbar do enunciado */}
+                  <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:10,justifyContent:"flex-end"}}>
+                    <button onClick={()=>setEnuncFontSize(f=>Math.max(11,f-1))}
+                      style={{width:24,height:24,borderRadius:5,border:`1px solid ${C.border}`,background:C.bg,color:C.textMed,cursor:"pointer",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}
+                      title="Diminuir fonte">A-</button>
+                    <span style={{fontSize:9,color:C.textLight,minWidth:16,textAlign:"center"}}>{enuncFontSize}</span>
+                    <button onClick={()=>setEnuncFontSize(f=>Math.min(22,f+1))}
+                      style={{width:24,height:24,borderRadius:5,border:`1px solid ${C.border}`,background:C.bg,color:C.textMed,cursor:"pointer",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}
+                      title="Aumentar fonte">A+</button>
+                    <button onClick={()=>setEnuncSpacing(s=>s>1.8?1.5:s+0.2)}
+                      style={{width:24,height:24,borderRadius:5,border:`1px solid ${enuncSpacing>1.8?C.primary:C.border}`,background:enuncSpacing>1.8?C.primaryXLight:C.bg,color:enuncSpacing>1.8?C.primary:C.textMed,cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}
+                      title="Espaçamento">≡</button>
+                    <button onClick={()=>{
+                      const sel=window.getSelection();
+                      if(!sel||sel.isCollapsed||!enuncRef.current?.contains(sel.getRangeAt(0)?.commonAncestorContainer)) return;
+                      const range=sel.getRangeAt(0);
+                      const pre=document.createRange();
+                      pre.setStart(enuncRef.current,0);
+                      pre.setEnd(range.startContainer,range.startOffset);
+                      const start=pre.toString().length;
+                      const end=start+range.toString().length;
+                      if(start<end) setEnuncHighlights(h=>[...h,{start,end}]);
+                      sel.removeAllRanges();
+                    }}
+                      style={{width:24,height:24,borderRadius:5,border:`1px solid ${C.border}`,background:C.bg,cursor:"pointer",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}
+                      title="Marcar trecho (selecione o texto primeiro)">
+                      <span style={{background:"#FEF08A",padding:"0 2px",borderRadius:2}}>M</span>
+                    </button>
+                    {enuncHighlights.length>0&&(
+                      <button onClick={()=>setEnuncHighlights([])}
+                        style={{width:24,height:24,borderRadius:5,border:`1px solid ${C.border}`,background:C.bg,color:C.textMed,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}}
+                        title="Limpar marcações">✕</button>
+                    )}
+                  </div>
+                  {/* Texto do enunciado */}
+                  <div ref={enuncRef} style={{fontSize:enuncFontSize,lineHeight:enuncSpacing,color:'#111827',fontFamily:"'Georgia',serif",userSelect:"text"}}>
+                    {(()=>{
+                      const texto=q?.enunciado||"";
+                      if(!enuncHighlights.length) return texto;
+                      const result=[];let last=0;
+                      [...enuncHighlights].sort((a,b)=>a.start-b.start).forEach(({start,end})=>{
+                        if(start>last) result.push(<span key={`t${last}`}>{texto.slice(last,start)}</span>);
+                        result.push(<mark key={`h${start}`} style={{background:"#FEF08A",borderRadius:2,padding:"0 1px"}}>{texto.slice(start,end)}</mark>);
+                        last=Math.max(last,end);
+                      });
+                      if(last<texto.length) result.push(<span key="tend">{texto.slice(last)}</span>);
+                      return result;
+                    })()}
+                  </div>
+                </div>
+              );
+            })()}
             {/* Alternativas */}
             {q?.tipo==='certo_errado'?(
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16}}>
@@ -2798,7 +2925,7 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
                   )}
                 </div>
                 {/* Ações pós-resposta */}
-                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                <div className="acoes-pos-resp" style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                   {/* Ver explicação */}
                   {!acertou&&abaQ!=='comentario_plataforma'&&(
                     <button onClick={()=>setAbaQ('comentario_plataforma')}
@@ -2969,19 +3096,23 @@ function ApoioLateral({q,children}){
   const temApoio=q?.texto_base||q?.imagem_base;
   const [abaAtiva,setAbaAtiva]=React.useState("apoio");
   const [zoomImg,setZoomImg]=React.useState(false);
-  // Ferramentas de leitura
-  const [fontSize,setFontSize]=React.useState(14); // 12-20
-  const [lineHeight,setLineHeight]=React.useState(1.95); // 1.6-2.4
+  const [fontSize,setFontSize]=React.useState(14);
+  const [lineHeight,setLineHeight]=React.useState(1.95);
   const [sepia,setSepia]=React.useState(false);
   const [modoLeitura,setModoLeitura]=React.useState(false);
-  const [highlights,setHighlights]=React.useState([]); // [{start,end}]
+  const [highlights,setHighlights]=React.useState([]);
   const textRef=React.useRef(null);
+  const textRefLeitura=React.useRef(null);
 
-  const addHighlight=()=>{
+  // Fix bug 1: toggle sepia funciona corretamente com callback funcional
+  const toggleSepia=()=>setSepia(s=>!s);
+
+  // Fix bug 2: addHighlight funciona em qualquer ref ativo
+  const addHighlightFromRef=(ref)=>{
     const sel=window.getSelection();
     if(!sel||sel.rangeCount===0||sel.isCollapsed) return;
     const range=sel.getRangeAt(0);
-    const container=textRef.current;
+    const container=ref.current;
     if(!container||!container.contains(range.commonAncestorContainer)) return;
     const text=q?.texto_base||"";
     const preRange=document.createRange();
@@ -2992,6 +3123,8 @@ function ApoioLateral({q,children}){
     if(start<end) setHighlights(h=>[...h,{start,end}]);
     sel.removeAllRanges();
   };
+
+  const addHighlight=()=>addHighlightFromRef(modoLeitura?textRefLeitura:textRef);
 
   const renderTextoComHighlight=(texto)=>{
     if(!highlights.length) return texto;
@@ -3046,7 +3179,7 @@ function ApoioLateral({q,children}){
           </ToolBtn>
         )}
         {/* Sepia */}
-        <ToolBtn onClick={()=>setSepia(s=>!s)} active={sepia} title="Modo sépia">☕</ToolBtn>
+        <ToolBtn onClick={toggleSepia} active={sepia} title="Modo sépia (clique para alternar)">☕</ToolBtn>
         {/* Modo leitura */}
         {!modoLeitura&&(
           <ToolBtn onClick={()=>setModoLeitura(true)} title="Modo leitura (tela cheia)">⤢</ToolBtn>
@@ -3105,16 +3238,16 @@ function ApoioLateral({q,children}){
               <span style={{fontSize:10,color:C.textLight,alignSelf:"center",minWidth:18,textAlign:"center"}}>{fontSize}</span>
               <ToolBtn onClick={()=>setFontSize(f=>Math.min(22,f+1))} title="Aumentar">A+</ToolBtn>
               <ToolBtn onClick={()=>setLineHeight(l=>l>2?1.6:l+0.2)} active={lineHeight>1.95}>≡</ToolBtn>
-              <ToolBtn onClick={addHighlight}><span style={{background:"#FEF08A",padding:"0 2px",borderRadius:2}}>M</span></ToolBtn>
+              <ToolBtn onClick={()=>addHighlightFromRef(textRefLeitura)}><span style={{background:"#FEF08A",padding:"0 2px",borderRadius:2}}>M</span></ToolBtn>
               {highlights.length>0&&<ToolBtn onClick={()=>setHighlights([])}>✕</ToolBtn>}
-              <ToolBtn onClick={()=>setSepia(s=>!s)} active={sepia}>☕</ToolBtn>
+              <ToolBtn onClick={toggleSepia} active={sepia}>☕</ToolBtn>
             </div>
             <button onClick={()=>setModoLeitura(false)}
               style={{padding:"6px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:"white",color:C.text,fontSize:12,fontWeight:600,cursor:"pointer",marginLeft:8}}>
               Fechar
             </button>
           </div>
-          <div ref={textRef} style={{flex:1,overflowY:"auto",padding:"40px",maxWidth:720,margin:"0 auto",width:"100%"}}>
+          <div ref={textRefLeitura} style={{flex:1,overflowY:"auto",padding:"40px",maxWidth:720,margin:"0 auto",width:"100%"}}>
             <div style={{fontSize,lineHeight,color:sepia?"#3D2B1F":C.text,fontFamily:"'Georgia',serif",whiteSpace:"pre-wrap"}}>
               {renderTextoComHighlight(q?.texto_base||"")}
             </div>
@@ -4291,19 +4424,19 @@ function TreinoSessao({user,filtro,onVoltar}){
                   <div style={{flex:1}}/>
 
                   {/* Acertos */}
-                  <div style={{padding:"0 10px",textAlign:"center",flexShrink:0}}>
+                  <div className="sessao-stats-item" style={{padding:"0 10px",textAlign:"center",flexShrink:0}}>
                     <div style={{fontSize:16,fontWeight:800,color:"#6EE7B7",lineHeight:1}}>{acertos}</div>
                     <div style={{fontSize:7,color:"rgba(255,255,255,0.35)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>acertos</div>
                   </div>
 
                   {/* Erros */}
-                  <div style={{padding:"0 10px",borderLeft:"1px solid rgba(255,255,255,0.08)",textAlign:"center",flexShrink:0}}>
+                  <div className="sessao-stats-item" style={{padding:"0 10px",borderLeft:"1px solid rgba(255,255,255,0.08)",textAlign:"center",flexShrink:0}}>
                     <div style={{fontSize:16,fontWeight:800,color:"#FCA5A5",lineHeight:1}}>{erros}</div>
                     <div style={{fontSize:7,color:"rgba(255,255,255,0.35)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>erros</div>
                   </div>
 
                   {/* Tempo */}
-                  <div style={{padding:"0 10px",borderLeft:"1px solid rgba(255,255,255,0.08)",textAlign:"center",flexShrink:0}}>
+                  <div className="sessao-stats-item" style={{padding:"0 10px",borderLeft:"1px solid rgba(255,255,255,0.08)",textAlign:"center",flexShrink:0}}>
                     <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.75)",lineHeight:1,fontFamily:"'Courier New',monospace",letterSpacing:1}}>{fmtTempo(tempoSeg)}</div>
                     <div style={{fontSize:7,color:"rgba(255,255,255,0.35)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>tempo</div>
                   </div>
@@ -4438,7 +4571,7 @@ function TreinoSessao({user,filtro,onVoltar}){
       })()}
 
       {/* QUESTÃO */}
-      <div style={{maxWidth:960,width:"100%",margin:"0 auto"}}>
+      <div style={{maxWidth:960,width:"100%",margin:"0 auto",padding:"0 8px"}}>
       <ApoioLateral q={q}>
         <QuestaoInterativa user={user} q={q} selecionada={selecionada} confirmada={confirmada}
           onSelect={(v)=>{if(!confirmada)setSelecionada(v);}}
