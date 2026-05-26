@@ -183,6 +183,12 @@ const css = `
     .demo-show{display:block!important;}
     .demo-mobile{display:none!important;}
   }
+  /* Mobile muito pequeno: até 380px — esconde labels para caber tudo */
+  @media(max-width:380px){
+    .sessao-sair-txt{display:none!important;}
+    .sessao-mat-txt{display:none!important;}
+    .sessao-stats-item{padding:0 5px!important;}
+  }
   /* Mobile extra: até 480px */
   @media(max-width:480px){
     /* Stats do header: mais compactos */
@@ -195,6 +201,19 @@ const css = `
     .alternativa-btn{padding:10px 12px!important;}
     /* Metadata strip: só o essencial */
     .meta-extra{display:none!important;}
+  }
+  /* Dica de swipe — só mobile */
+  .swipe-hint{display:none;}
+  @media(max-width:768px){
+    .swipe-hint{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      padding:10px 0 4px;
+      opacity:0.35;
+      pointer-events:none;
+    }
   }
   /* Scrollbar mais fina no mobile */
   @media(max-width:768px){
@@ -2762,7 +2781,41 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
         {abaQ==='questao'&&(
           <div>
             {/* Texto base omitido aqui — exibido pelo ApoioLateral */}
-            {/* Enunciado — tamanho controlado pelas ferramentas do texto de apoio */}
+            {/* Toolbar de leitura do enunciado — sempre visível */}
+            <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:12,paddingBottom:10,borderBottom:`1px solid ${C.border}`}}>
+              <span style={{fontSize:10,color:C.textLight,marginRight:4}}>Texto</span>
+              <button onClick={()=>setEnuncFontSize(f=>Math.max(12,f-1))}
+                style={{width:26,height:26,borderRadius:5,border:`1px solid ${C.border}`,background:C.bg,color:C.textMed,cursor:'pointer',fontSize:10,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>A-</button>
+              <span style={{fontSize:10,color:C.textLight,minWidth:18,textAlign:'center'}}>{enuncFontSize}</span>
+              <button onClick={()=>setEnuncFontSize(f=>Math.min(26,f+1))}
+                style={{width:26,height:26,borderRadius:5,border:`1px solid ${C.border}`,background:C.bg,color:C.textMed,cursor:'pointer',fontSize:10,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}>A+</button>
+              <div style={{width:1,height:16,background:C.border,margin:'0 2px'}}/>
+              <button onClick={()=>setEnuncSpacing(s=>s>1.75?1.5:s+0.25)}
+                style={{width:26,height:26,borderRadius:5,border:`1px solid ${enuncSpacing>1.75?C.primary:C.border}`,background:enuncSpacing>1.75?C.primaryXLight:C.bg,color:enuncSpacing>1.75?C.primary:C.textMed,cursor:'pointer',fontSize:14,display:'flex',alignItems:'center',justifyContent:'center'}}>≡</button>
+              <div style={{width:1,height:16,background:C.border,margin:'0 2px'}}/>
+              <button onClick={()=>{
+                const sel=window.getSelection();
+                if(!sel||sel.isCollapsed||!enuncRef.current?.contains(sel.getRangeAt(0)?.commonAncestorContainer)) return;
+                const range=sel.getRangeAt(0);
+                const pre=document.createRange();
+                pre.setStart(enuncRef.current,0);
+                pre.setEnd(range.startContainer,range.startOffset);
+                const start=pre.toString().length;
+                const end=start+range.toString().length;
+                if(start<end) setEnuncHighlights(h=>[...h,{start,end}]);
+                sel.removeAllRanges();
+              }}
+                style={{width:26,height:26,borderRadius:5,border:`1px solid ${C.border}`,background:C.bg,cursor:'pointer',fontSize:10,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}
+                title="Selecione o texto e clique para marcar">
+                <span style={{background:'#FEF08A',padding:'0 2px',borderRadius:2,lineHeight:1.2}}>M</span>
+              </button>
+              {enuncHighlights.length>0&&(
+                <button onClick={()=>setEnuncHighlights([])}
+                  style={{width:26,height:26,borderRadius:5,border:`1px solid ${C.border}`,background:C.bg,color:C.textMed,cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
+              )}
+            </div>
+
+            {/* Enunciado */}
             <div ref={enuncRef} className="questao-enunc-wrap" style={{fontSize:enuncFontSize,lineHeight:enuncSpacing,color:'#111827',fontFamily:"'Georgia',serif",userSelect:"text",marginBottom:24}}>
               {(()=>{
                 const texto=q?.enunciado||"";
@@ -4315,7 +4368,7 @@ function TreinoSessao({user,filtro,onVoltar}){
               <div style={{maxWidth:960,margin:"0 auto"}}>
 
                 {/* Linha 1: menu | sair | setas | stats */}
-                <div style={{display:"flex",alignItems:"center",minHeight:52,padding:"0 10px",gap:0,flexWrap:"wrap"}}>
+                <div style={{display:"flex",alignItems:"center",height:52,padding:"0 8px",gap:0,flexWrap:"nowrap",overflow:"hidden"}}>
 
                   {/* ☰ Menu */}
                   {temMenu&&(
@@ -4329,11 +4382,11 @@ function TreinoSessao({user,filtro,onVoltar}){
 
                   {/* Sair */}
                   <button onClick={onVoltar}
-                    style={{padding:"0 14px",height:"100%",background:"none",border:"none",borderRight:"1px solid rgba(255,255,255,0.25)",color:"rgba(255,255,255,0.9)",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Sora',sans-serif",display:"flex",alignItems:"center",gap:5,transition:"color 0.15s",flexShrink:0,marginRight:10}}
+                    style={{padding:"0 10px",height:"100%",background:"none",border:"none",borderRight:"1px solid rgba(255,255,255,0.25)",color:"rgba(255,255,255,0.9)",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"'Sora',sans-serif",display:"flex",alignItems:"center",gap:4,flexShrink:0,marginRight:6,whiteSpace:"nowrap"}}
                     onMouseEnter={e=>e.currentTarget.style.color="white"}
                     onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,0.9)"}>
                     <span style={{fontSize:16,lineHeight:1}}>←</span>
-                    <span>Sair</span>
+                    <span className="sessao-sair-txt">Sair</span>
                   </button>
 
                   {/* Grupo: setas questão */}
@@ -4344,7 +4397,7 @@ function TreinoSessao({user,filtro,onVoltar}){
                       style={{width:36,height:36,background:"none",border:"none",borderRight:"1px solid rgba(255,255,255,0.25)",color:idx===0?"rgba(255,255,255,0.3)":"#FFFFFF",cursor:idx===0?"not-allowed":"pointer",fontSize:18,fontWeight:300,display:"flex",alignItems:"center",justifyContent:"center"}}>
                       ‹
                     </button>
-                    <div style={{padding:"0 10px",fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.95)",whiteSpace:"nowrap",minWidth:44,textAlign:"center"}}>
+                    <div style={{padding:"0 8px",fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.95)",whiteSpace:"nowrap",textAlign:"center",flexShrink:0}}>
                       {idx+1}/{total}
                     </div>
                     <button onClick={()=>{if(idx<total-1){setIdx(i=>i+1);setSelecionada(null);setConfirmada(false);}}}
@@ -4363,7 +4416,7 @@ function TreinoSessao({user,filtro,onVoltar}){
                         style={{width:36,height:36,background:"none",border:"none",borderRight:"1px solid rgba(255,255,255,0.22)",color:mIdx<=0?"rgba(255,255,255,0.3)":"rgba(255,255,255,0.95)",cursor:mIdx<=0?"not-allowed":"pointer",fontSize:18,fontWeight:300,display:"flex",alignItems:"center",justifyContent:"center"}}>
                         ‹
                       </button>
-                      <div style={{padding:"0 8px",fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.9)",whiteSpace:"nowrap",textAlign:"center",letterSpacing:0.5,textTransform:"uppercase"}}>
+                      <div className="sessao-mat-txt" style={{padding:"0 8px",fontSize:9,fontWeight:700,color:"rgba(255,255,255,0.9)",whiteSpace:"nowrap",textAlign:"center",letterSpacing:0.5,textTransform:"uppercase"}}>
                         Mat.
                       </div>
                       <button onClick={()=>irParaMateria(1)} disabled={mIdx>=materias.length-1}
@@ -4522,6 +4575,15 @@ function TreinoSessao({user,filtro,onVoltar}){
       })()}
 
       {/* QUESTÃO */}
+      {/* Dica de swipe — só mobile */}
+      <div className="swipe-hint">
+        <span style={{fontSize:11,color:"inherit",fontFamily:"'Sora',sans-serif"}}>← voltar</span>
+        <div style={{display:"flex",gap:3}}>
+          {[0,1,2].map(i=><div key={i} style={{width:4,height:4,borderRadius:"50%",background:"currentColor",opacity:i===1?1:0.4}}/>)}
+        </div>
+        <span style={{fontSize:11,color:"inherit",fontFamily:"'Sora',sans-serif"}}>avançar →</span>
+      </div>
+
       {/* Container com swipe para mobile */}
       <div style={{maxWidth:960,width:"100%",margin:"0 auto",padding:"0 8px"}}
         onTouchStart={(e)=>{
