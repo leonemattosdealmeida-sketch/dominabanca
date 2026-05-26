@@ -2651,12 +2651,43 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
   const [enuncFontSize,setEnuncFontSize]=React.useState(20);
   const [enuncSpacing,setEnuncSpacing]=React.useState(1.75);
   const [enuncHighlights,setEnuncHighlights]=React.useState([]);
+  const [markPopup,setMarkPopup]=React.useState(null); // {x,y} posição do popup
   const enuncRef=React.useRef(null);
 
   // Reseta ferramentas ao mudar de questão
   React.useEffect(()=>{
     setEnuncHighlights([]);
+    setMarkPopup(null);
   },[q?.id]);
+
+  // Mostra popup "Marcar texto" quando há seleção dentro do enunciado
+  const handleEnuncSelect=()=>{
+    const sel=window.getSelection();
+    if(!sel||sel.isCollapsed||!enuncRef.current) return;
+    const range=sel.getRangeAt(0);
+    if(!enuncRef.current.contains(range.commonAncestorContainer)) return;
+    const rect=range.getBoundingClientRect();
+    const containerRect=enuncRef.current.closest('[data-questao-body]')?.getBoundingClientRect()||{left:0,top:0};
+    setMarkPopup({
+      x:rect.left+rect.width/2-containerRect.left,
+      y:rect.top-containerRect.top-8
+    });
+  };
+
+  const aplicarMarcacao=()=>{
+    const sel=window.getSelection();
+    if(!sel||sel.isCollapsed||!enuncRef.current) return;
+    const range=sel.getRangeAt(0);
+    if(!enuncRef.current.contains(range.commonAncestorContainer)){setMarkPopup(null);return;}
+    const pre=document.createRange();
+    pre.setStart(enuncRef.current,0);
+    pre.setEnd(range.startContainer,range.startOffset);
+    const start=pre.toString().length;
+    const end=start+range.toString().length;
+    if(start<end) setEnuncHighlights(h=>[...h,{start,end}]);
+    sel.removeAllRanges();
+    setMarkPopup(null);
+  };
   const [comentarios,setComentarios]=React.useState([]);
   const [loadingC,setLoadingC]=React.useState(false);
   const [novoComentario,setNovoComentario]=React.useState('');
@@ -2793,30 +2824,19 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
               <button onClick={()=>setEnuncSpacing(s=>s>1.75?1.5:s+0.25)}
                 style={{width:26,height:26,borderRadius:5,border:`1px solid ${enuncSpacing>1.75?C.primary:C.border}`,background:enuncSpacing>1.75?C.primaryXLight:C.bg,color:enuncSpacing>1.75?C.primary:C.textMed,cursor:'pointer',fontSize:14,display:'flex',alignItems:'center',justifyContent:'center'}}>≡</button>
               <div style={{width:1,height:16,background:C.border,margin:'0 2px'}}/>
-              <button onClick={()=>{
-                const sel=window.getSelection();
-                if(!sel||sel.isCollapsed||!enuncRef.current?.contains(sel.getRangeAt(0)?.commonAncestorContainer)) return;
-                const range=sel.getRangeAt(0);
-                const pre=document.createRange();
-                pre.setStart(enuncRef.current,0);
-                pre.setEnd(range.startContainer,range.startOffset);
-                const start=pre.toString().length;
-                const end=start+range.toString().length;
-                if(start<end) setEnuncHighlights(h=>[...h,{start,end}]);
-                sel.removeAllRanges();
-              }}
-                style={{width:26,height:26,borderRadius:5,border:`1px solid ${C.border}`,background:C.bg,cursor:'pointer',fontSize:10,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center'}}
-                title="Selecione o texto e clique para marcar">
-                <span style={{background:'#FEF08A',padding:'0 2px',borderRadius:2,lineHeight:1.2}}>M</span>
-              </button>
+              <span style={{fontSize:10,color:C.textLight,fontStyle:'italic'}}>Selecione o texto para marcar</span>
               {enuncHighlights.length>0&&(
                 <button onClick={()=>setEnuncHighlights([])}
-                  style={{width:26,height:26,borderRadius:5,border:`1px solid ${C.border}`,background:C.bg,color:C.textMed,cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
+                  style={{width:26,height:26,borderRadius:5,border:`1px solid ${C.border}`,background:'#FEF9C3',color:'#92400E',cursor:'pointer',fontSize:11,display:'flex',alignItems:'center',justifyContent:'center',marginLeft:4}}>✕</button>
               )}
             </div>
 
             {/* Enunciado */}
-            <div ref={enuncRef} className="questao-enunc-wrap" style={{fontSize:enuncFontSize,lineHeight:enuncSpacing,color:'#111827',fontFamily:"'Georgia',serif",userSelect:"text",marginBottom:24}}>
+            <div ref={enuncRef} className="questao-enunc-wrap"
+              onMouseUp={handleEnuncSelect}
+              onTouchEnd={handleEnuncSelect}
+              onMouseDown={()=>setMarkPopup(null)}
+              style={{fontSize:enuncFontSize,lineHeight:enuncSpacing,color:'#111827',fontFamily:"'Georgia',serif",userSelect:"text",marginBottom:24}}>
               {(()=>{
                 const texto=q?.enunciado||"";
                 if(!enuncHighlights.length) return texto;
@@ -4157,6 +4177,9 @@ function TreinoSessao({user,filtro,onVoltar}){
   const [tempoSeg,setTempoSeg]=React.useState(0);
   const [filtroMenu,setFiltroMenu]=React.useState("materia");
   const [ordemMenu,setOrdemMenu]=React.useState("asc");
+  const [swipeDx,setSwipeDx]=React.useState(0);
+  const [swiping,setSwiping]=React.useState(false);
+  const swipeRef=React.useRef({x:0,y:0,active:false});
   const LETRAS=["A","B","C","D","E"];
 
   React.useEffect(()=>{
@@ -4368,7 +4391,7 @@ function TreinoSessao({user,filtro,onVoltar}){
               <div style={{maxWidth:960,margin:"0 auto"}}>
 
                 {/* Linha 1: menu | sair | setas | stats */}
-                <div style={{display:"flex",alignItems:"center",height:52,padding:"0 8px",gap:0,flexWrap:"nowrap",overflow:"hidden"}}>
+                <div className="sessao-header-inner" style={{display:"flex",alignItems:"center",height:52,padding:"0 8px",gap:0,flexWrap:"nowrap",overflow:"hidden"}}>
 
                   {/* ☰ Menu */}
                   {temMenu&&(
@@ -4584,26 +4607,55 @@ function TreinoSessao({user,filtro,onVoltar}){
         <span style={{fontSize:11,color:"inherit",fontFamily:"'Sora',sans-serif"}}>avançar →</span>
       </div>
 
-      {/* Container com swipe para mobile */}
-      <div style={{maxWidth:960,width:"100%",margin:"0 auto",padding:"0 8px"}}
-        onTouchStart={(e)=>{
-          const touch=e.changedTouches[0];
-          e.currentTarget._swipeX=touch.clientX;
-          e.currentTarget._swipeY=touch.clientY;
-        }}
-        onTouchEnd={(e)=>{
-          const touch=e.changedTouches[0];
-          const dx=touch.clientX-(e.currentTarget._swipeX||0);
-          const dy=touch.clientY-(e.currentTarget._swipeY||0);
-          // Cancela se houver texto selecionado (usuário estava selecionando, não deslizando)
-          const sel=window.getSelection();
-          if(sel&&!sel.isCollapsed) return;
-          // Só swipe horizontal limpo (dx > 55px, dy < 60px)
-          if(Math.abs(dx)>55&&Math.abs(dy)<60){
-            if(dx<0&&idx<total-1){setIdx(i=>i+1);setSelecionada(null);setConfirmada(false);}
-            if(dx>0&&idx>0){setIdx(i=>i-1);setSelecionada(null);setConfirmada(false);}
-          }
-        }}>
+      {/* Container com swipe animado para mobile */}
+      {(()=>{
+        const THRESHOLD=80;
+        return(
+        <div style={{maxWidth:960,width:"100%",margin:"0 auto",padding:"0 8px",overflow:"hidden"}}
+          onTouchStart={(e)=>{
+            const t=e.changedTouches[0];
+            swipeRef.current={x:t.clientX,y:t.clientY,active:true};
+            setSwiping(false);setSwipeDx(0);
+          }}
+          onTouchMove={(e)=>{
+            if(!swipeRef.current.active) return;
+            const t=e.changedTouches[0];
+            const dx=t.clientX-swipeRef.current.x;
+            const dy=t.clientY-swipeRef.current.y;
+            // Só ativa swipe se movimento for mais horizontal que vertical
+            if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>8){
+              const sel=window.getSelection();
+              if(sel&&!sel.isCollapsed){swipeRef.current.active=false;return;}
+              setSwiping(true);
+              // Limita o arraste e adiciona resistência nas bordas
+              const maxDx=Math.min(Math.abs(dx),180)*Math.sign(dx);
+              const resist=(dx<0&&idx>=total-1)||(dx>0&&idx<=0)?0.2:1;
+              setSwipeDx(maxDx*resist);
+            }
+          }}
+          onTouchEnd={(e)=>{
+            if(!swipeRef.current.active){setSwipeDx(0);setSwiping(false);return;}
+            swipeRef.current.active=false;
+            const t=e.changedTouches[0];
+            const dx=t.clientX-swipeRef.current.x;
+            const dy=t.clientY-swipeRef.current.y;
+            const sel=window.getSelection();
+            if(sel&&!sel.isCollapsed){setSwipeDx(0);setSwiping(false);return;}
+            if(Math.abs(swipeDx)>=THRESHOLD&&Math.abs(dy)<70){
+              if(swipeDx<0&&idx<total-1){
+                setSwipeDx(-400);
+                setTimeout(()=>{setIdx(i=>i+1);setSelecionada(null);setConfirmada(false);setSwipeDx(0);setSwiping(false);},180);
+                return;
+              }
+              if(swipeDx>0&&idx>0){
+                setSwipeDx(400);
+                setTimeout(()=>{setIdx(i=>i-1);setSelecionada(null);setConfirmada(false);setSwipeDx(0);setSwiping(false);},180);
+                return;
+              }
+            }
+            setSwipeDx(0);setSwiping(false);
+          }}>
+          <div style={{transform:`translateX(${swipeDx}px)`,transition:swiping?'none':'transform 0.22s cubic-bezier(0.25,0.46,0.45,0.94)',willChange:'transform'}}>
       <ApoioLateral q={q}>
         <QuestaoInterativa user={user} q={q} selecionada={selecionada} confirmada={confirmada}
           onSelect={(v)=>{if(!confirmada)setSelecionada(v);}}
