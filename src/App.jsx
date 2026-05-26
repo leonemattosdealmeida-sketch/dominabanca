@@ -138,10 +138,18 @@ const css = `
     .hero-btns{flex-direction:column!important;}
     .hero-btns button{width:100%!important;text-align:center!important;}
 
-    /* Header da sessão de treino: compacta os stats */
-    .sessao-stats{gap:6px!important;}
-    .sessao-stats-item{padding:0 8px!important;}
-    .sessao-stats-num{font-size:14px!important;}
+    /* Header sessão: stats vão para 2ª linha centralizada */
+    .sessao-spacer{display:none!important;}
+    .sessao-stats-row{
+      width:100%!important;
+      justify-content:center!important;
+      padding:6px 0 8px!important;
+      border-top:1px solid rgba(255,255,255,0.12)!important;
+      margin-left:0!important;
+      flex-shrink:0!important;
+    }
+    .sessao-stats-item{padding:0 14px!important;}
+    .sessao-stats-num{font-size:15px!important;}
 
     /* Questão: padding menor */
     .questao-card{padding:14px!important;}
@@ -177,21 +185,14 @@ const css = `
   }
   /* Mobile extra: até 480px */
   @media(max-width:480px){
-    /* Header sessão: esconde labels, mostra só números */
-    .sessao-header-label{display:none!important;}
-    /* Setas: menores */
-    .sessao-seta{width:28px!important;height:28px!important;font-size:15px!important;}
-    /* Botão sair: só ícone */
-    .sessao-sair-txt{display:none!important;}
-    /* Stats: mais compactos */
+    /* Stats do header: mais compactos */
     .sessao-stats-item{padding:0 6px!important;}
     .sessao-stats-num{font-size:13px!important;}
-    /* Enunciado da questão: fonte menor */
-    .questao-enunc-wrap{font-size:14px!important;line-height:1.7!important;}
+    /* Enunciado e texto de apoio: 16px no mobile */
+    .questao-enunc-wrap{font-size:16px!important;line-height:1.7!important;}
+    .apoio-texto-mobile{font-size:16px!important;line-height:1.75!important;}
     /* Alternativas: padding menor */
     .alternativa-btn{padding:10px 12px!important;}
-    /* Tabs da questão: só ícone */
-    .q-tab-label{display:none!important;}
     /* Metadata strip: só o essencial */
     .meta-extra{display:none!important;}
   }
@@ -2628,8 +2629,8 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
   const ADMIN_EMAIL=import.meta.env.VITE_ADMIN_EMAIL||'';
   const [abaQ,setAbaQ]=React.useState('questao');
   // Ferramentas do enunciado
-  const [enuncFontSize,setEnuncFontSize]=React.useState(16);
-  const [enuncSpacing,setEnuncSpacing]=React.useState(1.8);
+  const [enuncFontSize,setEnuncFontSize]=React.useState(20);
+  const [enuncSpacing,setEnuncSpacing]=React.useState(1.75);
   const [enuncHighlights,setEnuncHighlights]=React.useState([]);
   const enuncRef=React.useRef(null);
 
@@ -2786,62 +2787,21 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
                 {q.texto_base}
               </div>
             )}
-            {/* Enunciado com ferramentas de leitura */}
-            {(()=>{
-              return(
-                <div style={{marginBottom:24}}>
-                  {/* Micro toolbar do enunciado */}
-                  <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:10,justifyContent:"flex-end"}}>
-                    <button onClick={()=>setEnuncFontSize(f=>Math.max(11,f-1))}
-                      style={{width:24,height:24,borderRadius:5,border:`1px solid ${C.border}`,background:C.bg,color:C.textMed,cursor:"pointer",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}
-                      title="Diminuir fonte">A-</button>
-                    <span style={{fontSize:9,color:C.textLight,minWidth:16,textAlign:"center"}}>{enuncFontSize}</span>
-                    <button onClick={()=>setEnuncFontSize(f=>Math.min(22,f+1))}
-                      style={{width:24,height:24,borderRadius:5,border:`1px solid ${C.border}`,background:C.bg,color:C.textMed,cursor:"pointer",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}
-                      title="Aumentar fonte">A+</button>
-                    <button onClick={()=>setEnuncSpacing(s=>s>1.8?1.5:s+0.2)}
-                      style={{width:24,height:24,borderRadius:5,border:`1px solid ${enuncSpacing>1.8?C.primary:C.border}`,background:enuncSpacing>1.8?C.primaryXLight:C.bg,color:enuncSpacing>1.8?C.primary:C.textMed,cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}
-                      title="Espaçamento">≡</button>
-                    <button onClick={()=>{
-                      const sel=window.getSelection();
-                      if(!sel||sel.isCollapsed||!enuncRef.current?.contains(sel.getRangeAt(0)?.commonAncestorContainer)) return;
-                      const range=sel.getRangeAt(0);
-                      const pre=document.createRange();
-                      pre.setStart(enuncRef.current,0);
-                      pre.setEnd(range.startContainer,range.startOffset);
-                      const start=pre.toString().length;
-                      const end=start+range.toString().length;
-                      if(start<end) setEnuncHighlights(h=>[...h,{start,end}]);
-                      sel.removeAllRanges();
-                    }}
-                      style={{width:24,height:24,borderRadius:5,border:`1px solid ${C.border}`,background:C.bg,cursor:"pointer",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}
-                      title="Marcar trecho (selecione o texto primeiro)">
-                      <span style={{background:"#FEF08A",padding:"0 2px",borderRadius:2}}>M</span>
-                    </button>
-                    {enuncHighlights.length>0&&(
-                      <button onClick={()=>setEnuncHighlights([])}
-                        style={{width:24,height:24,borderRadius:5,border:`1px solid ${C.border}`,background:C.bg,color:C.textMed,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}}
-                        title="Limpar marcações">✕</button>
-                    )}
-                  </div>
-                  {/* Texto do enunciado */}
-                  <div ref={enuncRef} style={{fontSize:enuncFontSize,lineHeight:enuncSpacing,color:'#111827',fontFamily:"'Georgia',serif",userSelect:"text"}}>
-                    {(()=>{
-                      const texto=q?.enunciado||"";
-                      if(!enuncHighlights.length) return texto;
-                      const result=[];let last=0;
-                      [...enuncHighlights].sort((a,b)=>a.start-b.start).forEach(({start,end})=>{
-                        if(start>last) result.push(<span key={`t${last}`}>{texto.slice(last,start)}</span>);
-                        result.push(<mark key={`h${start}`} style={{background:"#FEF08A",borderRadius:2,padding:"0 1px"}}>{texto.slice(start,end)}</mark>);
-                        last=Math.max(last,end);
-                      });
-                      if(last<texto.length) result.push(<span key="tend">{texto.slice(last)}</span>);
-                      return result;
-                    })()}
-                  </div>
-                </div>
-              );
-            })()}
+            {/* Enunciado — tamanho controlado pelas ferramentas do texto de apoio */}
+            <div ref={enuncRef} className="questao-enunc-wrap" style={{fontSize:enuncFontSize,lineHeight:enuncSpacing,color:'#111827',fontFamily:"'Georgia',serif",userSelect:"text",marginBottom:24}}>
+              {(()=>{
+                const texto=q?.enunciado||"";
+                if(!enuncHighlights.length) return texto;
+                const result=[];let last=0;
+                [...enuncHighlights].sort((a,b)=>a.start-b.start).forEach(({start,end})=>{
+                  if(start>last) result.push(<span key={`t${last}`}>{texto.slice(last,start)}</span>);
+                  result.push(<mark key={`h${start}`} style={{background:"#FEF08A",borderRadius:2,padding:"0 1px"}}>{texto.slice(start,end)}</mark>);
+                  last=Math.max(last,end);
+                });
+                if(last<texto.length) result.push(<span key="tend">{texto.slice(last)}</span>);
+                return result;
+              })()}
+            </div>
             {/* Alternativas */}
             {q?.tipo==='certo_errado'?(
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16}}>
@@ -3096,7 +3056,7 @@ function ApoioLateral({q,children}){
   const temApoio=q?.texto_base||q?.imagem_base;
   const [abaAtiva,setAbaAtiva]=React.useState("apoio");
   const [zoomImg,setZoomImg]=React.useState(false);
-  const [fontSize,setFontSize]=React.useState(14);
+  const [fontSize,setFontSize]=React.useState(20);
   const [lineHeight,setLineHeight]=React.useState(1.95);
   const [sepia,setSepia]=React.useState(false);
   const [modoLeitura,setModoLeitura]=React.useState(false);
@@ -3204,20 +3164,39 @@ function ApoioLateral({q,children}){
 
   return(
     <>
-      {/* MOBILE */}
+      {/* MOBILE — texto em cima, questão embaixo (sem abas) */}
       <div className="apoio-mobile">
-        <div style={{display:"flex",background:C.white,borderRadius:12,border:`1px solid ${C.border}`,overflow:"hidden",marginBottom:14}}>
-          {[{id:"apoio",l:q?.imagem_base?"Imagem":"Texto de apoio"},{id:"questao",l:"Questão"}].map(a=>(
-            <button key={a.id} onClick={()=>setAbaAtiva(a.id)}
-              style={{flex:1,padding:"10px",border:"none",background:abaAtiva===a.id?C.primary:"white",color:abaAtiva===a.id?"white":C.textMed,fontSize:12,fontWeight:700,cursor:"pointer",transition:"all 0.15s"}}>
-              {a.l}
+        {/* Texto de apoio */}
+        <div style={{marginBottom:12,borderRadius:14,overflow:"hidden",border:`1px solid ${C.border}`,background:sepia?"#FDFAF3":"white",boxShadow:"0 1px 6px rgba(0,0,0,0.05)"}}>
+          {/* Header do painel com toolbar */}
+          <div style={{padding:"8px 12px",borderBottom:`1px solid ${C.border}`,background:sepia?"#F5F0E4":C.bg,display:"flex",alignItems:"center",gap:5,flexWrap:"wrap"}}>
+            <span style={{fontSize:9,fontWeight:700,color:C.textLight,letterSpacing:0.8,textTransform:"uppercase"}}>
+              {q?.imagem_base?"Imagem":"Texto de apoio"}
+            </span>
+            <div style={{flex:1}}/>
+            <button onClick={()=>setFontSize(f=>Math.max(11,f-1))} style={{width:24,height:24,borderRadius:5,border:`1px solid ${C.border}`,background:"white",color:C.textMed,cursor:"pointer",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>A-</button>
+            <span style={{fontSize:9,color:C.textLight,minWidth:14,textAlign:"center"}}>{fontSize}</span>
+            <button onClick={()=>setFontSize(f=>Math.min(22,f+1))} style={{width:24,height:24,borderRadius:5,border:`1px solid ${C.border}`,background:"white",color:C.textMed,cursor:"pointer",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>A+</button>
+            <button onClick={()=>setLineHeight(l=>l>1.8?1.6:l+0.2)} style={{width:24,height:24,borderRadius:5,border:`1px solid ${lineHeight>1.8?C.primary:C.border}`,background:lineHeight>1.8?C.primaryXLight:"white",color:lineHeight>1.8?C.primary:C.textMed,cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>≡</button>
+            <button onClick={()=>addHighlightFromRef(textRef)} style={{width:24,height:24,borderRadius:5,border:`1px solid ${C.border}`,background:"white",cursor:"pointer",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <span style={{background:"#FEF08A",padding:"0 2px",borderRadius:2}}>M</span>
             </button>
-          ))}
+            {highlights.length>0&&<button onClick={()=>setHighlights([])} style={{width:24,height:24,borderRadius:5,border:`1px solid ${C.border}`,background:"white",color:C.textMed,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>}
+            <button onClick={toggleSepia} style={{width:24,height:24,borderRadius:5,border:`1px solid ${sepia?C.primary:C.border}`,background:sepia?C.primaryXLight:"white",color:sepia?C.primary:C.textMed,cursor:"pointer",fontSize:11,display:"flex",alignItems:"center",justifyContent:"center"}}>☕</button>
+          </div>
+          {/* Conteúdo do texto — altura livre, scroll natural */}
+          <div ref={textRef} style={{padding:"14px",userSelect:"text"}}>
+            {q?.imagem_base?(
+              <img src={q.imagem_base} alt="Apoio" style={{maxWidth:"100%",borderRadius:8}}/>
+            ):(
+              <div className="apoio-texto-mobile" style={{fontSize,lineHeight,color:sepia?"#3D2B1F":C.text,fontFamily:"'Georgia',serif",whiteSpace:"pre-wrap"}}>
+                {renderTextoComHighlight(q?.texto_base||"")}
+              </div>
+            )}
+          </div>
         </div>
-        {abaAtiva==="apoio"&&(
-          <div style={{marginBottom:14,maxHeight:"50vh",overflowY:"auto"}}>{painelTexto}</div>
-        )}
-        {abaAtiva==="questao"&&children}
+        {/* Questão abaixo */}
+        {children}
       </div>
 
       {/* DESKTOP */}
@@ -4360,8 +4339,8 @@ function TreinoSessao({user,filtro,onVoltar}){
             <div style={{background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,position:"sticky",top:0,zIndex:20,boxShadow:"0 2px 20px rgba(108,60,225,0.3)"}}>
               <div style={{maxWidth:960,margin:"0 auto"}}>
 
-                {/* Linha 1: menu | sair | setas questão | setas matéria | stats | tempo | contador */}
-                <div style={{display:"flex",alignItems:"center",height:52,padding:"0 12px",gap:0}}>
+                {/* Linha 1: menu | sair | setas | stats */}
+                <div style={{display:"flex",alignItems:"center",minHeight:52,padding:"0 10px",gap:0,flexWrap:"wrap"}}>
 
                   {/* ☰ Menu */}
                   {temMenu&&(
@@ -4420,27 +4399,24 @@ function TreinoSessao({user,filtro,onVoltar}){
                     </div>
                   )}
 
-                  {/* Flex spacer */}
-                  <div style={{flex:1}}/>
+                  {/* Flex spacer — some no mobile pois stats vão para 2ª linha */}
+                  <div className="sessao-spacer" style={{flex:1}}/>
 
-                  {/* Acertos */}
-                  <div className="sessao-stats-item" style={{padding:"0 10px",textAlign:"center",flexShrink:0}}>
-                    <div style={{fontSize:16,fontWeight:800,color:"#6EE7B7",lineHeight:1}}>{acertos}</div>
-                    <div style={{fontSize:7,color:"rgba(255,255,255,0.35)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>acertos</div>
+                  {/* Stats: acertos | erros | tempo */}
+                  <div className="sessao-stats-row" style={{display:"flex",alignItems:"center",marginLeft:"auto"}}>
+                    <div className="sessao-stats-item" style={{padding:"0 10px",textAlign:"center",flexShrink:0}}>
+                      <div style={{fontSize:16,fontWeight:800,color:"#6EE7B7",lineHeight:1}}>{acertos}</div>
+                      <div style={{fontSize:7,color:"rgba(255,255,255,0.35)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>acertos</div>
+                    </div>
+                    <div className="sessao-stats-item" style={{padding:"0 10px",borderLeft:"1px solid rgba(255,255,255,0.22)",textAlign:"center",flexShrink:0}}>
+                      <div style={{fontSize:16,fontWeight:800,color:"#FCA5A5",lineHeight:1}}>{erros}</div>
+                      <div style={{fontSize:7,color:"rgba(255,255,255,0.35)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>erros</div>
+                    </div>
+                    <div className="sessao-stats-item" style={{padding:"0 10px",borderLeft:"1px solid rgba(255,255,255,0.22)",textAlign:"center",flexShrink:0}}>
+                      <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.75)",lineHeight:1,fontFamily:"'Courier New',monospace",letterSpacing:1}}>{fmtTempo(tempoSeg)}</div>
+                      <div style={{fontSize:7,color:"rgba(255,255,255,0.35)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>tempo</div>
+                    </div>
                   </div>
-
-                  {/* Erros */}
-                  <div className="sessao-stats-item" style={{padding:"0 10px",borderLeft:"1px solid rgba(255,255,255,0.22)",textAlign:"center",flexShrink:0}}>
-                    <div style={{fontSize:16,fontWeight:800,color:"#FCA5A5",lineHeight:1}}>{erros}</div>
-                    <div style={{fontSize:7,color:"rgba(255,255,255,0.35)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>erros</div>
-                  </div>
-
-                  {/* Tempo */}
-                  <div className="sessao-stats-item" style={{padding:"0 10px",borderLeft:"1px solid rgba(255,255,255,0.22)",textAlign:"center",flexShrink:0}}>
-                    <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.75)",lineHeight:1,fontFamily:"'Courier New',monospace",letterSpacing:1}}>{fmtTempo(tempoSeg)}</div>
-                    <div style={{fontSize:7,color:"rgba(255,255,255,0.35)",marginTop:2,letterSpacing:0.5,textTransform:"uppercase"}}>tempo</div>
-                  </div>
-
 
                 </div>
 
@@ -4571,7 +4547,23 @@ function TreinoSessao({user,filtro,onVoltar}){
       })()}
 
       {/* QUESTÃO */}
-      <div style={{maxWidth:960,width:"100%",margin:"0 auto",padding:"0 8px"}}>
+      {/* Container com swipe para mobile */}
+      <div style={{maxWidth:960,width:"100%",margin:"0 auto",padding:"0 8px"}}
+        onTouchStart={(e)=>{
+          const touch=e.changedTouches[0];
+          e.currentTarget._swipeX=touch.clientX;
+          e.currentTarget._swipeY=touch.clientY;
+        }}
+        onTouchEnd={(e)=>{
+          const touch=e.changedTouches[0];
+          const dx=touch.clientX-(e.currentTarget._swipeX||0);
+          const dy=touch.clientY-(e.currentTarget._swipeY||0);
+          // Só swipe horizontal (dx > 50px e dy < 80px para não confundir com scroll)
+          if(Math.abs(dx)>50&&Math.abs(dy)<80){
+            if(dx<0&&idx<total-1){setIdx(i=>i+1);setSelecionada(null);setConfirmada(false);}
+            if(dx>0&&idx>0){setIdx(i=>i-1);setSelecionada(null);setConfirmada(false);}
+          }
+        }}>
       <ApoioLateral q={q}>
         <QuestaoInterativa user={user} q={q} selecionada={selecionada} confirmada={confirmada}
           onSelect={(v)=>{if(!confirmada)setSelecionada(v);}}
