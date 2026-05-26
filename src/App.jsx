@@ -4595,8 +4595,11 @@ function TreinoSessao({user,filtro,onVoltar}){
           const touch=e.changedTouches[0];
           const dx=touch.clientX-(e.currentTarget._swipeX||0);
           const dy=touch.clientY-(e.currentTarget._swipeY||0);
-          // Só swipe horizontal (dx > 50px e dy < 80px para não confundir com scroll)
-          if(Math.abs(dx)>50&&Math.abs(dy)<80){
+          // Cancela se houver texto selecionado (usuário estava selecionando, não deslizando)
+          const sel=window.getSelection();
+          if(sel&&!sel.isCollapsed) return;
+          // Só swipe horizontal limpo (dx > 55px, dy < 60px)
+          if(Math.abs(dx)>55&&Math.abs(dy)<60){
             if(dx<0&&idx<total-1){setIdx(i=>i+1);setSelecionada(null);setConfirmada(false);}
             if(dx>0&&idx>0){setIdx(i=>i-1);setSelecionada(null);setConfirmada(false);}
           }
