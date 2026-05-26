@@ -2702,57 +2702,43 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
   return(
     <div style={{display:'flex',flexDirection:'column',minHeight:'100%'}}>
 
-      {/* ── METADATA — profissional, denso, limpo ── */}
+      {/* ── METADATA ── */}
       <div style={{background:C.white,borderBottom:`1px solid ${C.border}`,borderRadius:'16px 16px 0 0',overflow:'hidden'}}>
-        {/* Linha 1: progresso + stats da sessão */}
-        <div style={{padding:'10px 16px',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',borderBottom:`1px solid ${C.border}`}}>
-          {/* Contador principal */}
-          <div style={{display:'flex',alignItems:'baseline',gap:4,flexShrink:0}}>
-            <span style={{fontSize:15,fontWeight:800,color:C.text}}>{atual||1}</span>
-            <span style={{fontSize:11,color:C.textLight}}>de {total||'—'}</span>
-          </div>
-          {/* Separador */}
-          <div style={{width:1,height:14,background:C.border,flexShrink:0}}/>
-          {/* Matéria */}
-          {q?.materia&&(
-            <div style={{display:'flex',alignItems:'center',gap:4,minWidth:0}}>
-              <span style={{fontSize:10,color:C.textLight,flexShrink:0}}>Matéria:</span>
-              <span style={{fontSize:11,fontWeight:600,color:C.primary,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:180}}>{q.materia}</span>
-            </div>
-          )}
-          {/* Separador */}
-          {q?.topico&&<div style={{width:1,height:14,background:C.border,flexShrink:0}}/>}
-          {/* Tópico */}
-          {q?.topico&&(
-            <div style={{display:'flex',alignItems:'center',gap:4,minWidth:0,flex:1}}>
-              <span style={{fontSize:10,color:C.textLight,flexShrink:0}}>Assunto:</span>
-              <span style={{fontSize:11,fontWeight:500,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.topico}</span>
-            </div>
-          )}
-          {/* Nível */}
-          {q?.nivel&&(
-            <span style={{marginLeft:'auto',fontSize:10,fontWeight:700,color:nivelCor,background:nivelCor+'15',padding:'2px 8px',borderRadius:100,flexShrink:0}}>
-              {nivelLabel}
-            </span>
-          )}
-        </div>
-        {/* Linha 2: código + banca + concurso + tipo */}
-        <div style={{padding:'6px 16px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',background:C.bg}}>
-          {numQ&&(
-            <span style={{fontSize:10,fontWeight:700,color:C.primary,fontFamily:"'Courier New',monospace",letterSpacing:0.5}}>
-              #{numQ}
-            </span>
-          )}
+        {/* Linha 1: código + banca + tipo + nível — sempre visível */}
+        <div style={{padding:'7px 14px',display:'flex',alignItems:'center',gap:6,background:C.bg,flexWrap:'wrap'}}>
+          {numQ&&<span style={{fontSize:10,fontWeight:700,color:C.primary,fontFamily:"'Courier New',monospace",letterSpacing:0.5}}>#{numQ}</span>}
           {(q?.banca||q?.fonte||q?.ano)&&(
-            <div style={{display:'flex',alignItems:'center',gap:5,minWidth:0,flex:1}}>
-              <span style={{fontSize:10,color:C.textMed,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                {[q?.banca,q?.fonte,q?.ano].filter(Boolean).join(' · ')}
-              </span>
+            <span style={{fontSize:10,color:C.textMed,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1,minWidth:0}}>
+              {[q?.banca,q?.fonte,q?.ano].filter(Boolean).join(' · ')}
+            </span>
+          )}
+          <span style={{fontSize:10,fontWeight:600,color:q?.tipo==='certo_errado'?'#0369A1':'#7C3AED',background:q?.tipo==='certo_errado'?'#EFF6FF':'#F5F3FF',padding:'2px 8px',borderRadius:100,flexShrink:0}}>
+            {q?.tipo==='certo_errado'?'C / E':'Múltipla'}
+          </span>
+          {q?.nivel&&<span style={{fontSize:10,fontWeight:700,color:nivelCor,flexShrink:0}}>{nivelLabel}</span>}
+        </div>
+        {/* Linha 2: matéria + assunto — destaque, sempre visível */}
+        <div style={{padding:'8px 14px',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',borderTop:`1px solid ${C.border}`}}>
+          {q?.materia&&(
+            <div style={{display:'flex',alignItems:'center',gap:5,minWidth:0,flex:'0 1 auto'}}>
+              <span style={{fontSize:10,color:C.textLight,flexShrink:0}}>Matéria:</span>
+              <span style={{fontSize:12,fontWeight:700,color:C.primary,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.materia}</span>
             </div>
           )}
-          <span style={{marginLeft:'auto',fontSize:10,fontWeight:600,color:q?.tipo==='certo_errado'?'#0369A1':'#7C3AED',background:q?.tipo==='certo_errado'?'#EFF6FF':'#F5F3FF',padding:'2px 8px',borderRadius:100,flexShrink:0}}>
-            {q?.tipo==='certo_errado'?'Certo ou Errado':'Múltipla Escolha'}
-          </span>
+          {q?.materia&&q?.topico&&<div style={{width:1,height:12,background:C.border,flexShrink:0}}/>}
+          {q?.topico&&(
+            <div style={{display:'flex',alignItems:'center',gap:5,minWidth:0,flex:1}}>
+              <span style={{fontSize:10,color:C.textLight,flexShrink:0}}>Assunto:</span>
+              <span style={{fontSize:12,fontWeight:500,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.topico}</span>
+            </div>
+          )}
+          {/* Contador — só aparece fora de sessão */}
+          {(atual&&total)&&(
+            <div style={{marginLeft:'auto',display:'flex',alignItems:'baseline',gap:3,flexShrink:0}}>
+              <span style={{fontSize:13,fontWeight:800,color:C.text}}>{atual}</span>
+              <span style={{fontSize:10,color:C.textLight}}>/{total}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -2781,12 +2767,7 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
         {/* QUESTÃO */}
         {abaQ==='questao'&&(
           <div>
-            {/* Texto base */}
-            {q?.texto_base&&(
-              <div style={{background:'#F8F9FA',border:'1px solid #E5E7EB',borderLeft:'4px solid #7C3AED',borderRadius:10,padding:'14px 16px',marginBottom:20,fontSize:13,lineHeight:1.8,color:'#374151',fontFamily:"'Georgia',serif"}}>
-                {q.texto_base}
-              </div>
-            )}
+            {/* Texto base omitido aqui — exibido pelo ApoioLateral */}
             {/* Enunciado — tamanho controlado pelas ferramentas do texto de apoio */}
             <div ref={enuncRef} className="questao-enunc-wrap" style={{fontSize:enuncFontSize,lineHeight:enuncSpacing,color:'#111827',fontFamily:"'Georgia',serif",userSelect:"text",marginBottom:24}}>
               {(()=>{
