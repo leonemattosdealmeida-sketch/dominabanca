@@ -4664,7 +4664,10 @@ function TreinoSessao({user,filtro,onVoltar}){
           soNaoRespondidas={soNaoRespondidas} setSoNaoRespondidas={setSoNaoRespondidas}
           respondidas={respondidas}/>
       </ApoioLateral>
-      </div>
+          </div>
+        </div>
+        );
+      })()}
     </div>
   );
 }
