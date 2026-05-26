@@ -2708,16 +2708,16 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
         <div style={{padding:'10px 14px',display:'flex',flexDirection:'column',gap:6}}>
           {/* Linha A: matéria */}
           {q?.materia&&(
-            <div style={{display:'flex',alignItems:'center',gap:6}}>
-              <span style={{fontSize:10,color:C.textLight,flexShrink:0,minWidth:44}}>Matéria</span>
-              <span style={{fontSize:12,fontWeight:700,color:C.primary,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.materia}</span>
+            <div style={{display:'flex',alignItems:'flex-start',gap:6}}>
+              <span style={{fontSize:10,color:C.textLight,flexShrink:0,minWidth:44,paddingTop:2}}>Matéria</span>
+              <span style={{fontSize:12,fontWeight:700,color:C.primary,lineHeight:1.4}}>{q.materia}</span>
             </div>
           )}
           {/* Linha B: assunto */}
           {q?.topico&&(
-            <div style={{display:'flex',alignItems:'center',gap:6}}>
-              <span style={{fontSize:10,color:C.textLight,flexShrink:0,minWidth:44}}>Assunto</span>
-              <span style={{fontSize:12,fontWeight:500,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{q.topico}</span>
+            <div style={{display:'flex',alignItems:'flex-start',gap:6}}>
+              <span style={{fontSize:10,color:C.textLight,flexShrink:0,minWidth:44,paddingTop:2}}>Assunto</span>
+              <span style={{fontSize:12,fontWeight:500,color:C.text,lineHeight:1.4}}>{q.topico}</span>
             </div>
           )}
           {/* Linha C: banca · concurso · ano + tipo + nível */}
