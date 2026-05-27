@@ -2750,10 +2750,10 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
   const errou=confirmada&&selecionada!==q?.gabarito;
 
   return(
-    <div style={{display:'flex',flexDirection:'column',minHeight:'100%'}}>
+    <div style={{display:'flex',flexDirection:'column',background:C.white,borderRadius:16,border:`1px solid ${C.border}`,overflow:'hidden',boxShadow:'0 2px 12px rgba(0,0,0,0.06)'}}>
 
       {/* ── METADATA ── */}
-      <div style={{background:C.white,borderBottom:`1px solid ${C.border}`,borderRadius:'16px 16px 0 0',overflow:'hidden'}}>
+      <div style={{background:C.bg,borderBottom:`1px solid ${C.border}`}}>
         {/* Bloco único em coluna — nunca perde info no mobile */}
         <div style={{padding:'10px 14px',display:'flex',flexDirection:'column',gap:6}}>
           {/* Linha A: matéria */}
@@ -2770,7 +2770,7 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
               <span style={{fontSize:12,fontWeight:500,color:C.text,lineHeight:1.4}}>{q.topico}</span>
             </div>
           )}
-          {/* Linha C: banca · concurso · ano + tipo + nível */}
+          {/* Linha C: código + banca + tipo + nível */}
           <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginTop:2,paddingTop:6,borderTop:`1px solid ${C.border}`}}>
             {numQ&&<span style={{fontSize:10,fontWeight:700,color:C.primary,fontFamily:"'Courier New',monospace"}}>#{numQ}</span>}
             {(q?.banca||q?.fonte||q?.ano)&&(
@@ -2785,8 +2785,6 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
           </div>
         </div>
       </div>
-
-
       {/* ── ABAS ── */}
       <div style={{background:'white',display:'flex',borderBottom:`1px solid ${C.border}`}}>
         {[
@@ -3159,7 +3157,7 @@ function ApoioLateral({q,children}){
   );
 
   const painelTexto=(
-    <div style={{background:sepia?"#FDFAF3":"white",borderRadius:modoLeitura?0:16,border:modoLeitura?"none":`1px solid ${C.border}`,overflow:"hidden",display:"flex",flexDirection:"column",boxShadow:modoLeitura?"none":"0 2px 12px rgba(0,0,0,0.06)"}}>
+    <div style={{background:sepia?"#FDFAF3":"white",flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
       {/* Toolbar */}
       <div style={{padding:"8px 14px",borderBottom:`1px solid ${C.border}`,background:sepia?"#F5F0E4":C.bg,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",flexShrink:0}}>
         <span style={{fontSize:10,fontWeight:700,color:C.textLight,letterSpacing:0.8,textTransform:"uppercase",marginRight:2}}>
@@ -3249,7 +3247,7 @@ function ApoioLateral({q,children}){
 
       {/* DESKTOP */}
       <div className="apoio-desktop" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,alignItems:"start"}}>
-        <div style={{position:"sticky",top:80,maxHeight:"80vh",display:"flex",flexDirection:"column"}}>
+        <div style={{position:"sticky",top:80,maxHeight:"calc(100vh - 100px)",display:"flex",flexDirection:"column",borderRadius:16,overflow:"hidden",border:`1px solid ${C.border}`,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
           {painelTexto}
         </div>
         <div>{children}</div>
