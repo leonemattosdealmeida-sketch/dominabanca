@@ -2932,17 +2932,37 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
         {abaQ==='comentario_plataforma'&&(
           <div>
             {!confirmada&&(
-              <div style={{textAlign:'center',padding:'24px 0',color:C.textLight,fontSize:14,fontFamily:"'Georgia',serif"}}>
+              <div style={{textAlign:'center',padding:'32px 16px',color:C.textLight,fontSize:14,fontFamily:"'Lora',serif",fontStyle:'italic'}}>
                 Responda a questão para ver a explicação.
               </div>
             )}
             {confirmada&&(q?.comentario?(
-              <div style={{fontSize:14,lineHeight:1.85,color:'#374151',fontFamily:"'Georgia',serif"}}>
+              <div style={{fontFamily:"'Lora',serif",color:'#1F2937'}}>
                 {q.comentario.split('\n\n').map((bloco,i)=>{
-                  const isTitle=/^\d\./.test(bloco);
+                  const isTitle=/^\d+[\.)]/i.test(bloco.trim());
+                  const renderInline=(txt)=>{
+                    const parts=txt.split(/(\*\*[^*]+\*\*)/g);
+                    return parts.map((p,j)=>p.startsWith('**')&&p.endsWith('**')?<strong key={j}>{p.slice(2,-2)}</strong>:p);
+                  };
+                  if(isTitle) return(
+                    <div key={i} style={{display:'flex',alignItems:'flex-start',gap:10,margin:'20px 0 10px',paddingBottom:8,borderBottom:`1px solid ${C.border}`}}>
+                      <span style={{fontSize:13,fontWeight:800,color:C.primary,fontFamily:"'Sora',sans-serif",flexShrink:0,marginTop:2}}>
+                        {bloco.trim().match(/^\d+/)?.[0]}.
+                      </span>
+                      <span style={{fontSize:15,fontWeight:700,color:'#111827',fontFamily:"'Lora',serif",lineHeight:1.4}}>
+                        {bloco.trim().replace(/^\d+[\.)\s]*/,'')}
+                      </span>
+                    </div>
+                  );
+                  const isGab=/gabarito|resposta correta|alternativa correta/i.test(bloco);
+                  if(isGab) return(
+                    <div key={i} style={{background:C.primaryXLight,borderLeft:`3px solid ${C.primary}`,borderRadius:8,padding:'10px 14px',margin:'12px 0',fontSize:14,lineHeight:1.7,color:C.text}}>
+                      {renderInline(bloco)}
+                    </div>
+                  );
                   return(
-                    <p key={i} style={{margin:'0 0 16px 0',fontWeight:isTitle?700:400,color:isTitle?'#1A1045':'#374151'}}>
-                      {bloco}
+                    <p key={i} style={{margin:'0 0 14px',fontSize:15,lineHeight:1.85,color:'#374151',fontWeight:400}}>
+                      {renderInline(bloco)}
                     </p>
                   );
                 })}
@@ -2950,7 +2970,7 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
             ):(
               <div style={{textAlign:'center',padding:'32px',color:C.textLight}}>
                 <div style={{fontSize:32,marginBottom:8}}>📝</div>
-                <div style={{fontSize:13}}>Ainda não há explicação para esta questão.</div>
+                <div style={{fontSize:13,fontFamily:"'Lora',serif"}}>Ainda não há explicação para esta questão.</div>
               </div>
             ))}
           </div>
