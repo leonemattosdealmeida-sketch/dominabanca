@@ -138,18 +138,25 @@ const css = `
     .hero-btns{flex-direction:column!important;}
     .hero-btns button{width:100%!important;text-align:center!important;}
 
-    /* Header sessão: stats vão para 2ª linha centralizada */
+    /* Header sessão: 2 linhas no mobile */
+    .sessao-header-inner{
+      flex-wrap:wrap!important;
+      height:auto!important;
+      min-height:52px!important;
+      overflow:visible!important;
+      padding-bottom:6px!important;
+    }
     .sessao-spacer{display:none!important;}
     .sessao-stats-row{
       width:100%!important;
       justify-content:center!important;
-      padding:6px 0 8px!important;
+      padding:5px 0 2px!important;
       border-top:1px solid rgba(255,255,255,0.12)!important;
       margin-left:0!important;
       flex-shrink:0!important;
     }
-    .sessao-stats-item{padding:0 14px!important;}
-    .sessao-stats-num{font-size:15px!important;}
+    .sessao-stats-item{padding:0 16px!important;}
+    .sessao-stats-num{font-size:16px!important;}
 
     /* Questão: padding menor */
     .questao-card{padding:14px!important;}
@@ -3118,6 +3125,39 @@ function ApoioLateral({q,children}){
     return result;
   };
 
+  const metadataJSX=!q?null:(
+    <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 14px',display:'flex',flexDirection:'column',gap:6,boxShadow:'0 1px 4px rgba(0,0,0,0.05)'}}>
+      {/* Matéria */}
+      {q?.materia&&(
+        <div style={{display:'flex',alignItems:'flex-start',gap:8}}>
+          <span style={{fontSize:10,color:C.textLight,flexShrink:0,minWidth:42,paddingTop:2,lineHeight:1.4}}>Matéria</span>
+          <span style={{fontSize:12,fontWeight:700,color:C.primary,lineHeight:1.4,wordBreak:'break-word'}}>{q.materia}</span>
+        </div>
+      )}
+      {/* Assunto */}
+      {q?.topico&&(
+        <div style={{display:'flex',alignItems:'flex-start',gap:8}}>
+          <span style={{fontSize:10,color:C.textLight,flexShrink:0,minWidth:42,paddingTop:2,lineHeight:1.4}}>Assunto</span>
+          <span style={{fontSize:12,fontWeight:500,color:C.text,lineHeight:1.5,wordBreak:'break-word'}}>{q.topico}</span>
+        </div>
+      )}
+      {/* Código + banca + tipo + nível */}
+      <div style={{display:'flex',alignItems:'center',gap:6,paddingTop:6,borderTop:`1px solid ${C.border}`,flexWrap:'wrap'}}>
+        {numQ&&<span style={{fontSize:10,fontWeight:700,color:C.primary,fontFamily:"'Courier New',monospace",flexShrink:0}}>#{numQ}</span>}
+        {(q?.banca||q?.fonte||q?.ano)&&(
+          <span style={{fontSize:10,color:C.textMed,flex:1,minWidth:0,wordBreak:'break-word'}}>
+            {[q?.banca,q?.fonte,q?.ano].filter(Boolean).join(' · ')}
+          </span>
+        )}
+        {q?.tipo&&(
+          <span style={{fontSize:10,fontWeight:600,color:q?.tipo==='certo_errado'?'#0369A1':'#7C3AED',background:q?.tipo==='certo_errado'?'#EFF6FF':'#F5F3FF',padding:'2px 7px',borderRadius:100,flexShrink:0}}>
+            {q?.tipo==='certo_errado'?'C / E':'Múltipla'}
+          </span>
+        )}
+        {q?.nivel&&<span style={{fontSize:10,fontWeight:700,color:nivelCor,flexShrink:0}}>{nivelLabel}</span>}
+      </div>
+    </div>
+  );
   if(!temApoio) return(
     <div style={{display:'flex',flexDirection:'column',gap:12}}>
       {metadataJSX}
@@ -3125,34 +3165,6 @@ function ApoioLateral({q,children}){
     </div>
   );
 
-  const metadataJSX=(
-    <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 14px',display:'flex',flexDirection:'column',gap:5,boxShadow:'0 1px 4px rgba(0,0,0,0.05)'}}>
-      <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
-        {q?.materia&&(
-          <div style={{display:'flex',alignItems:'flex-start',gap:5,minWidth:0}}>
-            <span style={{fontSize:10,color:C.textLight,flexShrink:0,paddingTop:1}}>Matéria</span>
-            <span style={{fontSize:12,fontWeight:700,color:C.primary,lineHeight:1.4}}>{q.materia}</span>
-          </div>
-        )}
-        {q?.topico&&(
-          <div style={{display:'flex',alignItems:'flex-start',gap:5,flex:1,minWidth:0}}>
-            <span style={{fontSize:10,color:C.textLight,flexShrink:0,paddingTop:1}}>Assunto</span>
-            <span style={{fontSize:12,fontWeight:500,color:C.text,lineHeight:1.4}}>{q.topico}</span>
-          </div>
-        )}
-      </div>
-      <div style={{display:'flex',alignItems:'center',gap:6,paddingTop:5,borderTop:`1px solid ${C.border}`,flexWrap:'wrap'}}>
-        {numQ&&<span style={{fontSize:10,fontWeight:700,color:C.primary,fontFamily:"'Courier New',monospace"}}>#{numQ}</span>}
-        {(q?.banca||q?.fonte||q?.ano)&&(
-          <span style={{fontSize:10,color:C.textMed,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-            {[q?.banca,q?.fonte,q?.ano].filter(Boolean).join(' · ')}
-          </span>
-        )}
-        {q?.tipo&&<span style={{fontSize:10,fontWeight:600,color:q?.tipo==='certo_errado'?'#0369A1':'#7C3AED',background:q?.tipo==='certo_errado'?'#EFF6FF':'#F5F3FF',padding:'2px 7px',borderRadius:100,flexShrink:0}}>{q?.tipo==='certo_errado'?'C / E':'Múltipla'}</span>}
-        {q?.nivel&&<span style={{fontSize:10,fontWeight:700,color:nivelCor,flexShrink:0}}>{nivelLabel}</span>}
-      </div>
-    </div>
-  );
 
   const ToolBtn=({onClick,active,title,children})=>(
     <button onClick={onClick} title={title}
@@ -4401,7 +4413,7 @@ function TreinoSessao({user,filtro,onVoltar}){
               <div style={{maxWidth:960,margin:"0 auto"}}>
 
                 {/* Linha 1: menu | sair | setas | stats */}
-                <div className="sessao-header-inner" style={{display:"flex",alignItems:"center",height:52,padding:"0 8px",gap:0,flexWrap:"nowrap",overflow:"hidden"}}>
+                <div className="sessao-header-inner" style={{display:"flex",alignItems:"center",minHeight:52,padding:"6px 8px",gap:0,flexWrap:"nowrap",overflow:"hidden"}}>
 
                   {/* ☰ Menu */}
                   {temMenu&&(
