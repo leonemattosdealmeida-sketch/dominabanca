@@ -71,7 +71,7 @@ function toggleDarkMode() {
 const C = C_LIGHT; // fallback para código fora de componentes
 
 const css = `
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,500;1,8..60,400&display=swap');
   @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -86,7 +86,7 @@ const css = `
   @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
   *{box-sizing:border-box;margin:0;padding:0;}
   html{scroll-behavior:smooth;}
-  body{background:#F8F7FF;overflow-x:hidden;}
+  body{background:#F8F7FF;overflow-x:hidden;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
   html{overflow-x:hidden;}
   ::-webkit-scrollbar{width:4px;}
   ::-webkit-scrollbar-thumb{background:#DDD6FE;border-radius:4px;}
@@ -2656,7 +2656,7 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
   const [abaQ,setAbaQ]=React.useState('questao');
   // Ferramentas do enunciado
   const [enuncFontSize,setEnuncFontSize]=React.useState(20);
-  const [enuncSpacing,setEnuncSpacing]=React.useState(1.75);
+  const [enuncSpacing,setEnuncSpacing]=React.useState(1.85);
   const [enuncHighlights,setEnuncHighlights]=React.useState([]);
   const [markPopup,setMarkPopup]=React.useState(null); // {x,y} posição do popup
   const enuncRef=React.useRef(null);
@@ -2808,7 +2808,7 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
               onMouseUp={handleEnuncSelect}
               onTouchEnd={handleEnuncSelect}
               onMouseDown={()=>setMarkPopup(null)}
-              style={{fontSize:enuncFontSize,lineHeight:enuncSpacing,color:'#111827',fontFamily:"'Georgia',serif",userSelect:"text",marginBottom:24}}>
+              style={{fontSize:enuncFontSize,lineHeight:enuncSpacing,color:'#111827',fontFamily:"'Lora',serif",userSelect:"text",marginBottom:24}}>
               {(()=>{
                 const texto=q?.enunciado||"";
                 if(!enuncHighlights.length) return texto;
@@ -2858,7 +2858,7 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
                       onMouseEnter={e=>{if(!confirmada&&selecionada!==l){e.currentTarget.style.borderColor='#7C3AED';}}}
                       onMouseLeave={e=>{if(!confirmada&&selecionada!==l){e.currentTarget.style.borderColor=C.border;}}}>
                       <span style={{fontSize:13,fontWeight:800,color:c.color,flexShrink:0,width:20}}>{l})</span>
-                      <span style={{fontSize:14,color:c.color,fontWeight:isGab?600:400,lineHeight:1.6,fontFamily:"'Georgia',serif"}}>
+                      <span style={{fontSize:15,color:c.color,fontWeight:isGab?600:400,lineHeight:1.65,fontFamily:"'Lora',serif",letterSpacing:0.1}}>
                         {q.alternativas[l]}
                       </span>
                       {isGab&&<span style={{marginLeft:'auto',fontSize:11,fontWeight:700,color:'#15803D',flexShrink:0}}>✓</span>}
@@ -3081,7 +3081,7 @@ function ApoioLateral({q,children}){
   const nivelLabel=q?.nivel==='facil'?'Fácil':q?.nivel==='dificil'?'Difícil':'Médio';
   const [zoomImg,setZoomImg]=React.useState(false);
   const [fontSize,setFontSize]=React.useState(20);
-  const [lineHeight,setLineHeight]=React.useState(1.95);
+  const [lineHeight,setLineHeight]=React.useState(1.9);
   const [sepia,setSepia]=React.useState(false);
   const [modoLeitura,setModoLeitura]=React.useState(false);
   const [highlights,setHighlights]=React.useState([]);
@@ -3217,7 +3217,7 @@ function ApoioLateral({q,children}){
             <div style={{fontSize:10,color:C.textLight,marginTop:6}}>Clique para ampliar</div>
           </div>
         ):(
-          <div style={{fontSize,lineHeight,color:sepia?"#3D2B1F":C.text,fontFamily:"'Georgia',serif",whiteSpace:"pre-wrap"}}>
+          <div style={{fontSize,lineHeight,color:sepia?"#3D2B1F":C.text,fontFamily:"'Lora',serif",whiteSpace:"pre-wrap"}}>
             {renderTextoComHighlight(q?.texto_base||"")}
           </div>
         )}
@@ -3254,7 +3254,7 @@ function ApoioLateral({q,children}){
             {q?.imagem_base?(
               <img src={q.imagem_base} alt="Apoio" style={{maxWidth:"100%",borderRadius:8}}/>
             ):(
-              <div className="apoio-texto-mobile" style={{fontSize,lineHeight,color:sepia?"#3D2B1F":C.text,fontFamily:"'Georgia',serif",whiteSpace:"pre-wrap"}}>
+              <div className="apoio-texto-mobile" style={{fontSize,lineHeight,color:sepia?"#3D2B1F":C.text,fontFamily:"'Lora',serif",whiteSpace:"pre-wrap"}}>
                 {renderTextoComHighlight(q?.texto_base||"")}
               </div>
             )}
@@ -3297,7 +3297,7 @@ function ApoioLateral({q,children}){
             </button>
           </div>
           <div ref={textRefLeitura} style={{flex:1,overflowY:"auto",padding:"40px",maxWidth:720,margin:"0 auto",width:"100%"}}>
-            <div style={{fontSize,lineHeight,color:sepia?"#3D2B1F":C.text,fontFamily:"'Georgia',serif",whiteSpace:"pre-wrap"}}>
+            <div style={{fontSize,lineHeight,color:sepia?"#3D2B1F":C.text,fontFamily:"'Lora',serif",whiteSpace:"pre-wrap"}}>
               {renderTextoComHighlight(q?.texto_base||"")}
             </div>
           </div>
