@@ -2752,39 +2752,6 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
   return(
     <div style={{display:'flex',flexDirection:'column',background:C.white,borderRadius:16,border:`1px solid ${C.border}`,overflow:'hidden',boxShadow:'0 2px 12px rgba(0,0,0,0.06)'}}>
 
-      {/* ── METADATA ── */}
-      <div style={{background:C.bg,borderBottom:`1px solid ${C.border}`}}>
-        {/* Bloco único em coluna — nunca perde info no mobile */}
-        <div style={{padding:'10px 14px',display:'flex',flexDirection:'column',gap:6}}>
-          {/* Linha A: matéria */}
-          {q?.materia&&(
-            <div style={{display:'flex',alignItems:'flex-start',gap:6}}>
-              <span style={{fontSize:10,color:C.textLight,flexShrink:0,minWidth:44,paddingTop:2}}>Matéria</span>
-              <span style={{fontSize:12,fontWeight:700,color:C.primary,lineHeight:1.4}}>{q.materia}</span>
-            </div>
-          )}
-          {/* Linha B: assunto */}
-          {q?.topico&&(
-            <div style={{display:'flex',alignItems:'flex-start',gap:6}}>
-              <span style={{fontSize:10,color:C.textLight,flexShrink:0,minWidth:44,paddingTop:2}}>Assunto</span>
-              <span style={{fontSize:12,fontWeight:500,color:C.text,lineHeight:1.4}}>{q.topico}</span>
-            </div>
-          )}
-          {/* Linha C: código + banca + tipo + nível */}
-          <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginTop:2,paddingTop:6,borderTop:`1px solid ${C.border}`}}>
-            {numQ&&<span style={{fontSize:10,fontWeight:700,color:C.primary,fontFamily:"'Courier New',monospace"}}>#{numQ}</span>}
-            {(q?.banca||q?.fonte||q?.ano)&&(
-              <span style={{fontSize:10,color:C.textMed,flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                {[q?.banca,q?.fonte,q?.ano].filter(Boolean).join(' · ')}
-              </span>
-            )}
-            <span style={{fontSize:10,fontWeight:600,color:q?.tipo==='certo_errado'?'#0369A1':'#7C3AED',background:q?.tipo==='certo_errado'?'#EFF6FF':'#F5F3FF',padding:'2px 7px',borderRadius:100,flexShrink:0}}>
-              {q?.tipo==='certo_errado'?'C / E':'Múltipla'}
-            </span>
-            {q?.nivel&&<span style={{fontSize:10,fontWeight:700,color:nivelCor,flexShrink:0}}>{nivelLabel}</span>}
-          </div>
-        </div>
-      </div>
       {/* ── ABAS ── */}
       <div style={{background:'white',display:'flex',borderBottom:`1px solid ${C.border}`}}>
         {[
@@ -3101,6 +3068,10 @@ function ApoioLateral({q,children}){
   const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const temApoio=q?.texto_base||q?.imagem_base;
   const [abaAtiva,setAbaAtiva]=React.useState("apoio");
+  // Metadata
+  const numQ=q?.numero||q?.codigo||q?.id?.toString().slice(-4)||null;
+  const nivelCor=q?.nivel==='facil'?'#10B981':q?.nivel==='dificil'?'#EF4444':'#F59E0B';
+  const nivelLabel=q?.nivel==='facil'?'Fácil':q?.nivel==='dificil'?'Difícil':'Médio';
   const [zoomImg,setZoomImg]=React.useState(false);
   const [fontSize,setFontSize]=React.useState(20);
   const [lineHeight,setLineHeight]=React.useState(1.95);
@@ -3147,7 +3118,41 @@ function ApoioLateral({q,children}){
     return result;
   };
 
-  if(!temApoio) return <>{children}</>;
+  if(!temApoio) return(
+    <div style={{display:'flex',flexDirection:'column',gap:12}}>
+      <MetadataStrip/>
+      {children}
+    </div>
+  );
+
+  const MetadataStrip=()=>(
+    <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 14px',display:'flex',flexDirection:'column',gap:5,boxShadow:'0 1px 4px rgba(0,0,0,0.05)'}}>
+      <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
+        {q?.materia&&(
+          <div style={{display:'flex',alignItems:'flex-start',gap:5,minWidth:0}}>
+            <span style={{fontSize:10,color:C.textLight,flexShrink:0,paddingTop:1}}>Matéria</span>
+            <span style={{fontSize:12,fontWeight:700,color:C.primary,lineHeight:1.4}}>{q.materia}</span>
+          </div>
+        )}
+        {q?.topico&&(
+          <div style={{display:'flex',alignItems:'flex-start',gap:5,flex:1,minWidth:0}}>
+            <span style={{fontSize:10,color:C.textLight,flexShrink:0,paddingTop:1}}>Assunto</span>
+            <span style={{fontSize:12,fontWeight:500,color:C.text,lineHeight:1.4}}>{q.topico}</span>
+          </div>
+        )}
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:6,paddingTop:5,borderTop:`1px solid ${C.border}`,flexWrap:'wrap'}}>
+        {numQ&&<span style={{fontSize:10,fontWeight:700,color:C.primary,fontFamily:"'Courier New',monospace"}}>#{numQ}</span>}
+        {(q?.banca||q?.fonte||q?.ano)&&(
+          <span style={{fontSize:10,color:C.textMed,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+            {[q?.banca,q?.fonte,q?.ano].filter(Boolean).join(' · ')}
+          </span>
+        )}
+        {q?.tipo&&<span style={{fontSize:10,fontWeight:600,color:q?.tipo==='certo_errado'?'#0369A1':'#7C3AED',background:q?.tipo==='certo_errado'?'#EFF6FF':'#F5F3FF',padding:'2px 7px',borderRadius:100,flexShrink:0}}>{q?.tipo==='certo_errado'?'C / E':'Múltipla'}</span>}
+        {q?.nivel&&<span style={{fontSize:10,fontWeight:700,color:nivelCor,flexShrink:0}}>{nivelLabel}</span>}
+      </div>
+    </div>
+  );
 
   const ToolBtn=({onClick,active,title,children})=>(
     <button onClick={onClick} title={title}
@@ -3210,8 +3215,10 @@ function ApoioLateral({q,children}){
 
   return(
     <>
-      {/* MOBILE — texto em cima, questão embaixo (sem abas) */}
+      {/* MOBILE — metadata, texto, questão em coluna */}
       <div className="apoio-mobile">
+        {/* Metadata */}
+        <div style={{marginBottom:10}}><MetadataStrip/></div>
         {/* Texto de apoio */}
         <div style={{marginBottom:12,borderRadius:14,overflow:"hidden",border:`1px solid ${C.border}`,background:sepia?"#FDFAF3":"white",boxShadow:"0 1px 6px rgba(0,0,0,0.05)"}}>
           {/* Header do painel com toolbar */}
@@ -3246,11 +3253,16 @@ function ApoioLateral({q,children}){
       </div>
 
       {/* DESKTOP */}
-      <div className="apoio-desktop" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,alignItems:"start"}}>
-        <div style={{position:"sticky",top:80,maxHeight:"calc(100vh - 100px)",display:"flex",flexDirection:"column",borderRadius:16,overflow:"hidden",border:`1px solid ${C.border}`,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
-          {painelTexto}
+      <div className="apoio-desktop" style={{display:"flex",flexDirection:"column",gap:12}}>
+        {/* Metadata full-width */}
+        <MetadataStrip/>
+        {/* Duas colunas */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"start"}}>
+          <div style={{position:"sticky",top:70,maxHeight:"calc(100vh - 90px)",display:"flex",flexDirection:"column",borderRadius:14,overflow:"hidden",border:`1px solid ${C.border}`,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
+            {painelTexto}
+          </div>
+          <div>{children}</div>
         </div>
-        <div>{children}</div>
       </div>
 
       {/* Modo leitura — tela cheia */}
