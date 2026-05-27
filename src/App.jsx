@@ -3120,12 +3120,12 @@ function ApoioLateral({q,children}){
 
   if(!temApoio) return(
     <div style={{display:'flex',flexDirection:'column',gap:12}}>
-      <MetadataStrip/>
+      {metadataJSX}
       {children}
     </div>
   );
 
-  const MetadataStrip=()=>(
+  const metadataJSX=(
     <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 14px',display:'flex',flexDirection:'column',gap:5,boxShadow:'0 1px 4px rgba(0,0,0,0.05)'}}>
       <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
         {q?.materia&&(
@@ -3218,7 +3218,7 @@ function ApoioLateral({q,children}){
       {/* MOBILE — metadata, texto, questão em coluna */}
       <div className="apoio-mobile">
         {/* Metadata */}
-        <div style={{marginBottom:10}}><MetadataStrip/></div>
+        <div style={{marginBottom:10}}>{metadataJSX}</div>
         {/* Texto de apoio */}
         <div style={{marginBottom:12,borderRadius:14,overflow:"hidden",border:`1px solid ${C.border}`,background:sepia?"#FDFAF3":"white",boxShadow:"0 1px 6px rgba(0,0,0,0.05)"}}>
           {/* Header do painel com toolbar */}
@@ -3255,7 +3255,7 @@ function ApoioLateral({q,children}){
       {/* DESKTOP */}
       <div className="apoio-desktop" style={{display:"flex",flexDirection:"column",gap:12}}>
         {/* Metadata full-width */}
-        <MetadataStrip/>
+        {metadataJSX}
         {/* Duas colunas */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,alignItems:"start"}}>
           <div style={{position:"sticky",top:70,maxHeight:"calc(100vh - 90px)",display:"flex",flexDirection:"column",borderRadius:14,overflow:"hidden",border:`1px solid ${C.border}`,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
