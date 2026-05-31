@@ -2052,9 +2052,10 @@ function ImportarPrint({user,onSalvar}){
   "tem_imagem": true/false (true se houver gráfico, diagrama, esquema, tabela visual ou figura essencial para responder),
   "tipo": "multipla" ou "certo_errado",
   "alternativas": {"A":"...","B":"...","C":"...","D":"...","E":"..."} (vazio {} se for certo_errado),
-  "banca": "nome da banca se identificável, senão vazio",
+  "banca": "nome da banca organizadora (ex: CESPE, FGV, CESGRANRIO), senão vazio",
   "ano": número do ano se identificável, senão null,
-  "concurso": "órgão/concurso se identificável, senão vazio",
+  "orgao": "órgão/instituição do concurso (ex: Petrobras, INSS, TJ-SP), senão vazio",
+  "cargo": "cargo/função do concurso (ex: Técnico Júnior, Analista, Perito), senão vazio",
   "materia": "matéria principal da questão",
   "topico": "assunto específico dentro da matéria"
 }
@@ -2137,7 +2138,7 @@ Use parágrafos separados por linha em branco. Comece títulos com número e pon
         materia:dados.materia||"",
         topico:dados.topico||"",
         banca:dados.banca||"",
-        fonte:dados.concurso||"",
+        fonte:[dados.orgao,dados.cargo].filter(Boolean).join(" - ")||"",
         ano:dados.ano?Number(dados.ano)||null:null,
         tipo:dados.tipo||"multipla",
         enunciado:dados.enunciado,
@@ -2255,7 +2256,8 @@ Use parágrafos separados por linha em branco. Comece títulos com número e pon
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
               {[
                 {k:"materia",l:"Matéria"},{k:"topico",l:"Assunto"},
-                {k:"banca",l:"Banca"},{k:"concurso",l:"Concurso"},
+                {k:"banca",l:"Banca"},{k:"orgao",l:"Órgão"},
+                {k:"cargo",l:"Cargo"},
               ].map(f=>(
                 <div key={f.k}>
                   <label style={{fontSize:11,color:C.textLight,display:"block",marginBottom:3}}>{f.l}</label>
