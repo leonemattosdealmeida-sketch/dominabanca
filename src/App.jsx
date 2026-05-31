@@ -4596,6 +4596,290 @@ function TreinoTab({user,plano,onIniciar}){
     </div>
   );
 }
+
+/* ─── MAPA ESTRATÉGICO DO CONCURSO ───────────────────────────────────────── */
+function MapaEstrategico({user,questoes,onIrQuestao}){
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
+  const [bancas,setBancas]=React.useState([]);
+  const [cargos,setCargos]=React.useState([]);
+  const [filtroBanca,setFiltroBanca]=React.useState("");
+  const [filtroCargo,setFiltroCargo]=React.useState("");
+  const [todasQuestoes,setTodasQuestoes]=React.useState([]);
+  const [respostas,setRespostas]=React.useState([]);
+  const [loading,setLoading]=React.useState(true);
+  const [assuntoAberto,setAssuntoAberto]=React.useState(null);
+  const [analiseIA,setAnaliseIA]=React.useState(null);
+  const [gerandoIA,setGerandoIA]=React.useState(false);
+
+  // Carrega banco completo + respostas dos alunos
+  React.useEffect(()=>{
+    (async()=>{
+      setLoading(true);
+      const {data:qs}=await supabase.from("questoes").select("id,materia,topico,banca,fonte,tipo,nivel").eq("ativa",true).limit(5000);
+      const lista=qs||[];
+      setTodasQuestoes(lista);
+      setBancas([...new Set(lista.map(q=>q.banca).filter(Boolean))].sort());
+      setCargos([...new Set(lista.map(q=>q.fonte).filter(Boolean))].sort());
+      // Respostas para aproveitamento
+      const {data:resp}=await supabase.from("respostas_sessao").select("questao_id,correta").limit(20000);
+      setRespostas(resp||[]);
+      setLoading(false);
+    })();
+  },[]);
+
+  // Filtra questões conforme banca/cargo
+  const filtradas=React.useMemo(()=>{
+    return todasQuestoes.filter(q=>
+      (!filtroBanca||q.banca===filtroBanca)&&
+      (!filtroCargo||q.fonte===filtroCargo)
+    );
+  },[todasQuestoes,filtroBanca,filtroCargo]);
+
+  // Mapa de aproveitamento por questão
+  const aprovPorQuestao=React.useMemo(()=>{
+    const m={};
+    respostas.forEach(r=>{
+      if(!m[r.questao_id]) m[r.questao_id]={total:0,certas:0};
+      m[r.questao_id].total++;
+      if(r.correta) m[r.questao_id].certas++;
+    });
+    return m;
+  },[respostas]);
+
+  // Agrupa por matéria → assunto com estatísticas
+  const mapa=React.useMemo(()=>{
+    const porMateria={};
+    filtradas.forEach(q=>{
+      const mat=q.materia||"Sem matéria";
+      const top=q.topico||"Geral";
+      if(!porMateria[mat]) porMateria[mat]={total:0,assuntos:{}};
+      porMateria[mat].total++;
+      if(!porMateria[mat].assuntos[top]) porMateria[mat].assuntos[top]={total:0,qids:[],respTotal:0,respCertas:0};
+      const a=porMateria[mat].assuntos[top];
+      a.total++;
+      a.qids.push(q.id);
+      const ap=aprovPorQuestao[q.id];
+      if(ap){a.respTotal+=ap.total;a.respCertas+=ap.certas;}
+    });
+    return porMateria;
+  },[filtradas,aprovPorQuestao]);
+
+  const totalFiltrado=filtradas.length;
+
+  // Lista de matérias ordenada por incidência
+  const materiasOrdenadas=Object.entries(mapa).sort(([,a],[,b])=>b.total-a.total);
+
+  // Classifica prioridade por % de incidência
+  const prioridade=(pct)=>{
+    if(pct>=15) return{cor:"#EF4444",bg:"#FEF2F2",label:"Alta",emoji:"🔴"};
+    if(pct>=6) return{cor:"#F59E0B",bg:"#FFFBEB",label:"Média",emoji:"🟡"};
+    return{cor:"#10B981",bg:"#ECFDF5",label:"Baixa",emoji:"🟢"};
+  };
+
+  const gerarAnaliseIA=async()=>{
+    if(!filtroBanca&&!filtroCargo){return;}
+    setGerandoIA(true);setAnaliseIA(null);
+    try{
+      const topAssuntos=materiasOrdenadas.slice(0,8).map(([m,d])=>{
+        const tops=Object.entries(d.assuntos).sort(([,a],[,b])=>b.total-a.total).slice(0,3).map(([t,td])=>`${t} (${td.total}q)`).join(", ");
+        return `${m}: ${d.total} questões. Principais: ${tops}`;
+      }).join("\n");
+      const alvo=filtroBanca||filtroCargo;
+      const prompt=`Você é um analista especialista em concursos públicos brasileiros. Com base nos dados estatísticos de incidência de questões abaixo, gere uma análise estratégica sobre o perfil de cobrança ${filtroBanca?`da banca ${filtroBanca}`:`do concurso ${filtroCargo}`}.
+
+DADOS REAIS DE INCIDÊNCIA:
+${topAssuntos}
+
+Gere uma análise em JSON puro (sem markdown):
+{
+  "perfil": "2-3 frases sobre o estilo geral de cobrança desta banca/concurso",
+  "pegadinhas": ["3 a 4 pegadinhas ou armadilhas típicas"],
+  "tendencias": ["3 tendências de cobrança observadas ou esperadas"],
+  "dica_estrategica": "1 parágrafo com a estratégia de estudo mais eficiente"
+}
+IMPORTANTE: baseie-se nos dados reais fornecidos. Seja específico e útil.`;
+
+      const resp=await fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"gpt-4o-mini",max_tokens:1500,
+          system:"Você é analista de concursos. Retorne JSON puro válido.",
+          messages:[{role:"user",content:prompt}]})});
+      const d=await resp.json();
+      const txt=(d.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim();
+      setAnaliseIA(JSON.parse(txt));
+    }catch(e){console.error(e);setAnaliseIA({erro:true});}
+    setGerandoIA(false);
+  };
+
+  if(loading) return(
+    <div style={{padding:"60px 20px",textAlign:"center",color:C.textMed}}>
+      <div style={{fontSize:28,marginBottom:10}}>📊</div>
+      <div style={{fontSize:14}}>Carregando dados do banco...</div>
+    </div>
+  );
+
+  return(
+    <div style={{padding:"0 4px"}}>
+      {/* Filtros */}
+      <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
+        <div style={{flex:1,minWidth:180}}>
+          <label style={{fontSize:10,fontWeight:700,color:C.textLight,textTransform:"uppercase",letterSpacing:0.8,display:"block",marginBottom:5}}>Banca</label>
+          <select value={filtroBanca} onChange={e=>{setFiltroBanca(e.target.value);setAnaliseIA(null);}}
+            style={{width:"100%",padding:"9px 12px",border:`1px solid ${C.border}`,borderRadius:9,fontSize:13,fontFamily:"'Sora',sans-serif",background:"white",cursor:"pointer"}}>
+            <option value="">Todas as bancas</option>
+            {bancas.map(b=><option key={b} value={b}>{b}</option>)}
+          </select>
+        </div>
+        <div style={{flex:1,minWidth:180}}>
+          <label style={{fontSize:10,fontWeight:700,color:C.textLight,textTransform:"uppercase",letterSpacing:0.8,display:"block",marginBottom:5}}>Cargo / Concurso</label>
+          <select value={filtroCargo} onChange={e=>{setFiltroCargo(e.target.value);setAnaliseIA(null);}}
+            style={{width:"100%",padding:"9px 12px",border:`1px solid ${C.border}`,borderRadius:9,fontSize:13,fontFamily:"'Sora',sans-serif",background:"white",cursor:"pointer"}}>
+            <option value="">Todos os cargos</option>
+            {cargos.map(c=><option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* Resumo geral */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:20}}>
+        {[
+          {l:"Questões mapeadas",v:totalFiltrado.toLocaleString("pt-BR"),cor:C.primary},
+          {l:"Matérias",v:materiasOrdenadas.length,cor:"#0891B2"},
+          {l:"Assuntos",v:materiasOrdenadas.reduce((s,[,d])=>s+Object.keys(d.assuntos).length,0),cor:"#059669"},
+        ].map(card=>(
+          <div key={card.l} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:12,padding:"14px"}}>
+            <div style={{fontSize:22,fontWeight:800,color:card.cor,lineHeight:1}}>{card.v}</div>
+            <div style={{fontSize:10,color:C.textLight,marginTop:4,textTransform:"uppercase",letterSpacing:0.5}}>{card.l}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Análise da banca (IA) */}
+      {(filtroBanca||filtroCargo)&&(
+        <div style={{background:`linear-gradient(135deg,#1A1045,${C.primary})`,borderRadius:14,padding:"16px 18px",marginBottom:20,color:"white"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:analiseIA?12:0}}>
+            <div>
+              <div style={{fontSize:13,fontWeight:700}}>🧠 Inteligência da Banca</div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,0.6)",marginTop:2}}>Análise gerada por IA com base nos dados reais</div>
+            </div>
+            {!analiseIA&&(
+              <button onClick={gerarAnaliseIA} disabled={gerandoIA}
+                style={{padding:"7px 14px",background:"rgba(255,255,255,0.18)",border:"1px solid rgba(255,255,255,0.3)",color:"white",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+                {gerandoIA?"Analisando...":"Gerar análise"}
+              </button>
+            )}
+          </div>
+          {analiseIA&&!analiseIA.erro&&(
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              <div style={{fontSize:13,lineHeight:1.6,color:"rgba(255,255,255,0.92)"}}>{analiseIA.perfil}</div>
+              {analiseIA.pegadinhas?.length>0&&(
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:"#FCA5A5",marginBottom:5,textTransform:"uppercase",letterSpacing:0.5}}>⚠️ Pegadinhas comuns</div>
+                  {analiseIA.pegadinhas.map((p,i)=><div key={i} style={{fontSize:12,color:"rgba(255,255,255,0.85)",lineHeight:1.5,marginBottom:3}}>• {p}</div>)}
+                </div>
+              )}
+              {analiseIA.tendencias?.length>0&&(
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:"#A7F3D0",marginBottom:5,textTransform:"uppercase",letterSpacing:0.5}}>📈 Tendências</div>
+                  {analiseIA.tendencias.map((t,i)=><div key={i} style={{fontSize:12,color:"rgba(255,255,255,0.85)",lineHeight:1.5,marginBottom:3}}>• {t}</div>)}
+                </div>
+              )}
+              {analiseIA.dica_estrategica&&(
+                <div style={{background:"rgba(255,255,255,0.1)",borderRadius:10,padding:"10px 12px",fontSize:12,lineHeight:1.6,color:"rgba(255,255,255,0.92)"}}>
+                  <strong style={{color:"#C4B5FD"}}>Estratégia:</strong> {analiseIA.dica_estrategica}
+                </div>
+              )}
+            </div>
+          )}
+          {analiseIA?.erro&&<div style={{fontSize:12,color:"#FCA5A5"}}>Não foi possível gerar a análise. Tente novamente.</div>}
+        </div>
+      )}
+
+      {/* Legenda prioridade */}
+      <div style={{display:"flex",gap:14,marginBottom:14,flexWrap:"wrap"}}>
+        {[{e:"🔴",l:"Alta prioridade"},{e:"🟡",l:"Média"},{e:"🟢",l:"Baixa"}].map(p=>(
+          <div key={p.l} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:C.textMed}}>
+            <span>{p.e}</span>{p.l}
+          </div>
+        ))}
+      </div>
+
+      {/* Mapa de matérias */}
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {materiasOrdenadas.length===0&&(
+          <div style={{textAlign:"center",padding:"40px 20px",color:C.textLight,fontSize:13}}>
+            Nenhuma questão encontrada com esses filtros.
+          </div>
+        )}
+        {materiasOrdenadas.map(([mat,dados])=>{
+          const pctMat=totalFiltrado>0?(dados.total/totalFiltrado)*100:0;
+          const prMat=prioridade(pctMat);
+          const assuntosOrd=Object.entries(dados.assuntos).sort(([,a],[,b])=>b.total-a.total);
+          return(
+            <div key={mat} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
+              {/* Cabeçalho da matéria */}
+              <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10}}>
+                <span style={{fontSize:14}}>{prMat.emoji}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:700,color:C.text}}>{mat}</div>
+                  <div style={{fontSize:10,color:C.textLight,marginTop:1}}>{assuntosOrd.length} assuntos · {dados.total} questões</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:14,fontWeight:800,color:prMat.cor}}>{pctMat.toFixed(1)}%</div>
+                  <div style={{fontSize:9,color:C.textLight}}>incidência</div>
+                </div>
+              </div>
+              {/* Barra de incidência */}
+              <div style={{height:3,background:C.bg}}>
+                <div style={{height:"100%",width:`${Math.min(100,pctMat*4)}%`,background:prMat.cor}}/>
+              </div>
+              {/* Assuntos */}
+              <div style={{padding:"4px 8px 8px"}}>
+                {assuntosOrd.map(([top,td])=>{
+                  const aprov=td.respTotal>0?Math.round((td.respCertas/td.respTotal)*100):null;
+                  const aberto=assuntoAberto===`${mat}::${top}`;
+                  return(
+                    <div key={top}>
+                      <button onClick={()=>setAssuntoAberto(aberto?null:`${mat}::${top}`)}
+                        style={{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"8px 8px",background:aberto?C.bg:"none",border:"none",borderRadius:8,cursor:"pointer",textAlign:"left"}}>
+                        <span style={{fontSize:11,color:C.textMed,flex:1}}>{top}</span>
+                        {aprov!==null&&<span style={{fontSize:10,fontWeight:700,color:aprov>=70?"#10B981":aprov>=50?"#F59E0B":"#EF4444"}}>{aprov}% acertos</span>}
+                        <span style={{fontSize:11,fontWeight:700,color:C.textMed}}>{td.total}</span>
+                        <span style={{fontSize:11,color:C.textLight,transform:aberto?"rotate(90deg)":"none",transition:"transform 0.15s"}}>›</span>
+                      </button>
+                      {/* Raio-X do assunto */}
+                      {aberto&&(
+                        <div style={{padding:"4px 12px 12px",display:"flex",flexDirection:"column",gap:8}}>
+                          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+                            {[
+                              {l:"Questões",v:td.total},
+                              {l:"Respostas",v:td.respTotal||"—"},
+                              {l:"Aproveitamento",v:aprov!==null?`${aprov}%`:"—"},
+                            ].map(s=>(
+                              <div key={s.l} style={{background:C.bg,borderRadius:8,padding:"8px",textAlign:"center"}}>
+                                <div style={{fontSize:14,fontWeight:800,color:C.text}}>{s.v}</div>
+                                <div style={{fontSize:9,color:C.textLight,marginTop:2}}>{s.l}</div>
+                              </div>
+                            ))}
+                          </div>
+                          <button onClick={()=>onIrQuestao&&onIrQuestao(td.qids)}
+                            style={{padding:"8px",background:C.primaryXLight,border:`1px solid ${C.primary}40`,color:C.primary,borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                            Treinar {td.total} questões deste assunto →
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
 function TreinoSessao({user,filtro,onVoltar}){
   const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const [questoes,setQuestoes]=React.useState([]);
@@ -4613,6 +4897,7 @@ function TreinoSessao({user,filtro,onVoltar}){
   const [tempoSeg,setTempoSeg]=React.useState(0);
   const [filtroMenu,setFiltroMenu]=React.useState("materia");
   const [ordemMenu,setOrdemMenu]=React.useState("asc");
+  const [abaMenu,setAbaMenu]=React.useState("caderno");
   const [swipeDx,setSwipeDx]=React.useState(0);
   const [swiping,setSwiping]=React.useState(false);
   const swipeRef=React.useRef({x:0,y:0,active:false});
@@ -4914,118 +5199,112 @@ function TreinoSessao({user,filtro,onVoltar}){
               </div>
             </div>
 
-            {/* ── MENU DE QUESTÕES — fundo branco, filtros, lista vertical ── */}
+            {/* ── PAINEL DO MENU (tela cheia, com abas) ── */}
             {detalharSessao&&(
-              <div style={{background:"white",position:"sticky",top:54,zIndex:19,boxShadow:"0 4px 24px rgba(0,0,0,0.15)",borderBottom:`1px solid ${C.border}`}}>
-                <div style={{maxWidth:960,margin:"0 auto",padding:"0"}}>
+              <div style={{position:"fixed",inset:0,zIndex:300,background:"rgba(15,12,40,0.6)",backdropFilter:"blur(4px)",display:"flex",flexDirection:"column",alignItems:"center",padding:"0"}}
+                onClick={(e)=>{if(e.target===e.currentTarget)setDetalharSessao(false);}}>
+                <div style={{background:C.bg,width:"100%",maxWidth:720,height:"100%",maxHeight:"100vh",display:"flex",flexDirection:"column",boxShadow:"0 0 60px rgba(0,0,0,0.4)"}}>
 
-                  {/* Header */}
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 20px",borderBottom:`1px solid ${C.border}`}}>
-                    <div style={{display:"flex",alignItems:"center",gap:16}}>
-                      <div>
-                        <span style={{fontSize:13,fontWeight:700,color:C.text}}>{total} questões</span>
-                        <span style={{fontSize:11,color:C.textLight,marginLeft:10}}>{acertos} acertos · {erros} erros · {fmtTempo(tempoSeg)}</span>
-                      </div>
+                  {/* Header do painel */}
+                  <div style={{background:"white",borderBottom:`1px solid ${C.border}`,padding:"14px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+                    <div>
+                      <div style={{fontFamily:"'Lora',serif",fontSize:17,fontWeight:700,color:C.text}}>Painel de estudos</div>
+                      <div style={{fontSize:11,color:C.textLight,marginTop:1}}>{total} questões · {acertos} acertos · {erros} erros · {fmtTempo(tempoSeg)}</div>
                     </div>
                     <button onClick={()=>setDetalharSessao(false)}
-                      style={{width:28,height:28,borderRadius:6,background:C.bg,border:`1px solid ${C.border}`,color:C.textLight,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      ✕
-                    </button>
+                      style={{width:34,height:34,borderRadius:9,background:C.bg,border:`1px solid ${C.border}`,color:C.textMed,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
                   </div>
 
-                  {/* Filtros */}
-                  {(()=>{
-                    // Agrupa por matéria com contagem
-                    const porMateria={};
-                    questoes.forEach(q=>{
-                      const m=q.materia||"—";
-                      if(!porMateria[m]) porMateria[m]={count:0,topicos:{}};
-                      porMateria[m].count++;
-                      const t=q.topico||"—";
-                      if(!porMateria[m].topicos[t]) porMateria[m].topicos[t]=0;
-                      porMateria[m].topicos[t]++;
-                    });
+                  {/* Abas */}
+                  <div style={{background:"white",borderBottom:`1px solid ${C.border}`,display:"flex",flexShrink:0,padding:"0 8px"}}>
+                    {[{id:"caderno",l:"📋 Questões do caderno"},{id:"mapa",l:"🗺️ Mapa estratégico"}].map(a=>(
+                      <button key={a.id} onClick={()=>setAbaMenu(a.id)}
+                        style={{padding:"12px 16px",border:"none",background:"none",cursor:"pointer",fontSize:13,fontWeight:abaMenu===a.id?700:500,color:abaMenu===a.id?C.primary:C.textMed,borderBottom:`2px solid ${abaMenu===a.id?C.primary:"transparent"}`,fontFamily:"'Sora',sans-serif",transition:"all 0.15s"}}>
+                        {a.l}
+                      </button>
+                    ))}
+                  </div>
 
-                    // Ordena conforme filtro
-                    let entradasOrdenadas=Object.entries(porMateria);
-                    if(filtroMenu==="quantidade"){
-                      entradasOrdenadas=entradasOrdenadas.sort(([,a],[,b])=>ordemMenu==="asc"?a.count-b.count:b.count-a.count);
-                    }else if(filtroMenu==="materia"){
-                      entradasOrdenadas=entradasOrdenadas.sort(([a],[b])=>ordemMenu==="asc"?a.localeCompare(b):b.localeCompare(a));
-                    }
+                  {/* Conteúdo rolável */}
+                  <div style={{flex:1,overflowY:"auto",padding:"18px"}}>
 
-                    return(
-                      <>
-                        {/* Barra de filtros */}
-                        <div style={{display:"flex",alignItems:"center",gap:6,padding:"8px 20px",borderBottom:`1px solid ${C.border}`,background:C.bg,flexWrap:"wrap"}}>
-                          <span style={{fontSize:10,fontWeight:700,color:C.textLight,textTransform:"uppercase",letterSpacing:0.8,marginRight:4}}>Ordenar por</span>
-                          {[
-                            {id:"materia",l:"Matéria e Assunto"},
-                            {id:"quantidade",l:"Quantidade"},
-                          ].map(f=>(
-                            <button key={f.id} onClick={()=>{if(filtroMenu===f.id)setOrdemMenu(o=>o==="asc"?"desc":"asc");else setFiltroMenu(f.id);}}
-                              style={{padding:"4px 10px",borderRadius:6,border:`1px solid ${filtroMenu===f.id?C.primary:C.border}`,background:filtroMenu===f.id?C.primaryXLight:"white",color:filtroMenu===f.id?C.primary:C.textMed,fontSize:11,fontWeight:filtroMenu===f.id?700:400,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
-                              {f.l}
-                              {filtroMenu===f.id&&<span style={{fontSize:10}}>{ordemMenu==="asc"?"↑":"↓"}</span>}
-                            </button>
-                          ))}
-                        </div>
-
-                        {/* Lista de matérias */}
-                        <div style={{maxHeight:320,overflowY:"auto"}}>
-                          {entradasOrdenadas.map(([mat,dados],mi)=>{
-                            const primeiraQ=questoes.findIndex(q=>q.materia===mat);
-                            const estaAqui=materiaAtual===mat;
-                            const topicosOrdenados=Object.entries(dados.topicos).sort(([,a],[,b])=>b-a);
-                            return(
-                              <div key={mat} style={{borderBottom:mi<entradasOrdenadas.length-1?`1px solid ${C.border}`:"none"}}>
-                                {/* Linha matéria */}
-                                <button onClick={()=>{if(primeiraQ>-1){setIdx(primeiraQ);setSelecionada(null);setConfirmada(false);}setDetalharSessao(false);}}
-                                  style={{width:"100%",display:"flex",alignItems:"center",padding:"11px 20px",background:estaAqui?C.primaryXLight:"white",border:"none",cursor:"pointer",textAlign:"left",transition:"background 0.1s"}}
-                                  onMouseEnter={e=>e.currentTarget.style.background=estaAqui?C.primaryXLight:C.bg}
-                                  onMouseLeave={e=>e.currentTarget.style.background=estaAqui?C.primaryXLight:"white"}>
-                                  {/* Indicador atual */}
-                                  <div style={{width:3,height:32,borderRadius:2,background:estaAqui?C.primary:"transparent",marginRight:12,flexShrink:0}}/>
-                                  <div style={{flex:1,minWidth:0}}>
-                                    <div style={{fontSize:13,fontWeight:estaAqui?700:600,color:estaAqui?C.primary:C.text}}>{mat}</div>
-                                    <div style={{fontSize:10,color:C.textLight,marginTop:1}}>
-                                      {topicosOrdenados.length} tópico{topicosOrdenados.length!==1?"s":""}
+                    {/* ABA: Questões do caderno */}
+                    {abaMenu==="caderno"&&(()=>{
+                      const porMateria={};
+                      questoes.forEach(q=>{
+                        const m=q.materia||"—";
+                        if(!porMateria[m]) porMateria[m]={count:0,topicos:{}};
+                        porMateria[m].count++;
+                        const t=q.topico||"—";
+                        porMateria[m].topicos[t]=(porMateria[m].topicos[t]||0)+1;
+                      });
+                      let entradas=Object.entries(porMateria);
+                      if(filtroMenu==="quantidade") entradas=entradas.sort(([,a],[,b])=>ordemMenu==="asc"?a.count-b.count:b.count-a.count);
+                      else entradas=entradas.sort(([a],[b])=>ordemMenu==="asc"?a.localeCompare(b):b.localeCompare(a));
+                      return(
+                        <>
+                          {/* Filtros */}
+                          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:14,flexWrap:"wrap"}}>
+                            <span style={{fontSize:10,fontWeight:700,color:C.textLight,textTransform:"uppercase",letterSpacing:0.8,marginRight:2}}>Ordenar</span>
+                            {[{id:"materia",l:"A-Z"},{id:"quantidade",l:"Quantidade"}].map(f=>(
+                              <button key={f.id} onClick={()=>{if(filtroMenu===f.id)setOrdemMenu(o=>o==="asc"?"desc":"asc");else setFiltroMenu(f.id);}}
+                                style={{padding:"5px 11px",borderRadius:7,border:`1px solid ${filtroMenu===f.id?C.primary:C.border}`,background:filtroMenu===f.id?C.primaryXLight:"white",color:filtroMenu===f.id?C.primary:C.textMed,fontSize:12,fontWeight:filtroMenu===f.id?700:400,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                                {f.l}{filtroMenu===f.id&&<span>{ordemMenu==="asc"?"↑":"↓"}</span>}
+                              </button>
+                            ))}
+                          </div>
+                          {/* Lista */}
+                          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                            {entradas.map(([mat,dados])=>{
+                              const primeiraQ=questoes.findIndex(q=>q.materia===mat);
+                              const estaAqui=questoes[idx]?.materia===mat;
+                              const topicosOrd=Object.entries(dados.topicos).sort(([,a],[,b])=>b-a);
+                              return(
+                                <div key={mat} style={{background:"white",border:`1px solid ${estaAqui?C.primary+"50":C.border}`,borderRadius:12,overflow:"hidden"}}>
+                                  <button onClick={()=>{if(primeiraQ>-1){setIdx(primeiraQ);setSelecionada(null);setConfirmada(false);}setDetalharSessao(false);}}
+                                    style={{width:"100%",display:"flex",alignItems:"center",padding:"12px 14px",background:estaAqui?C.primaryXLight:"white",border:"none",cursor:"pointer",textAlign:"left"}}>
+                                    <div style={{width:3,height:30,borderRadius:2,background:estaAqui?C.primary:"transparent",marginRight:12,flexShrink:0}}/>
+                                    <div style={{flex:1}}>
+                                      <div style={{fontSize:13,fontWeight:estaAqui?700:600,color:estaAqui?C.primary:C.text}}>{mat}</div>
+                                      <div style={{fontSize:10,color:C.textLight,marginTop:1}}>{topicosOrd.length} assunto{topicosOrd.length!==1?"s":""}</div>
                                     </div>
-                                  </div>
-                                  <div style={{fontSize:12,fontWeight:700,color:estaAqui?C.primary:C.textMed,flexShrink:0}}>{dados.count}</div>
-                                  <span style={{fontSize:11,color:C.textLight,marginLeft:2,flexShrink:0}}>questões</span>
-                                  <span style={{fontSize:12,color:C.textLight,marginLeft:10,flexShrink:0}}>›</span>
-                                </button>
-                                {/* Tópicos da matéria — linha fina abaixo */}
-                                {topicosOrdenados.length>0&&(
-                                  <div style={{padding:"0 20px 10px 35px",display:"flex",flexDirection:"column",gap:1,background:estaAqui?C.primaryXLight:"white"}}>
-                                    {topicosOrdenados.slice(0,5).map(([top,cnt],ti)=>{
-                                      const topicIdx=questoes.findIndex(q=>q.materia===mat&&q.topico===top);
-                                      const isTopicAtual=questoes[idx]?.materia===mat&&questoes[idx]?.topico===top;
-                                      return(
-                                        <button key={ti}
-                                          onClick={()=>{if(topicIdx>-1){setIdx(topicIdx);setSelecionada(null);setConfirmada(false);}setDetalharSessao(false);}}
-                                          style={{display:"flex",alignItems:"center",gap:8,padding:"4px 8px",background:"none",border:"none",cursor:"pointer",borderRadius:6,textAlign:"left",transition:"background 0.1s"}}
-                                          onMouseEnter={e=>e.currentTarget.style.background=C.border}
-                                          onMouseLeave={e=>e.currentTarget.style.background="none"}>
-                                          {isTopicAtual&&<div style={{width:4,height:4,borderRadius:"50%",background:C.primary,flexShrink:0}}/>}
-                                          <span style={{fontSize:11,color:isTopicAtual?C.primary:C.textMed,flex:1,fontWeight:isTopicAtual?600:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{top}</span>
-                                          <span style={{fontSize:10,color:C.textLight,flexShrink:0}}>{cnt}</span>
-                                        </button>
-                                      );
-                                    })}
-                                    {topicosOrdenados.length>5&&(
-                                      <span style={{fontSize:10,color:C.textLight,padding:"2px 8px"}}>+{topicosOrdenados.length-5} tópicos</span>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </>
-                    );
-                  })()}
+                                    <div style={{fontSize:13,fontWeight:700,color:estaAqui?C.primary:C.textMed,flexShrink:0}}>{dados.count}</div>
+                                    <span style={{fontSize:11,color:C.textLight,marginLeft:8}}>›</span>
+                                  </button>
+                                  {topicosOrd.length>0&&(
+                                    <div style={{padding:"0 14px 10px 29px",display:"flex",flexWrap:"wrap",gap:5}}>
+                                      {topicosOrd.slice(0,6).map(([top,cnt])=>{
+                                        const topicIdx=questoes.findIndex(q=>q.materia===mat&&q.topico===top);
+                                        const isAtual=questoes[idx]?.materia===mat&&questoes[idx]?.topico===top;
+                                        return(
+                                          <button key={top} onClick={()=>{if(topicIdx>-1){setIdx(topicIdx);setSelecionada(null);setConfirmada(false);}setDetalharSessao(false);}}
+                                            style={{padding:"4px 10px",background:isAtual?C.primaryXLight:C.bg,border:`1px solid ${isAtual?C.primary+"40":C.border}`,borderRadius:100,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+                                            <span style={{fontSize:10,color:isAtual?C.primary:C.textMed,fontWeight:isAtual?600:400}}>{top}</span>
+                                            <span style={{fontSize:9,color:C.textLight}}>{cnt}</span>
+                                          </button>
+                                        );
+                                      })}
+                                      {topicosOrd.length>6&&<span style={{fontSize:10,color:C.textLight,alignSelf:"center"}}>+{topicosOrd.length-6}</span>}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      );
+                    })()}
+
+                    {/* ABA: Mapa estratégico */}
+                    {abaMenu==="mapa"&&(
+                      <MapaEstrategico user={user} questoes={questoes}
+                        onIrQuestao={(qids)=>{
+                          const primeira=questoes.findIndex(q=>qids.includes(q.id));
+                          if(primeira>-1){setIdx(primeira);setSelecionada(null);setConfirmada(false);}
+                          setDetalharSessao(false);
+                        }}/>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
