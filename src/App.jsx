@@ -4640,9 +4640,10 @@ function MapaEstrategico({user,questoes,onTreinar}){
   const aprovPorQuestao=React.useMemo(()=>{
     const m={};
     respostas.forEach(r=>{
-      if(!m[r.questao_id]) m[r.questao_id]={total:0,certas:0};
-      m[r.questao_id].total++;
-      if(r.correta) m[r.questao_id].certas++;
+      const qid=String(r.questao_id);
+      if(!m[qid]) m[qid]={total:0,certas:0};
+      m[qid].total++;
+      if(r.correta) m[qid].certas++;
     });
     return m;
   },[respostas]);
@@ -4653,14 +4654,14 @@ function MapaEstrategico({user,questoes,onTreinar}){
     filtradas.forEach(q=>{
       const mat=q.materia||"Sem matéria";
       const top=q.topico||"Geral";
-      if(!porMateria[mat]) porMateria[mat]={total:0,assuntos:{}};
+      if(!porMateria[mat]) porMateria[mat]={total:0,assuntos:{},respTotal:0,respCertas:0};
       porMateria[mat].total++;
       if(!porMateria[mat].assuntos[top]) porMateria[mat].assuntos[top]={total:0,qids:[],respTotal:0,respCertas:0};
       const a=porMateria[mat].assuntos[top];
       a.total++;
       a.qids.push(q.id);
-      const ap=aprovPorQuestao[q.id];
-      if(ap){a.respTotal+=ap.total;a.respCertas+=ap.certas;}
+      const ap=aprovPorQuestao[String(q.id)];
+      if(ap){a.respTotal+=ap.total;a.respCertas+=ap.certas;porMateria[mat].respTotal+=ap.total;porMateria[mat].respCertas+=ap.certas;}
     });
     return porMateria;
   },[filtradas,aprovPorQuestao]);
@@ -4816,6 +4817,7 @@ IMPORTANTE: baseie-se nos dados reais fornecidos. Seja específico e útil.`;
           const prMat=prioridade(pctMat);
           const assuntosOrd=Object.entries(dados.assuntos).sort(([,a],[,b])=>b.total-a.total);
           const matAberta=materiaAberta===mat;
+          const aprovMat=dados.respTotal>0?Math.round((dados.respCertas/dados.respTotal)*100):null;
           return(
             <div key={mat} style={{background:C.white,border:`1px solid ${matAberta?prMat.cor+"50":C.border}`,borderRadius:12,overflow:"hidden"}}>
               {/* Cabeçalho da matéria — clicar expande assuntos */}
@@ -4824,7 +4826,7 @@ IMPORTANTE: baseie-se nos dados reais fornecidos. Seja específico e útil.`;
                 <span style={{fontSize:15}}>{prMat.emoji}</span>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:13,fontWeight:700,color:C.text}}>{mat}</div>
-                  <div style={{fontSize:10,color:C.textLight,marginTop:1}}>{assuntosOrd.length} assunto{assuntosOrd.length!==1?"s":""} · {dados.total} questões</div>
+                  <div style={{fontSize:10,color:C.textLight,marginTop:1}}>{assuntosOrd.length} assunto{assuntosOrd.length!==1?"s":""} · {dados.total} questões{aprovMat!==null?` · ${aprovMat}% acertos`:""}</div>
                 </div>
                 <div style={{textAlign:"right",marginRight:4}}>
                   <div style={{fontSize:14,fontWeight:800,color:prMat.cor}}>{pctMat.toFixed(1)}%</div>
@@ -5244,6 +5246,11 @@ function TreinoSessao({user,filtro,onVoltar}){
                         if(filtro.topico) query=query.eq("topico",filtro.topico);
                         const {data}=await query.limit(500);
                         if(data&&data.length>0){
+                          // Cria sessão para gravar as respostas
+                          const {data:sessao}=await supabase.from("sessoes_estudo")
+                            .insert({user_id:user.id,materias:[filtro.materia],total_questoes:data.length})
+                            .select().single();
+                          if(sessao) setSessaoId(sessao.id);
                           setQuestoes(data);
                           setQuestoesOriginais(data);
                           setTotal(data.length);
