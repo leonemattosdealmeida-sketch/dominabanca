@@ -2077,7 +2077,7 @@ REGRAS:
       const extraido=JSON.parse(limpo);
 
       // Verifica duplicata
-      const {data:existentes}=await supabase.from("questoes").select("id,enunciado,codigo").limit(2000);
+      const {data:existentes}=await supabase.from("questoes").select("id,enunciado").limit(2000);
       let dup=null;
       for(const ex of (existentes||[])){
         if(similaridade(ex.enunciado,extraido.enunciado)>=0.85){dup=ex;break;}
@@ -2132,14 +2132,12 @@ Use parágrafos separados por linha em branco. Comece títulos com número e pon
     try{
       let imagemBase=null;
       if(dados.tem_imagem&&diagramaImg) imagemBase=`data:image/png;base64,${diagramaImg}`;
-      const codigo="Q"+Date.now().toString().slice(-6);
       const payload={
-        codigo,
         materia:dados.materia||"",
         topico:dados.topico||"",
         banca:dados.banca||"",
         fonte:dados.concurso||"",
-        ano:dados.ano||null,
+        ano:dados.ano?Number(dados.ano)||null:null,
         tipo:dados.tipo||"multipla",
         enunciado:dados.enunciado,
         alternativas:dados.tipo==="certo_errado"?{}:(dados.alternativas||{}),
@@ -2147,6 +2145,7 @@ Use parágrafos separados por linha em branco. Comece títulos com número e pon
         comentario:dados.comentario,
         imagem_base:imagemBase,
         nivel:"medio",
+        ativa:true,
       };
       const {error}=await supabase.from("questoes").insert(payload);
       if(error) throw error;
@@ -2244,7 +2243,7 @@ Use parágrafos separados por linha em branco. Comece títulos com número e pon
           {duplicata&&(
             <div style={{background:"#FFFBEB",border:"1px solid #FCD34D",borderRadius:12,padding:"12px 16px"}}>
               <div style={{fontSize:13,fontWeight:700,color:"#92400E",marginBottom:4}}>⚠️ Questão similar já existe</div>
-              <div style={{fontSize:12,color:"#92400E",lineHeight:1.5}}>Encontramos uma questão muito parecida no banco{duplicata.codigo?` (#${duplicata.codigo})`:""}. Verifique se não é duplicata antes de salvar.</div>
+              <div style={{fontSize:12,color:"#92400E",lineHeight:1.5}}>Encontramos uma questão muito parecida no banco. Verifique se não é duplicata antes de salvar.</div>
             </div>
           )}
 
