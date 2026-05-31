@@ -1614,7 +1614,7 @@ Responda SOMENTE com JSON válido (sem texto fora do JSON):
         </div>
         {/* Linha 2: tabs */}
         <div style={{display:"flex",borderTop:`1px solid ${C.border}`,padding:"0 20px"}}>
-          {[{id:"questoes",icon:"📚",l:"Questões"},{id:"simulados",icon:"🏆",l:"Simulados"},{id:"importar",icon:"📥",l:"Importar Prova"}].map(a=>(
+          {[{id:"questoes",icon:"📚",l:"Questões"},{id:"simulados",icon:"🏆",l:"Simulados"},{id:"importar",icon:"📥",l:"Importar Prova"},{id:"importar_print",icon:"📸",l:"Importar Print"}].map(a=>(
             <button key={a.id} onClick={()=>setAbaAdmin(a.id)} style={{
               padding:"10px 20px",background:"transparent",border:"none",
               borderBottom:`3px solid ${abaAdmin===a.id?C.primary:"transparent"}`,
@@ -1630,6 +1630,7 @@ Responda SOMENTE com JSON válido (sem texto fora do JSON):
       <div style={{display:"flex",flex:1,maxWidth:1300,width:"100%",margin:"0 auto",padding:"16px",gap:16,alignItems:"start",flexWrap:"wrap"}} className="admin-layout">
 
         {abaAdmin==="simulados"&&<SimuladoAdmin user={user}/>}
+        {abaAdmin==="importar_print"&&<ImportarPrint user={user} onSalvar={()=>{if(typeof loadQuestoes==='function')loadQuestoes();}}/>}
         {abaAdmin==="importar"&&<ImportarProva
           user={user}
           provaPdf={provaPdf} setProvaPdf={setProvaPdf}
@@ -1973,6 +1974,371 @@ Responda SOMENTE com JSON válido (sem texto fora do JSON):
         </div>
         </>}
       </div>
+    </div>
+  );
+}
+
+
+
+/* ─── IMPORTAR QUESTÃO POR PRINT (visão IA) ──────────────────────────────── */
+function ImportarPrint({user,onSalvar}){
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
+  const [printImg,setPrintImg]=React.useState(null);       // base64 do print da questão
+  const [diagramaImg,setDiagramaImg]=React.useState(null); // base64 do diagrama (opcional)
+  const [fase,setFase]=React.useState("upload");           // upload | analisando | revisar | salvando | erro
+  const [erro,setErro]=React.useState("");
+  const [dados,setDados]=React.useState(null);             // questão extraída
+  const [gerandoComentario,setGerandoComentario]=React.useState(false);
+  const [duplicata,setDuplicata]=React.useState(null);     // questão similar encontrada
+  const [salvou,setSalvou]=React.useState(false);
+  const printRef=React.useRef(null);
+  const diagramaRef=React.useRef(null);
+
+  const fileToBase64=(file)=>new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result.split(",")[1]);
+    r.onerror=rej;
+    r.readAsDataURL(file);
+  });
+
+  const normalizar=(txt)=>(txt||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"").trim();
+
+  // Similaridade simples (Dice coefficient sobre bigramas)
+  const similaridade=(a,b)=>{
+    const na=normalizar(a),nb=normalizar(b);
+    if(!na||!nb) return 0;
+    if(na===nb) return 1;
+    const bigrams=(s)=>{const m=new Map();for(let i=0;i<s.length-1;i++){const bg=s.slice(i,i+2);m.set(bg,(m.get(bg)||0)+1);}return m;};
+    const ma=bigrams(na),mb=bigrams(nb);
+    let inter=0;
+    ma.forEach((cnt,bg)=>{if(mb.has(bg))inter+=Math.min(cnt,mb.get(bg));});
+    const total=(na.length-1)+(nb.length-1);
+    return total>0?(2*inter)/total:0;
+  };
+
+  const analisar=async()=>{
+    if(!printImg){setErro("Envie o print da questão.");return;}
+    setFase("analisando");setErro("");
+    try{
+      const messages=[{
+        role:"user",
+        content:[
+          {type:"text",text:`Analise este print de uma questão de concurso público brasileiro e extraia TODAS as informações. Retorne APENAS JSON puro (sem markdown, sem texto antes/depois), começando com { e terminando com }:
+{
+  "enunciado": "texto completo do enunciado/comando da questão",
+  "tem_imagem": true/false (true se houver gráfico, diagrama, esquema, tabela visual ou figura essencial para responder),
+  "tipo": "multipla" ou "certo_errado",
+  "alternativas": {"A":"...","B":"...","C":"...","D":"...","E":"..."} (vazio {} se for certo_errado),
+  "banca": "nome da banca se identificável, senão vazio",
+  "ano": número do ano se identificável, senão null,
+  "concurso": "órgão/concurso se identificável, senão vazio",
+  "materia": "matéria principal da questão",
+  "topico": "assunto específico dentro da matéria"
+}
+REGRAS:
+- Transcreva o enunciado EXATAMENTE como está, sem resumir.
+- Se houver diagrama/esquema/gráfico, descreva-o brevemente entre colchetes dentro do enunciado E marque tem_imagem como true.
+- Para certo_errado, alternativas deve ser {}.
+- Não invente banca/ano/concurso se não estiverem visíveis.`},
+          {type:"image_url",image_url:{url:`data:image/png;base64,${printImg}`}}
+        ]
+      }];
+
+      const resp=await fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"gpt-4o",max_tokens:4000,
+          system:"Você é especialista em transcrever questões de concursos a partir de imagens. Retorne sempre JSON puro válido.",
+          messages})});
+      const d=await resp.json();
+      const text=d.content?.[0]?.text||"{}";
+      const limpo=text.replace(/```json|```/g,"").trim();
+      const extraido=JSON.parse(limpo);
+
+      // Verifica duplicata
+      const {data:existentes}=await supabase.from("questoes").select("id,enunciado,codigo").limit(2000);
+      let dup=null;
+      for(const ex of (existentes||[])){
+        if(similaridade(ex.enunciado,extraido.enunciado)>=0.85){dup=ex;break;}
+      }
+      setDuplicata(dup);
+      setDados({...extraido,gabarito:"",comentario:""});
+      setFase("revisar");
+    }catch(e){
+      console.error(e);
+      setErro("Não consegui ler a questão. Tente um print mais nítido.");
+      setFase("erro");
+    }
+  };
+
+  const gerarComentario=async()=>{
+    if(!dados?.gabarito){setErro("Informe o gabarito antes de gerar o comentário.");return;}
+    setGerandoComentario(true);setErro("");
+    try{
+      const altsTxt=dados.tipo==="certo_errado"
+        ?`Tipo: Certo ou Errado. Gabarito: ${dados.gabarito==="C"?"CERTO":"ERRADO"}.`
+        :Object.entries(dados.alternativas||{}).filter(([,v])=>v).map(([k,v])=>`${k}) ${v}`).join("\n");
+      const prompt=`Você é um professor especialista em concursos. Gere um comentário completo e didático justificando o gabarito.
+
+Matéria: ${dados.materia}
+Assunto: ${dados.topico}
+Enunciado: ${dados.enunciado}
+${altsTxt}
+Gabarito correto: ${dados.tipo==="certo_errado"?(dados.gabarito==="C"?"CERTO":"ERRADO"):dados.gabarito+") "+(dados.alternativas?.[dados.gabarito]||"")}
+
+Estrutura do comentário:
+1. Análise do enunciado (o que a questão pede)
+2. Resolução/justificativa do gabarito${dados.tipo!=="certo_errado"?"\n3. Por que as outras alternativas estão erradas":""}
+4. Conclusão objetiva
+
+Use parágrafos separados por linha em branco. Comece títulos com número e ponto.`;
+
+      const resp=await fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"gpt-4o-mini",max_tokens:2000,
+          system:"Você é professor de concursos didático e preciso.",
+          messages:[{role:"user",content:prompt}]})});
+      const d=await resp.json();
+      const com=d.content?.[0]?.text||"";
+      setDados(prev=>({...prev,comentario:com}));
+    }catch(e){console.error(e);setErro("Erro ao gerar comentário.");}
+    setGerandoComentario(false);
+  };
+
+  const salvar=async()=>{
+    if(!dados?.gabarito){setErro("Informe o gabarito.");return;}
+    if(!dados?.comentario){setErro("Gere o comentário antes de salvar.");return;}
+    setFase("salvando");setErro("");
+    try{
+      let imagemBase=null;
+      if(dados.tem_imagem&&diagramaImg) imagemBase=`data:image/png;base64,${diagramaImg}`;
+      const codigo="Q"+Date.now().toString().slice(-6);
+      const payload={
+        codigo,
+        materia:dados.materia||"",
+        topico:dados.topico||"",
+        banca:dados.banca||"",
+        fonte:dados.concurso||"",
+        ano:dados.ano||null,
+        tipo:dados.tipo||"multipla",
+        enunciado:dados.enunciado,
+        alternativas:dados.tipo==="certo_errado"?{}:(dados.alternativas||{}),
+        gabarito:dados.gabarito,
+        comentario:dados.comentario,
+        imagem_base:imagemBase,
+        nivel:"medio",
+      };
+      const {error}=await supabase.from("questoes").insert(payload);
+      if(error) throw error;
+      setSalvou(true);
+      setTimeout(()=>{
+        setPrintImg(null);setDiagramaImg(null);setDados(null);setDuplicata(null);
+        setSalvou(false);setFase("upload");
+        onSalvar&&onSalvar();
+      },1500);
+    }catch(e){console.error(e);setErro("Erro ao salvar: "+(e.message||""));setFase("revisar");}
+  };
+
+  const Card=({children})=>(<div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:20,width:"100%"}}>{children}</div>);
+
+  return(
+    <div style={{flex:1,width:"100%",maxWidth:760,margin:"0 auto",display:"flex",flexDirection:"column",gap:16}}>
+
+      {erro&&(
+        <div style={{background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:10,padding:"10px 14px",fontSize:13,color:"#991B1B"}}>{erro}</div>
+      )}
+
+      {/* FASE UPLOAD */}
+      {(fase==="upload"||fase==="erro")&&(
+        <Card>
+          <div style={{fontFamily:"'Lora',serif",fontSize:18,fontWeight:700,color:C.text,marginBottom:6}}>Importar questão por print</div>
+          <div style={{fontSize:13,color:C.textMed,marginBottom:20,lineHeight:1.6}}>
+            Envie o print da questão. A IA vai extrair o enunciado, alternativas, banca, ano, matéria e assunto. Você informa o gabarito e gera o comentário.
+          </div>
+
+          {/* Print da questão */}
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:8}}>1. Print da questão <span style={{color:"#EF4444"}}>*</span></div>
+            <input ref={printRef} type="file" accept="image/*" style={{display:"none"}}
+              onChange={async e=>{const f=e.target.files[0];if(f)setPrintImg(await fileToBase64(f));}}/>
+            <div onClick={()=>printRef.current?.click()}
+              style={{border:`2px dashed ${printImg?C.primary:C.border}`,borderRadius:12,padding:printImg?12:24,textAlign:"center",cursor:"pointer",background:printImg?C.primaryXLight:C.bg,transition:"all 0.15s"}}>
+              {printImg?(
+                <div>
+                  <img src={`data:image/png;base64,${printImg}`} alt="Print" style={{maxWidth:"100%",maxHeight:280,borderRadius:8,marginBottom:8}}/>
+                  <div style={{fontSize:11,color:C.primary,fontWeight:600}}>Clique para trocar</div>
+                </div>
+              ):(
+                <div>
+                  <div style={{fontSize:32,marginBottom:6}}>📸</div>
+                  <div style={{fontSize:13,color:C.textMed,fontWeight:600}}>Clique para enviar o print</div>
+                  <div style={{fontSize:11,color:C.textLight,marginTop:4}}>PNG, JPG — questão completa com alternativas</div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Diagrama opcional */}
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:4}}>2. Imagem/diagrama da questão <span style={{color:C.textLight,fontWeight:400}}>(opcional)</span></div>
+            <div style={{fontSize:11,color:C.textLight,marginBottom:8,lineHeight:1.5}}>Se a questão tiver gráfico, esquema ou figura essencial, recorte e envie aqui para exibir junto à questão.</div>
+            <input ref={diagramaRef} type="file" accept="image/*" style={{display:"none"}}
+              onChange={async e=>{const f=e.target.files[0];if(f)setDiagramaImg(await fileToBase64(f));}}/>
+            <div onClick={()=>diagramaRef.current?.click()}
+              style={{border:`2px dashed ${diagramaImg?C.primary:C.border}`,borderRadius:12,padding:diagramaImg?12:16,textAlign:"center",cursor:"pointer",background:diagramaImg?C.primaryXLight:C.bg}}>
+              {diagramaImg?(
+                <div>
+                  <img src={`data:image/png;base64,${diagramaImg}`} alt="Diagrama" style={{maxWidth:"100%",maxHeight:180,borderRadius:8,marginBottom:6}}/>
+                  <div style={{fontSize:11,color:C.primary,fontWeight:600}}>Clique para trocar</div>
+                </div>
+              ):(
+                <div style={{fontSize:12,color:C.textLight}}>🖼️ Recorte do diagrama (se houver)</div>
+              )}
+            </div>
+          </div>
+
+          <button onClick={analisar} disabled={!printImg}
+            style={{width:"100%",padding:"14px",background:printImg?`linear-gradient(135deg,#1A1045,${C.primary})`:"#E5E7EB",color:printImg?"white":"#9CA3AF",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:printImg?"pointer":"not-allowed",fontFamily:"'Sora',sans-serif"}}>
+            Analisar questão →
+          </button>
+        </Card>
+      )}
+
+      {/* FASE ANALISANDO */}
+      {fase==="analisando"&&(
+        <Card>
+          <div style={{textAlign:"center",padding:"32px 0"}}>
+            <div style={{fontSize:36,marginBottom:12}}>🔍</div>
+            <div style={{fontSize:15,fontWeight:700,color:C.text,marginBottom:6}}>Lendo a questão...</div>
+            <div style={{fontSize:12,color:C.textMed}}>Extraindo enunciado, alternativas e metadados</div>
+          </div>
+        </Card>
+      )}
+
+      {/* FASE REVISAR */}
+      {fase==="revisar"&&dados&&(
+        <>
+          {/* Alerta duplicata */}
+          {duplicata&&(
+            <div style={{background:"#FFFBEB",border:"1px solid #FCD34D",borderRadius:12,padding:"12px 16px"}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#92400E",marginBottom:4}}>⚠️ Questão similar já existe</div>
+              <div style={{fontSize:12,color:"#92400E",lineHeight:1.5}}>Encontramos uma questão muito parecida no banco{duplicata.codigo?` (#${duplicata.codigo})`:""}. Verifique se não é duplicata antes de salvar.</div>
+            </div>
+          )}
+
+          <Card>
+            <div style={{fontFamily:"'Lora',serif",fontSize:16,fontWeight:700,color:C.text,marginBottom:16}}>Revisar e confirmar</div>
+
+            {/* Metadados editáveis */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+              {[
+                {k:"materia",l:"Matéria"},{k:"topico",l:"Assunto"},
+                {k:"banca",l:"Banca"},{k:"concurso",l:"Concurso"},
+              ].map(f=>(
+                <div key={f.k}>
+                  <label style={{fontSize:11,color:C.textLight,display:"block",marginBottom:3}}>{f.l}</label>
+                  <input value={dados[f.k]||""} onChange={e=>setDados(p=>({...p,[f.k]:e.target.value}))}
+                    style={{width:"100%",padding:"8px 10px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:13,fontFamily:"'Sora',sans-serif",boxSizing:"border-box"}}/>
+                </div>
+              ))}
+              <div>
+                <label style={{fontSize:11,color:C.textLight,display:"block",marginBottom:3}}>Ano</label>
+                <input value={dados.ano||""} onChange={e=>setDados(p=>({...p,ano:e.target.value}))}
+                  style={{width:"100%",padding:"8px 10px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:13,fontFamily:"'Sora',sans-serif",boxSizing:"border-box"}}/>
+              </div>
+              <div>
+                <label style={{fontSize:11,color:C.textLight,display:"block",marginBottom:3}}>Tipo</label>
+                <select value={dados.tipo} onChange={e=>setDados(p=>({...p,tipo:e.target.value}))}
+                  style={{width:"100%",padding:"8px 10px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:13,fontFamily:"'Sora',sans-serif",boxSizing:"border-box",background:"white"}}>
+                  <option value="multipla">Múltipla escolha</option>
+                  <option value="certo_errado">Certo / Errado</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Enunciado */}
+            <div style={{marginBottom:16}}>
+              <label style={{fontSize:11,color:C.textLight,display:"block",marginBottom:3}}>Enunciado</label>
+              <textarea value={dados.enunciado} onChange={e=>setDados(p=>({...p,enunciado:e.target.value}))}
+                style={{width:"100%",minHeight:120,padding:"10px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:13,fontFamily:"'Lora',serif",lineHeight:1.6,boxSizing:"border-box",resize:"vertical"}}/>
+            </div>
+
+            {/* Diagrama anexado */}
+            {dados.tem_imagem&&(
+              <div style={{marginBottom:16,padding:"10px 14px",background:diagramaImg?"#F0FDF4":"#FFFBEB",border:`1px solid ${diagramaImg?"#86EFAC":"#FCD34D"}`,borderRadius:10,fontSize:12,color:diagramaImg?"#166534":"#92400E"}}>
+                {diagramaImg?"✓ Esta questão tem imagem anexada e será exibida junto.":"⚠️ A IA detectou que esta questão precisa de uma imagem/diagrama. Volte e anexe o recorte para não perder informação."}
+              </div>
+            )}
+
+            {/* Alternativas */}
+            {dados.tipo==="multipla"&&(
+              <div style={{marginBottom:16}}>
+                <label style={{fontSize:11,color:C.textLight,display:"block",marginBottom:6}}>Alternativas</label>
+                {["A","B","C","D","E"].map(l=>(
+                  (dados.alternativas?.[l]!==undefined||["A","B","C","D"].includes(l))&&(
+                    <div key={l} style={{display:"flex",gap:8,marginBottom:6,alignItems:"center"}}>
+                      <div onClick={()=>setDados(p=>({...p,gabarito:l}))}
+                        style={{width:30,height:30,borderRadius:8,border:`2px solid ${dados.gabarito===l?"#10B981":C.border}`,background:dados.gabarito===l?"#10B981":"white",color:dados.gabarito===l?"white":C.textMed,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,cursor:"pointer",flexShrink:0}}>{l}</div>
+                      <input value={dados.alternativas?.[l]||""} onChange={e=>setDados(p=>({...p,alternativas:{...p.alternativas,[l]:e.target.value}}))}
+                        placeholder={`Alternativa ${l}`}
+                        style={{flex:1,padding:"7px 10px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:13,fontFamily:"'Lora',serif",boxSizing:"border-box"}}/>
+                    </div>
+                  )
+                ))}
+                <div style={{fontSize:11,color:C.textLight,marginTop:4}}>Clique na letra para marcar o gabarito.</div>
+              </div>
+            )}
+
+            {/* Gabarito C/E */}
+            {dados.tipo==="certo_errado"&&(
+              <div style={{marginBottom:16}}>
+                <label style={{fontSize:11,color:C.textLight,display:"block",marginBottom:6}}>Gabarito</label>
+                <div style={{display:"flex",gap:8}}>
+                  {[{v:"C",l:"CERTO"},{v:"E",l:"ERRADO"}].map(g=>(
+                    <button key={g.v} onClick={()=>setDados(p=>({...p,gabarito:g.v}))}
+                      style={{flex:1,padding:"12px",borderRadius:10,border:`2px solid ${dados.gabarito===g.v?"#10B981":C.border}`,background:dados.gabarito===g.v?"#ECFDF5":"white",color:dados.gabarito===g.v?"#065F46":C.textMed,fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                      {g.l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Comentário */}
+            <div style={{marginBottom:16}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                <label style={{fontSize:11,color:C.textLight}}>Comentário (justificativa do gabarito)</label>
+                <button onClick={gerarComentario} disabled={!dados.gabarito||gerandoComentario}
+                  style={{padding:"5px 12px",borderRadius:7,border:"none",background:dados.gabarito?C.primary:"#E5E7EB",color:dados.gabarito?"white":"#9CA3AF",fontSize:11,fontWeight:700,cursor:dados.gabarito?"pointer":"not-allowed"}}>
+                  {gerandoComentario?"Gerando...":"✨ Gerar comentário"}
+                </button>
+              </div>
+              <textarea value={dados.comentario} onChange={e=>setDados(p=>({...p,comentario:e.target.value}))}
+                placeholder="Clique em 'Gerar comentário' ou escreva manualmente."
+                style={{width:"100%",minHeight:140,padding:"10px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:13,fontFamily:"'Lora',serif",lineHeight:1.6,boxSizing:"border-box",resize:"vertical"}}/>
+            </div>
+
+            {/* Ações */}
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>{setFase("upload");setDados(null);setDuplicata(null);}}
+                style={{flex:1,padding:"12px",background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,fontSize:13,fontWeight:600,color:C.textMed,cursor:"pointer"}}>
+                Cancelar
+              </button>
+              <button onClick={salvar} disabled={!dados.gabarito||!dados.comentario}
+                style={{flex:2,padding:"12px",background:(dados.gabarito&&dados.comentario)?"linear-gradient(135deg,#1A1045,#10B981)":"#E5E7EB",color:(dados.gabarito&&dados.comentario)?"white":"#9CA3AF",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:(dados.gabarito&&dados.comentario)?"pointer":"not-allowed"}}>
+                💾 Salvar no banco
+              </button>
+            </div>
+          </Card>
+        </>
+      )}
+
+      {/* FASE SALVANDO / SALVOU */}
+      {fase==="salvando"&&(
+        <Card>
+          <div style={{textAlign:"center",padding:"32px 0"}}>
+            <div style={{fontSize:36,marginBottom:12}}>{salvou?"✅":"💾"}</div>
+            <div style={{fontSize:15,fontWeight:700,color:C.text}}>{salvou?"Questão salva!":"Salvando..."}</div>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
@@ -6885,23 +7251,373 @@ export default function App(){
       </div>
     </div>
   );
-  if(screen==="onboarding")return<Onboarding user={userData} onComplete={async ()=>{await supabase.from("alunos").update({primeiro_acesso:false,ultimo_acesso:new Date().toISOString()})..eq("user_id",user.id).single();
+  if(screen==="onboarding")return<Onboarding user={userData} onComplete={async ()=>{await supabase.from("alunos").update({primeiro_acesso:false,ultimo_acesso:new Date().toISOString()}).eq("user_id",userData.id);setScreen("dashboard");}}/>;
+  if(screen==="dashboard")return<Dashboard user={userData} onLogout={async()=>{await supabase.auth.signOut();setScreen("landing");setUserData(null);}}/>;
+  return<Landing onCadastro={()=>setScreen("cadastro")} onLogin={()=>setScreen("login")}/>;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ONBOARDING — POR ÁREA DE ESTUDO
+// ══════════════════════════════════════════════════════════════════════════════
+
+const AREAS_CONCURSO=[{id:"policial_federal",area:"Policial Federal",icon:"🔵",cor:"#1D4ED8",concursos:["PF","PRF","PCDF","PC-Estadual","Agente Penitenciário"],materias_base:["Direito Constitucional","Direito Administrativo","Direito Penal","Direito Processual Penal","Língua Portuguesa","Raciocínio Lógico","Informática","Legislação Específica"]},{id:"fiscal",area:"Fiscal / Tributário",icon:"💛",cor:"#D97706",concursos:["Receita Federal","SEFAZ","PGFN","TCE","TCU"],materias_base:["Direito Tributário","Direito Constitucional","Direito Administrativo","Contabilidade","Raciocínio Lógico","Língua Portuguesa","Legislação Específica"]},{id:"judiciario",area:"Judiciário",icon:"⚖️",cor:"#7C3AED",concursos:["TJ Estadual","TRF","TRT","STJ","STF","MP Estadual"],materias_base:["Direito Constitucional","Direito Administrativo","Direito Civil","Direito Processual Civil","Língua Portuguesa","Raciocínio Lógico","Informática"]},{id:"administrativo",area:"Administrativo / Geral",icon:"🏛️",cor:"#059669",concursos:["INSS","Correios","Banco do Brasil","Caixa Econômica","IBGE"],materias_base:["Língua Portuguesa","Raciocínio Lógico","Matemática","Informática","Direito Constitucional","Direito Administrativo","Conhecimentos Gerais"]},{id:"saude",area:"Saúde",icon:"🏥",cor:"#DC2626",concursos:["CFM","CRM","Secretaria de Saúde","SUS","ANVISA","FIOCRUZ"],materias_base:["Língua Portuguesa","Raciocínio Lógico","Conhecimentos Específicos","Informática","Legislação em Saúde","Bioética"]},{id:"educacao",area:"Educação",icon:"📚",cor:"#0891B2",concursos:["Secretaria de Educação","MEC","FNDE","CAPES","INEP"],materias_base:["Língua Portuguesa","Raciocínio Lógico","Conhecimentos Pedagógicos","Legislação Educacional","Conhecimentos Específicos","Informática"]},{id:"militar",area:"Militar / Defesa",icon:"🪖",cor:"#4B5563",concursos:["Exército","Marinha","Aeronáutica","AMAN","EsPCEx","EFOMM"],materias_base:["Matemática","Física","Química","Língua Portuguesa","Inglês","Informática","Raciocínio Lógico","História","Geografia"]}];
+
+const DIAS_SEMANA=["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
+
+function Onboarding({user,onComplete,onBack}){
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
+  const nome=user?.user_metadata?.nome?.split(" ")[0]||user?.email?.split("@")[0]||"aluno";
+  const [step,setStep]=React.useState(0);
+  const [areaSel,setAreaSel]=React.useState(null);
+  const [concursoSel,setConcursoSel]=React.useState("");
+  const [materiasSel,setMateriasSel]=React.useState([]);
+  const [materiasDisponiveis,setMateriasDisponiveis]=React.useState([]);
+  const [loadingMat,setLoadingMat]=React.useState(false);
+  const [horasDia,setHorasDia]=React.useState(2);
+  const [diasSemana,setDiasSemana]=React.useState(["Seg","Ter","Qua","Qui","Sex"]);
+  const [horario,setHorario]=React.useState("noite");
+  const [temRedacao,setTemRedacao]=React.useState(null);
+  const [tipoRedacao,setTipoRedacao]=React.useState("dissertativo");
+  const [freqRedacao,setFreqRedacao]=React.useState("1x");
+  const [nivelRedacao,setNivelRedacao]=React.useState("intermediario");
+  const [salvando,setSalvando]=React.useState(false);
+
+  React.useEffect(()=>{
+    if(!areaSel) return;
+    setLoadingMat(true);
+    supabase.from("questoes").select("materia").then(({data})=>{
+      const counts={};
+      (data||[]).forEach(q=>{if(q.materia) counts[q.materia]=(counts[q.materia]||0)+1;});
+      const base=areaSel.materias_base;
+      const todasMat=[...new Set([...base,...Object.keys(counts)])].sort();
+      const comCount=todasMat.map(m=>({nome:m,count:counts[m]||0,base:base.includes(m)}));
+      setMateriasDisponiveis(comCount);
+      setMateriasSel(comCount.filter(m=>m.base).map(m=>m.nome));
+      setLoadingMat(false);
+    });
+  },[areaSel]);
+
+  const toggleMateria=(nome)=>setMateriasSel(prev=>prev.includes(nome)?prev.filter(m=>m!==nome):[...prev,nome]);
+  const toggleDia=(d)=>setDiasSemana(prev=>prev.includes(d)?prev.filter(x=>x!==d):[...prev,d]);
+  const totalHorasSemana=horasDia*diasSemana.length;
+
+  const salvarOnboarding=async()=>{
+    setSalvando(true);
+    try{
+      const cronograma={area:areaSel.id,area_nome:areaSel.area,area_icon:areaSel.icon,concurso:concursoSel||null,materias:materiasSel,horas_dia:horasDia,dias_semana:diasSemana,horario,redacao:temRedacao?{ativo:true,tipo:tipoRedacao,frequencia:freqRedacao,nivel:nivelRedacao}:{ativo:false},created_at:new Date().toISOString()};
+      const {data:ob}=await supabase.from("onboarding").select("id,cronogramas").eq("user_id",user.id).maybeSingle();
       if(ob){
-        const cronogramas=ob.cronogramas||[];
-        cronogramas.push(cronograma);
-        await supabase.from("onboarding").update({cronogramas,updated_at:new Date().toISOString()}).eq("id",ob.id);
+        const lista=[...(ob.cronogramas||[]),cronograma];
+        await supabase.from("onboarding").update({cronogramas:lista,updated_at:new Date().toISOString()}).eq("id",ob.id);
       }else{
-        await supabase.from("onboarding").insert({user_id:user.id,cronogramas:[cronograma],completo:true});
+        await supabase.from("onboarding").insert({user_id:user.id,cronogramas:[cronograma],concluido:true});
       }
       onComplete(cronograma);
     }catch(e){console.error(e);}
     setSalvando(false);
   };
 
-  // Barra de progresso
   const progresso=Math.round((step/6)*100);
-
-  const OB={primary:"#5B4FCF",bg:"#F5F4FF",card:"white",border:"#E5E3FF",text:"#1A1045",textMed:"#6B7280",accent:"#00C48C"};
 
   return(
     <div style={{minHeight:"100vh",background:`linear-gradient(135deg,#1A1045 0%,#2D1B69 50%,#1A1045 100%)`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px 16px",fontFamily:"'Sora',sans-serif"}}>
+    <div style={{minHeight:"100vh",background:`linear-gradient(135deg,#1A1045 0%,#2D1B69 50%,#1A1045 100%)`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px 16px",fontFamily:"'Sora',sans-serif"}}>
+      {/* Card principal */}
+      <div style={{width:"100%",maxWidth:560,background:"white",borderRadius:24,boxShadow:"0 24px 80px rgba(0,0,0,0.35)",overflow:"hidden"}}>
+
+        {/* Header roxo com progresso */}
+        <div style={{background:"linear-gradient(135deg,#1A1045,#5B4FCF)",padding:"20px 24px 16px"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+            <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",letterSpacing:1.5,textTransform:"uppercase"}}>
+              {["Boas-vindas","Área","Concurso","Matérias","Disponibilidade","Redação","Resumo"][step]}
+            </div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.5)"}}>{step}/6</div>
+          </div>
+          <div style={{height:4,background:"rgba(255,255,255,0.15)",borderRadius:100}}>
+            <div style={{height:"100%",width:`${progresso}%`,background:"linear-gradient(90deg,#A78BFA,#C4B5FD)",borderRadius:100,transition:"width 0.4s ease"}}/>
+          </div>
+        </div>
+
+        {/* Conteúdo do step */}
+        <div style={{padding:"28px 24px 24px"}}>
+
+          {/* STEP 0: Boas-vindas */}
+          {step===0&&(
+            <div style={{textAlign:"center"}}>
+              <div style={{fontSize:48,marginBottom:16}}>👋</div>
+              <h2 style={{fontFamily:"'Lora',serif",fontSize:24,fontWeight:700,color:"#1A1045",marginBottom:10}}>
+                Olá, {nome}!
+              </h2>
+              <p style={{fontSize:14,color:"#6B7280",lineHeight:1.7,marginBottom:28}}>
+                Vou ajudar você a criar um cronograma de estudos personalizado.<br/>
+                São apenas 5 passos rápidos e sua trilha de estudos estará pronta.
+              </p>
+              <button onClick={()=>setStep(1)}
+                style={{width:"100%",padding:"14px",background:"linear-gradient(135deg,#1A1045,#5B4FCF)",color:"white",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>
+                Vamos começar →
+              </button>
+              {onBack&&(
+                <button onClick={onBack} style={{marginTop:12,padding:"10px",width:"100%",background:"none",border:"none",color:"#6B7280",fontSize:13,cursor:"pointer"}}>
+                  Voltar ao início
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* STEP 1: Área */}
+          {step===1&&(
+            <div>
+              <h2 style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,color:"#1A1045",marginBottom:6}}>Qual área você está estudando?</h2>
+              <p style={{fontSize:13,color:"#6B7280",marginBottom:20}}>Selecione a área do concurso que deseja estudar agora.</p>
+              <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:24}}>
+                {AREAS_CONCURSO.map(area=>(
+                  <button key={area.id} onClick={()=>setAreaSel(area)}
+                    style={{display:"flex",alignItems:"center",gap:14,padding:"14px 16px",border:`2px solid ${areaSel?.id===area.id?area.cor:"#E5E7EB"}`,borderRadius:12,background:areaSel?.id===area.id?area.cor+"10":"white",cursor:"pointer",transition:"all 0.15s",textAlign:"left"}}>
+                    <span style={{fontSize:24,flexShrink:0}}>{area.icon}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:700,color:areaSel?.id===area.id?area.cor:"#111827"}}>{area.area}</div>
+                      <div style={{fontSize:11,color:"#9CA3AF",marginTop:2}}>{area.concursos.slice(0,3).join(" · ")}{area.concursos.length>3?` +${area.concursos.length-3}`:""}</div>
+                    </div>
+                    {areaSel?.id===area.id&&<span style={{fontSize:18,color:area.cor,flexShrink:0}}>✓</span>}
+                  </button>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={()=>setStep(0)} style={{flex:1,padding:"12px",background:"#F3F4F6",border:"none",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer",color:"#6B7280"}}>← Voltar</button>
+                <button onClick={()=>{if(areaSel)setStep(2);}} disabled={!areaSel}
+                  style={{flex:2,padding:"12px",background:areaSel?"linear-gradient(135deg,#1A1045,#5B4FCF)":"#E5E7EB",color:areaSel?"white":"#9CA3AF",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:areaSel?"pointer":"not-allowed"}}>
+                  Continuar →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2: Concurso */}
+          {step===2&&areaSel&&(
+            <div>
+              <h2 style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,color:"#1A1045",marginBottom:6}}>Qual concurso é seu foco?</h2>
+              <p style={{fontSize:13,color:"#6B7280",marginBottom:20}}>Opcional — ajuda a priorizar as matérias certas.</p>
+              <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:20}}>
+                {areaSel.concursos.map(c=>(
+                  <button key={c} onClick={()=>setConcursoSel(concursoSel===c?"":c)}
+                    style={{padding:"8px 14px",borderRadius:100,border:`2px solid ${concursoSel===c?areaSel.cor:"#E5E7EB"}`,background:concursoSel===c?areaSel.cor+"15":"white",color:concursoSel===c?areaSel.cor:"#374151",fontSize:13,fontWeight:concursoSel===c?700:400,cursor:"pointer",transition:"all 0.15s"}}>
+                    {c}
+                  </button>
+                ))}
+              </div>
+              {concursoSel&&(
+                <div style={{background:"#F0FDF4",border:"1px solid #86EFAC",borderRadius:10,padding:"10px 14px",fontSize:12,color:"#166534",marginBottom:16}}>
+                  ✓ Foco em <strong>{concursoSel}</strong> — as matérias do próximo passo já estarão otimizadas para este concurso.
+                </div>
+              )}
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={()=>setStep(1)} style={{flex:1,padding:"12px",background:"#F3F4F6",border:"none",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer",color:"#6B7280"}}>← Voltar</button>
+                <button onClick={()=>setStep(3)}
+                  style={{flex:2,padding:"12px",background:"linear-gradient(135deg,#1A1045,#5B4FCF)",color:"white",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                  {concursoSel?"Continuar →":"Pular →"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: Matérias */}
+          {step===3&&(
+            <div>
+              <h2 style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,color:"#1A1045",marginBottom:4}}>Matérias do seu cronograma</h2>
+              <p style={{fontSize:13,color:"#6B7280",marginBottom:16}}>{materiasSel.length} selecionadas — adicione ou remova conforme sua necessidade.</p>
+              {loadingMat?(
+                <div style={{textAlign:"center",padding:"32px",color:"#6B7280"}}>Carregando matérias do banco...</div>
+              ):(
+                <div style={{maxHeight:320,overflowY:"auto",display:"flex",flexDirection:"column",gap:6,marginBottom:20,paddingRight:4}}>
+                  {materiasDisponiveis.sort((a,b)=>{
+                    if(a.base&&!b.base) return -1;if(!a.base&&b.base) return 1;
+                    return b.count-a.count;
+                  }).map(m=>{
+                    const sel=materiasSel.includes(m.nome);
+                    return(
+                      <button key={m.nome} onClick={()=>toggleMateria(m.nome)}
+                        style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",border:`1.5px solid ${sel?"#5B4FCF":"#E5E7EB"}`,borderRadius:10,background:sel?"#F5F4FF":"white",cursor:"pointer",textAlign:"left",transition:"all 0.15s"}}>
+                        <div style={{width:20,height:20,borderRadius:5,border:`2px solid ${sel?"#5B4FCF":"#D1D5DB"}`,background:sel?"#5B4FCF":"white",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                          {sel&&<span style={{fontSize:11,color:"white",fontWeight:800}}>✓</span>}
+                        </div>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:13,fontWeight:sel?700:400,color:sel?"#1A1045":"#374151"}}>{m.nome}</div>
+                          {m.base&&<div style={{fontSize:10,color:"#5B4FCF",marginTop:1}}>✦ Recomendada para {areaSel?.area}</div>}
+                        </div>
+                        <div style={{fontSize:11,color:"#9CA3AF",flexShrink:0}}>
+                          {m.count>0?`${m.count} questões`:"Em breve"}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <div style={{background:"#F9FAFB",borderRadius:10,padding:"10px 14px",fontSize:12,color:"#6B7280",marginBottom:16}}>
+                {materiasSel.length} matérias · {materiasDisponiveis.filter(m=>materiasSel.includes(m.nome)).reduce((s,m)=>s+m.count,0).toLocaleString("pt-BR")} questões disponíveis
+              </div>
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={()=>setStep(2)} style={{flex:1,padding:"12px",background:"#F3F4F6",border:"none",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer",color:"#6B7280"}}>← Voltar</button>
+                <button onClick={()=>{if(materiasSel.length>0)setStep(4);}} disabled={materiasSel.length===0}
+                  style={{flex:2,padding:"12px",background:materiasSel.length>0?"linear-gradient(135deg,#1A1045,#5B4FCF)":"#E5E7EB",color:materiasSel.length>0?"white":"#9CA3AF",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:materiasSel.length>0?"pointer":"not-allowed"}}>
+                  Continuar →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4: Disponibilidade */}
+          {step===4&&(
+            <div>
+              <h2 style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,color:"#1A1045",marginBottom:6}}>Qual sua disponibilidade?</h2>
+              <p style={{fontSize:13,color:"#6B7280",marginBottom:20}}>O cronograma será distribuído de acordo com seu tempo.</p>
+              {/* Horas por dia */}
+              <div style={{marginBottom:22}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#374151",marginBottom:10,textTransform:"uppercase",letterSpacing:0.8}}>Horas de estudo por dia</div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {[1,1.5,2,3,4,5,6].map(h=>(
+                    <button key={h} onClick={()=>setHorasDia(h)}
+                      style={{padding:"8px 14px",borderRadius:100,border:`2px solid ${horasDia===h?"#5B4FCF":"#E5E7EB"}`,background:horasDia===h?"#5B4FCF":"white",color:horasDia===h?"white":"#374151",fontSize:13,fontWeight:horasDia===h?700:400,cursor:"pointer",transition:"all 0.15s"}}>
+                      {h}h
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Dias da semana */}
+              <div style={{marginBottom:22}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#374151",marginBottom:10,textTransform:"uppercase",letterSpacing:0.8}}>Dias de estudo</div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {DIAS_SEMANA.map(d=>{
+                    const sel=diasSemana.includes(d);
+                    return(
+                      <button key={d} onClick={()=>toggleDia(d)}
+                        style={{width:44,height:44,borderRadius:10,border:`2px solid ${sel?"#5B4FCF":"#E5E7EB"}`,background:sel?"#5B4FCF":"white",color:sel?"white":"#6B7280",fontSize:12,fontWeight:sel?700:400,cursor:"pointer",transition:"all 0.15s"}}>
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* Horário preferido */}
+              <div style={{marginBottom:22}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#374151",marginBottom:10,textTransform:"uppercase",letterSpacing:0.8}}>Horário preferido</div>
+                <div style={{display:"flex",gap:8}}>
+                  {[{id:"manha",l:"☀️ Manhã"},{id:"tarde",l:"🌤️ Tarde"},{id:"noite",l:"🌙 Noite"},{id:"madrugada",l:"🌌 Madrugada"}].map(h=>(
+                    <button key={h.id} onClick={()=>setHorario(h.id)}
+                      style={{flex:1,padding:"8px",borderRadius:10,border:`2px solid ${horario===h.id?"#5B4FCF":"#E5E7EB"}`,background:horario===h.id?"#F5F4FF":"white",color:horario===h.id?"#5B4FCF":"#6B7280",fontSize:11,fontWeight:horario===h.id?700:400,cursor:"pointer",transition:"all 0.15s"}}>
+                      {h.l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Resumo do tempo */}
+              <div style={{background:"#F5F4FF",border:"1px solid #C4B5FD",borderRadius:10,padding:"10px 14px",fontSize:12,color:"#5B4FCF",marginBottom:20}}>
+                📅 {totalHorasSemana}h de estudo por semana · {diasSemana.length} dias · {materiasSel.length} matérias
+              </div>
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={()=>setStep(3)} style={{flex:1,padding:"12px",background:"#F3F4F6",border:"none",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer",color:"#6B7280"}}>← Voltar</button>
+                <button onClick={()=>setStep(5)} disabled={diasSemana.length===0}
+                  style={{flex:2,padding:"12px",background:diasSemana.length>0?"linear-gradient(135deg,#1A1045,#5B4FCF)":"#E5E7EB",color:diasSemana.length>0?"white":"#9CA3AF",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:diasSemana.length>0?"pointer":"not-allowed"}}>
+                  Continuar →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 5: Redação */}
+          {step===5&&(
+            <div>
+              <h2 style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,color:"#1A1045",marginBottom:6}}>Tem redação na sua prova?</h2>
+              <p style={{fontSize:13,color:"#6B7280",marginBottom:20}}>Se sim, vamos incluir treinos de redação no seu cronograma.</p>
+              <div style={{display:"flex",gap:10,marginBottom:20}}>
+                {[{v:true,l:"✍️ Sim, tem redação"},{v:false,l:"✗ Não tem redação"}].map(op=>(
+                  <button key={String(op.v)} onClick={()=>setTemRedacao(op.v)}
+                    style={{flex:1,padding:"14px",border:`2px solid ${temRedacao===op.v?"#5B4FCF":"#E5E7EB"}`,borderRadius:12,background:temRedacao===op.v?"#F5F4FF":"white",color:temRedacao===op.v?"#5B4FCF":"#6B7280",fontSize:13,fontWeight:temRedacao===op.v?700:400,cursor:"pointer",transition:"all 0.15s"}}>
+                    {op.l}
+                  </button>
+                ))}
+              </div>
+              {temRedacao&&(
+                <>
+                  <div style={{marginBottom:18}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#374151",marginBottom:8,textTransform:"uppercase",letterSpacing:0.8}}>Tipo de redação</div>
+                    <div style={{display:"flex",gap:8}}>
+                      {[{id:"dissertativo",l:"Dissertativo-Argumentativo"},{id:"oficial",l:"Estilo Oficial / Relatório"}].map(t=>(
+                        <button key={t.id} onClick={()=>setTipoRedacao(t.id)}
+                          style={{flex:1,padding:"10px",borderRadius:10,border:`2px solid ${tipoRedacao===t.id?"#5B4FCF":"#E5E7EB"}`,background:tipoRedacao===t.id?"#F5F4FF":"white",color:tipoRedacao===t.id?"#5B4FCF":"#6B7280",fontSize:12,fontWeight:tipoRedacao===t.id?700:400,cursor:"pointer"}}>
+                          {t.l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{marginBottom:18}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#374151",marginBottom:8,textTransform:"uppercase",letterSpacing:0.8}}>Frequência de treino</div>
+                    <div style={{display:"flex",gap:8}}>
+                      {[{id:"1x",l:"1x / semana"},{id:"2x",l:"2x / semana"},{id:"3x",l:"3x / semana"}].map(f=>(
+                        <button key={f.id} onClick={()=>setFreqRedacao(f.id)}
+                          style={{flex:1,padding:"10px",borderRadius:10,border:`2px solid ${freqRedacao===f.id?"#5B4FCF":"#E5E7EB"}`,background:freqRedacao===f.id?"#F5F4FF":"white",color:freqRedacao===f.id?"#5B4FCF":"#6B7280",fontSize:12,fontWeight:freqRedacao===f.id?700:400,cursor:"pointer"}}>
+                          {f.l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{marginBottom:18}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#374151",marginBottom:8,textTransform:"uppercase",letterSpacing:0.8}}>Seu nível atual</div>
+                    <div style={{display:"flex",gap:8}}>
+                      {[{id:"iniciante",l:"🌱 Iniciante"},{id:"intermediario",l:"📈 Intermediário"},{id:"avancado",l:"🏆 Avançado"}].map(n=>(
+                        <button key={n.id} onClick={()=>setNivelRedacao(n.id)}
+                          style={{flex:1,padding:"10px",borderRadius:10,border:`2px solid ${nivelRedacao===n.id?"#5B4FCF":"#E5E7EB"}`,background:nivelRedacao===n.id?"#F5F4FF":"white",color:nivelRedacao===n.id?"#5B4FCF":"#6B7280",fontSize:12,fontWeight:nivelRedacao===n.id?700:400,cursor:"pointer"}}>
+                          {n.l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={()=>setStep(4)} style={{flex:1,padding:"12px",background:"#F3F4F6",border:"none",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer",color:"#6B7280"}}>← Voltar</button>
+                <button onClick={()=>{if(temRedacao!==null)setStep(6);}} disabled={temRedacao===null}
+                  style={{flex:2,padding:"12px",background:temRedacao!==null?"linear-gradient(135deg,#1A1045,#5B4FCF)":"#E5E7EB",color:temRedacao!==null?"white":"#9CA3AF",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:temRedacao!==null?"pointer":"not-allowed"}}>
+                  Ver resumo →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 6: Resumo */}
+          {step===6&&areaSel&&(
+            <div>
+              <div style={{textAlign:"center",marginBottom:20}}>
+                <div style={{fontSize:40,marginBottom:8}}>{areaSel.icon}</div>
+                <h2 style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,color:"#1A1045",marginBottom:4}}>Tudo pronto, {nome}!</h2>
+                <p style={{fontSize:13,color:"#6B7280"}}>Confirme seu cronograma antes de salvar.</p>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:24}}>
+                {[
+                  {l:"Área",v:`${areaSel.icon} ${areaSel.area}`},
+                  {l:"Concurso",v:concursoSel||"Geral (sem foco específico)"},
+                  {l:"Matérias",v:`${materiasSel.length} matérias selecionadas`},
+                  {l:"Disponibilidade",v:`${horasDia}h/dia · ${diasSemana.join(", ")} · ${horario}`},
+                  {l:"Total semanal",v:`${totalHorasSemana}h por semana`},
+                  {l:"Redação",v:temRedacao?`${tipoRedacao==="dissertativo"?"Dissertativo-Argumentativo":"Estilo Oficial"} · ${freqRedacao}/semana · Nível ${nivelRedacao}`:"Sem redação"},
+                ].map(item=>(
+                  <div key={item.l} style={{display:"flex",gap:12,padding:"10px 14px",background:"#F9FAFB",borderRadius:10,alignItems:"flex-start"}}>
+                    <span style={{fontSize:11,fontWeight:700,color:"#9CA3AF",minWidth:90,textTransform:"uppercase",letterSpacing:0.5,paddingTop:1}}>{item.l}</span>
+                    <span style={{fontSize:13,color:"#111827",fontWeight:500,flex:1}}>{item.v}</span>
+                  </div>
+                ))}
+              </div>
+              <button onClick={salvarOnboarding} disabled={salvando}
+                style={{width:"100%",padding:"15px",background:salvando?"#9CA3AF":"linear-gradient(135deg,#1A1045,#5B4FCF)",color:"white",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:salvando?"not-allowed":"pointer",fontFamily:"'Sora',sans-serif",marginBottom:10}}>
+                {salvando?"Criando seu cronograma...":"🚀 Criar meu cronograma"}
+              </button>
+              <button onClick={()=>setStep(5)} style={{width:"100%",padding:"10px",background:"none",border:"none",color:"#6B7280",fontSize:13,cursor:"pointer"}}>
+                ← Editar
+              </button>
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+}
