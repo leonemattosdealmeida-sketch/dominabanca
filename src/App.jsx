@@ -1993,6 +1993,29 @@ function ImportarPrint({user,onSalvar}){
   const [salvou,setSalvou]=React.useState(false);
   const printRef=React.useRef(null);
   const diagramaRef=React.useRef(null);
+  const [colarAlvo,setColarAlvo]=React.useState("print"); // "print" | "diagrama"
+
+  // Colar imagem com Ctrl+V
+  React.useEffect(()=>{
+    const handlePaste=async(e)=>{
+      const items=e.clipboardData?.items;
+      if(!items) return;
+      for(const item of items){
+        if(item.type.startsWith("image/")){
+          e.preventDefault();
+          const file=item.getAsFile();
+          if(file){
+            const b64=await fileToBase64(file);
+            if(colarAlvo==="diagrama") setDiagramaImg(b64);
+            else setPrintImg(b64);
+          }
+          break;
+        }
+      }
+    };
+    window.addEventListener("paste",handlePaste);
+    return()=>window.removeEventListener("paste",handlePaste);
+  },[colarAlvo]);
 
   const fileToBase64=(file)=>new Promise((res,rej)=>{
     const r=new FileReader();
@@ -2158,18 +2181,19 @@ Use parágrafos separados por linha em branco. Comece títulos com número e pon
             <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:8}}>1. Print da questão <span style={{color:"#EF4444"}}>*</span></div>
             <input ref={printRef} type="file" accept="image/*" style={{display:"none"}}
               onChange={async e=>{const f=e.target.files[0];if(f)setPrintImg(await fileToBase64(f));}}/>
-            <div onClick={()=>printRef.current?.click()}
-              style={{border:`2px dashed ${printImg?C.primary:C.border}`,borderRadius:12,padding:printImg?12:24,textAlign:"center",cursor:"pointer",background:printImg?C.primaryXLight:C.bg,transition:"all 0.15s"}}>
+            <div onClick={()=>{setColarAlvo("print");printRef.current?.click();}}
+              onMouseEnter={()=>setColarAlvo("print")}
+              style={{border:`2px dashed ${printImg?C.primary:(colarAlvo==="print"?C.primary:C.border)}`,borderRadius:12,padding:printImg?12:24,textAlign:"center",cursor:"pointer",background:printImg?C.primaryXLight:C.bg,transition:"all 0.15s"}}>
               {printImg?(
                 <div>
                   <img src={`data:image/png;base64,${printImg}`} alt="Print" style={{maxWidth:"100%",maxHeight:280,borderRadius:8,marginBottom:8}}/>
-                  <div style={{fontSize:11,color:C.primary,fontWeight:600}}>Clique para trocar</div>
+                  <div style={{fontSize:11,color:C.primary,fontWeight:600}}>Clique ou cole (Ctrl+V) para trocar</div>
                 </div>
               ):(
                 <div>
                   <div style={{fontSize:32,marginBottom:6}}>📸</div>
-                  <div style={{fontSize:13,color:C.textMed,fontWeight:600}}>Clique para enviar o print</div>
-                  <div style={{fontSize:11,color:C.textLight,marginTop:4}}>PNG, JPG — questão completa com alternativas</div>
+                  <div style={{fontSize:14,color:C.text,fontWeight:700,marginBottom:4}}>Cole com Ctrl+V ou clique para enviar</div>
+                  <div style={{fontSize:11,color:C.textLight}}>PNG, JPG — questão completa com alternativas</div>
                 </div>
               )}
             </div>
@@ -2181,15 +2205,16 @@ Use parágrafos separados por linha em branco. Comece títulos com número e pon
             <div style={{fontSize:11,color:C.textLight,marginBottom:8,lineHeight:1.5}}>Se a questão tiver gráfico, esquema ou figura essencial, recorte e envie aqui para exibir junto à questão.</div>
             <input ref={diagramaRef} type="file" accept="image/*" style={{display:"none"}}
               onChange={async e=>{const f=e.target.files[0];if(f)setDiagramaImg(await fileToBase64(f));}}/>
-            <div onClick={()=>diagramaRef.current?.click()}
-              style={{border:`2px dashed ${diagramaImg?C.primary:C.border}`,borderRadius:12,padding:diagramaImg?12:16,textAlign:"center",cursor:"pointer",background:diagramaImg?C.primaryXLight:C.bg}}>
+            <div onClick={()=>{setColarAlvo("diagrama");diagramaRef.current?.click();}}
+              onMouseEnter={()=>setColarAlvo("diagrama")}
+              style={{border:`2px dashed ${diagramaImg?C.primary:(colarAlvo==="diagrama"?C.primary:C.border)}`,borderRadius:12,padding:diagramaImg?12:16,textAlign:"center",cursor:"pointer",background:diagramaImg?C.primaryXLight:C.bg}}>
               {diagramaImg?(
                 <div>
                   <img src={`data:image/png;base64,${diagramaImg}`} alt="Diagrama" style={{maxWidth:"100%",maxHeight:180,borderRadius:8,marginBottom:6}}/>
-                  <div style={{fontSize:11,color:C.primary,fontWeight:600}}>Clique para trocar</div>
+                  <div style={{fontSize:11,color:C.primary,fontWeight:600}}>Clique ou cole (Ctrl+V) para trocar</div>
                 </div>
               ):(
-                <div style={{fontSize:12,color:C.textLight}}>🖼️ Recorte do diagrama (se houver)</div>
+                <div style={{fontSize:12,color:C.textLight}}>🖼️ Clique ou cole (Ctrl+V) o recorte do diagrama</div>
               )}
             </div>
           </div>
