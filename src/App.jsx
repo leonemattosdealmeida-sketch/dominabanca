@@ -4816,18 +4816,19 @@ IMPORTANTE: baseie-se nos dados reais fornecidos. Seja específico e útil.`;
           const assuntosOrd=Object.entries(dados.assuntos).sort(([,a],[,b])=>b.total-a.total);
           return(
             <div key={mat} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
-              {/* Cabeçalho da matéria */}
-              <div style={{padding:"12px 14px",display:"flex",alignItems:"center",gap:10}}>
+              {/* Cabeçalho da matéria — clicável */}
+              <button onClick={()=>{const qids=Object.values(dados.assuntos).flatMap(a=>a.qids);onIrQuestao&&onIrQuestao(qids);}}
+                style={{width:"100%",padding:"12px 14px",display:"flex",alignItems:"center",gap:10,background:"none",border:"none",cursor:"pointer",textAlign:"left"}}>
                 <span style={{fontSize:14}}>{prMat.emoji}</span>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:13,fontWeight:700,color:C.text}}>{mat}</div>
-                  <div style={{fontSize:10,color:C.textLight,marginTop:1}}>{assuntosOrd.length} assuntos · {dados.total} questões</div>
+                  <div style={{fontSize:10,color:C.textLight,marginTop:1}}>{assuntosOrd.length} assuntos · {dados.total} questões · toque para treinar</div>
                 </div>
                 <div style={{textAlign:"right"}}>
                   <div style={{fontSize:14,fontWeight:800,color:prMat.cor}}>{pctMat.toFixed(1)}%</div>
                   <div style={{fontSize:9,color:C.textLight}}>incidência</div>
                 </div>
-              </div>
+              </button>
               {/* Barra de incidência */}
               <div style={{height:3,background:C.bg}}>
                 <div style={{height:"100%",width:`${Math.min(100,pctMat*4)}%`,background:prMat.cor}}/>
@@ -4839,13 +4840,23 @@ IMPORTANTE: baseie-se nos dados reais fornecidos. Seja específico e útil.`;
                   const aberto=assuntoAberto===`${mat}::${top}`;
                   return(
                     <div key={top}>
-                      <button onClick={()=>setAssuntoAberto(aberto?null:`${mat}::${top}`)}
-                        style={{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"8px 8px",background:aberto?C.bg:"none",border:"none",borderRadius:8,cursor:"pointer",textAlign:"left"}}>
-                        <span style={{fontSize:11,color:C.textMed,flex:1}}>{top}</span>
-                        {aprov!==null&&<span style={{fontSize:10,fontWeight:700,color:aprov>=70?"#10B981":aprov>=50?"#F59E0B":"#EF4444"}}>{aprov}% acertos</span>}
-                        <span style={{fontSize:11,fontWeight:700,color:C.textMed}}>{td.total}</span>
-                        <span style={{fontSize:11,color:C.textLight,transform:aberto?"rotate(90deg)":"none",transition:"transform 0.15s"}}>›</span>
-                      </button>
+                      <div style={{display:"flex",alignItems:"center",gap:4,padding:"2px 0"}}>
+                        {/* Clicar no assunto → treina */}
+                        <button onClick={()=>onIrQuestao&&onIrQuestao(td.qids)}
+                          style={{flex:1,display:"flex",alignItems:"center",gap:8,padding:"8px",background:"none",border:"none",borderRadius:8,cursor:"pointer",textAlign:"left"}}
+                          onMouseEnter={e=>e.currentTarget.style.background=C.bg}
+                          onMouseLeave={e=>e.currentTarget.style.background="none"}>
+                          <span style={{fontSize:11,color:C.textMed,flex:1}}>{top}</span>
+                          {aprov!==null&&<span style={{fontSize:10,fontWeight:700,color:aprov>=70?"#10B981":aprov>=50?"#F59E0B":"#EF4444"}}>{aprov}%</span>}
+                          <span style={{fontSize:11,fontWeight:700,color:C.textMed}}>{td.total}</span>
+                        </button>
+                        {/* Botão raio-x */}
+                        <button onClick={()=>setAssuntoAberto(aberto?null:`${mat}::${top}`)}
+                          title="Ver estatísticas"
+                          style={{width:28,height:28,borderRadius:7,background:aberto?C.primaryXLight:"none",border:`1px solid ${aberto?C.primary+"40":C.border}`,color:aberto?C.primary:C.textLight,cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                          {aberto?"−":"+"}
+                        </button>
+                      </div>
                       {/* Raio-X do assunto */}
                       {aberto&&(
                         <div style={{padding:"4px 12px 12px",display:"flex",flexDirection:"column",gap:8}}>
@@ -4897,7 +4908,6 @@ function TreinoSessao({user,filtro,onVoltar}){
   const [tempoSeg,setTempoSeg]=React.useState(0);
   const [filtroMenu,setFiltroMenu]=React.useState("materia");
   const [ordemMenu,setOrdemMenu]=React.useState("asc");
-  const [abaMenu,setAbaMenu]=React.useState("caderno");
   const [swipeDx,setSwipeDx]=React.useState(0);
   const [swiping,setSwiping]=React.useState(false);
   const swipeRef=React.useRef({x:0,y:0,active:false});
@@ -5208,102 +5218,25 @@ function TreinoSessao({user,filtro,onVoltar}){
                   {/* Header do painel */}
                   <div style={{background:"white",borderBottom:`1px solid ${C.border}`,padding:"14px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
                     <div>
-                      <div style={{fontFamily:"'Lora',serif",fontSize:17,fontWeight:700,color:C.text}}>Painel de estudos</div>
+                      <div style={{fontFamily:"'Lora',serif",fontSize:17,fontWeight:700,color:C.text}}>🗺️ Mapa estratégico</div>
                       <div style={{fontSize:11,color:C.textLight,marginTop:1}}>{total} questões · {acertos} acertos · {erros} erros · {fmtTempo(tempoSeg)}</div>
                     </div>
                     <button onClick={()=>setDetalharSessao(false)}
                       style={{width:34,height:34,borderRadius:9,background:C.bg,border:`1px solid ${C.border}`,color:C.textMed,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
                   </div>
 
-                  {/* Abas */}
-                  <div style={{background:"white",borderBottom:`1px solid ${C.border}`,display:"flex",flexShrink:0,padding:"0 8px"}}>
-                    {[{id:"caderno",l:"📋 Questões do caderno"},{id:"mapa",l:"🗺️ Mapa estratégico"}].map(a=>(
-                      <button key={a.id} onClick={()=>setAbaMenu(a.id)}
-                        style={{padding:"12px 16px",border:"none",background:"none",cursor:"pointer",fontSize:13,fontWeight:abaMenu===a.id?700:500,color:abaMenu===a.id?C.primary:C.textMed,borderBottom:`2px solid ${abaMenu===a.id?C.primary:"transparent"}`,fontFamily:"'Sora',sans-serif",transition:"all 0.15s"}}>
-                        {a.l}
-                      </button>
-                    ))}
-                  </div>
+
 
                   {/* Conteúdo rolável */}
                   <div style={{flex:1,overflowY:"auto",padding:"18px"}}>
 
-                    {/* ABA: Questões do caderno */}
-                    {abaMenu==="caderno"&&(()=>{
-                      const porMateria={};
-                      questoes.forEach(q=>{
-                        const m=q.materia||"—";
-                        if(!porMateria[m]) porMateria[m]={count:0,topicos:{}};
-                        porMateria[m].count++;
-                        const t=q.topico||"—";
-                        porMateria[m].topicos[t]=(porMateria[m].topicos[t]||0)+1;
-                      });
-                      let entradas=Object.entries(porMateria);
-                      if(filtroMenu==="quantidade") entradas=entradas.sort(([,a],[,b])=>ordemMenu==="asc"?a.count-b.count:b.count-a.count);
-                      else entradas=entradas.sort(([a],[b])=>ordemMenu==="asc"?a.localeCompare(b):b.localeCompare(a));
-                      return(
-                        <>
-                          {/* Filtros */}
-                          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:14,flexWrap:"wrap"}}>
-                            <span style={{fontSize:10,fontWeight:700,color:C.textLight,textTransform:"uppercase",letterSpacing:0.8,marginRight:2}}>Ordenar</span>
-                            {[{id:"materia",l:"A-Z"},{id:"quantidade",l:"Quantidade"}].map(f=>(
-                              <button key={f.id} onClick={()=>{if(filtroMenu===f.id)setOrdemMenu(o=>o==="asc"?"desc":"asc");else setFiltroMenu(f.id);}}
-                                style={{padding:"5px 11px",borderRadius:7,border:`1px solid ${filtroMenu===f.id?C.primary:C.border}`,background:filtroMenu===f.id?C.primaryXLight:"white",color:filtroMenu===f.id?C.primary:C.textMed,fontSize:12,fontWeight:filtroMenu===f.id?700:400,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
-                                {f.l}{filtroMenu===f.id&&<span>{ordemMenu==="asc"?"↑":"↓"}</span>}
-                              </button>
-                            ))}
-                          </div>
-                          {/* Lista */}
-                          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                            {entradas.map(([mat,dados])=>{
-                              const primeiraQ=questoes.findIndex(q=>q.materia===mat);
-                              const estaAqui=questoes[idx]?.materia===mat;
-                              const topicosOrd=Object.entries(dados.topicos).sort(([,a],[,b])=>b-a);
-                              return(
-                                <div key={mat} style={{background:"white",border:`1px solid ${estaAqui?C.primary+"50":C.border}`,borderRadius:12,overflow:"hidden"}}>
-                                  <button onClick={()=>{if(primeiraQ>-1){setIdx(primeiraQ);setSelecionada(null);setConfirmada(false);}setDetalharSessao(false);}}
-                                    style={{width:"100%",display:"flex",alignItems:"center",padding:"12px 14px",background:estaAqui?C.primaryXLight:"white",border:"none",cursor:"pointer",textAlign:"left"}}>
-                                    <div style={{width:3,height:30,borderRadius:2,background:estaAqui?C.primary:"transparent",marginRight:12,flexShrink:0}}/>
-                                    <div style={{flex:1}}>
-                                      <div style={{fontSize:13,fontWeight:estaAqui?700:600,color:estaAqui?C.primary:C.text}}>{mat}</div>
-                                      <div style={{fontSize:10,color:C.textLight,marginTop:1}}>{topicosOrd.length} assunto{topicosOrd.length!==1?"s":""}</div>
-                                    </div>
-                                    <div style={{fontSize:13,fontWeight:700,color:estaAqui?C.primary:C.textMed,flexShrink:0}}>{dados.count}</div>
-                                    <span style={{fontSize:11,color:C.textLight,marginLeft:8}}>›</span>
-                                  </button>
-                                  {topicosOrd.length>0&&(
-                                    <div style={{padding:"0 14px 10px 29px",display:"flex",flexWrap:"wrap",gap:5}}>
-                                      {topicosOrd.slice(0,6).map(([top,cnt])=>{
-                                        const topicIdx=questoes.findIndex(q=>q.materia===mat&&q.topico===top);
-                                        const isAtual=questoes[idx]?.materia===mat&&questoes[idx]?.topico===top;
-                                        return(
-                                          <button key={top} onClick={()=>{if(topicIdx>-1){setIdx(topicIdx);setSelecionada(null);setConfirmada(false);}setDetalharSessao(false);}}
-                                            style={{padding:"4px 10px",background:isAtual?C.primaryXLight:C.bg,border:`1px solid ${isAtual?C.primary+"40":C.border}`,borderRadius:100,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
-                                            <span style={{fontSize:10,color:isAtual?C.primary:C.textMed,fontWeight:isAtual?600:400}}>{top}</span>
-                                            <span style={{fontSize:9,color:C.textLight}}>{cnt}</span>
-                                          </button>
-                                        );
-                                      })}
-                                      {topicosOrd.length>6&&<span style={{fontSize:10,color:C.textLight,alignSelf:"center"}}>+{topicosOrd.length-6}</span>}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </>
-                      );
-                    })()}
-
-                    {/* ABA: Mapa estratégico */}
-                    {abaMenu==="mapa"&&(
-                      <MapaEstrategico user={user} questoes={questoes}
-                        onIrQuestao={(qids)=>{
-                          const primeira=questoes.findIndex(q=>qids.includes(q.id));
-                          if(primeira>-1){setIdx(primeira);setSelecionada(null);setConfirmada(false);}
-                          setDetalharSessao(false);
-                        }}/>
-                    )}
+                    {/* Mapa estratégico */}
+                    <MapaEstrategico user={user} questoes={questoes}
+                      onIrQuestao={(qids)=>{
+                        const primeira=questoes.findIndex(q=>qids.includes(q.id));
+                        if(primeira>-1){setIdx(primeira);setSelecionada(null);setConfirmada(false);}
+                        setDetalharSessao(false);
+                      }}/>
                   </div>
                 </div>
               </div>
