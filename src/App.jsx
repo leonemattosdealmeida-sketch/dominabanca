@@ -2133,6 +2133,7 @@ Use parágrafos separados por linha em branco. Comece títulos com número e pon
       let imagemBase=null;
       if(dados.tem_imagem&&diagramaImg) imagemBase=`data:image/png;base64,${diagramaImg}`;
       const payload={
+        grupo:dados.materia||"Geral",
         materia:dados.materia||"",
         topico:dados.topico||"",
         banca:dados.banca||"",
