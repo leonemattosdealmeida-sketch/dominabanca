@@ -4598,7 +4598,7 @@ function TreinoTab({user,plano,onIniciar}){
 }
 
 /* ─── MAPA ESTRATÉGICO DO CONCURSO ───────────────────────────────────────── */
-function MapaEstrategico({user,questoes,onIrQuestao}){
+function MapaEstrategico({user,questoes,onTreinar}){
   const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
   const [bancas,setBancas]=React.useState([]);
   const [cargos,setCargos]=React.useState([]);
@@ -4608,6 +4608,7 @@ function MapaEstrategico({user,questoes,onIrQuestao}){
   const [respostas,setRespostas]=React.useState([]);
   const [loading,setLoading]=React.useState(true);
   const [assuntoAberto,setAssuntoAberto]=React.useState(null);
+  const [materiaAberta,setMateriaAberta]=React.useState(null);
   const [analiseIA,setAnaliseIA]=React.useState(null);
   const [gerandoIA,setGerandoIA]=React.useState(false);
 
@@ -4814,74 +4815,79 @@ IMPORTANTE: baseie-se nos dados reais fornecidos. Seja específico e útil.`;
           const pctMat=totalFiltrado>0?(dados.total/totalFiltrado)*100:0;
           const prMat=prioridade(pctMat);
           const assuntosOrd=Object.entries(dados.assuntos).sort(([,a],[,b])=>b.total-a.total);
+          const matAberta=materiaAberta===mat;
           return(
-            <div key={mat} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:12,overflow:"hidden"}}>
-              {/* Cabeçalho da matéria — clicável */}
-              <button onClick={()=>{const qids=Object.values(dados.assuntos).flatMap(a=>a.qids);onIrQuestao&&onIrQuestao(qids);}}
-                style={{width:"100%",padding:"12px 14px",display:"flex",alignItems:"center",gap:10,background:"none",border:"none",cursor:"pointer",textAlign:"left"}}>
-                <span style={{fontSize:14}}>{prMat.emoji}</span>
+            <div key={mat} style={{background:C.white,border:`1px solid ${matAberta?prMat.cor+"50":C.border}`,borderRadius:12,overflow:"hidden"}}>
+              {/* Cabeçalho da matéria — clicar expande assuntos */}
+              <button onClick={()=>setMateriaAberta(matAberta?null:mat)}
+                style={{width:"100%",padding:"13px 14px",display:"flex",alignItems:"center",gap:10,background:matAberta?prMat.bg:"white",border:"none",cursor:"pointer",textAlign:"left"}}>
+                <span style={{fontSize:15}}>{prMat.emoji}</span>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:13,fontWeight:700,color:C.text}}>{mat}</div>
-                  <div style={{fontSize:10,color:C.textLight,marginTop:1}}>{assuntosOrd.length} assuntos · {dados.total} questões · toque para treinar</div>
+                  <div style={{fontSize:10,color:C.textLight,marginTop:1}}>{assuntosOrd.length} assunto{assuntosOrd.length!==1?"s":""} · {dados.total} questões</div>
                 </div>
-                <div style={{textAlign:"right"}}>
+                <div style={{textAlign:"right",marginRight:4}}>
                   <div style={{fontSize:14,fontWeight:800,color:prMat.cor}}>{pctMat.toFixed(1)}%</div>
                   <div style={{fontSize:9,color:C.textLight}}>incidência</div>
                 </div>
+                <span style={{fontSize:14,color:C.textLight,transform:matAberta?"rotate(90deg)":"none",transition:"transform 0.2s",flexShrink:0}}>›</span>
               </button>
               {/* Barra de incidência */}
               <div style={{height:3,background:C.bg}}>
                 <div style={{height:"100%",width:`${Math.min(100,pctMat*4)}%`,background:prMat.cor}}/>
               </div>
-              {/* Assuntos */}
-              <div style={{padding:"4px 8px 8px"}}>
-                {assuntosOrd.map(([top,td])=>{
-                  const aprov=td.respTotal>0?Math.round((td.respCertas/td.respTotal)*100):null;
-                  const aberto=assuntoAberto===`${mat}::${top}`;
-                  return(
-                    <div key={top}>
-                      <div style={{display:"flex",alignItems:"center",gap:4,padding:"2px 0"}}>
-                        {/* Clicar no assunto → treina */}
-                        <button onClick={()=>onIrQuestao&&onIrQuestao(td.qids)}
-                          style={{flex:1,display:"flex",alignItems:"center",gap:8,padding:"8px",background:"none",border:"none",borderRadius:8,cursor:"pointer",textAlign:"left"}}
-                          onMouseEnter={e=>e.currentTarget.style.background=C.bg}
-                          onMouseLeave={e=>e.currentTarget.style.background="none"}>
-                          <span style={{fontSize:11,color:C.textMed,flex:1}}>{top}</span>
-                          {aprov!==null&&<span style={{fontSize:10,fontWeight:700,color:aprov>=70?"#10B981":aprov>=50?"#F59E0B":"#EF4444"}}>{aprov}%</span>}
-                          <span style={{fontSize:11,fontWeight:700,color:C.textMed}}>{td.total}</span>
-                        </button>
-                        {/* Botão raio-x */}
-                        <button onClick={()=>setAssuntoAberto(aberto?null:`${mat}::${top}`)}
-                          title="Ver estatísticas"
-                          style={{width:28,height:28,borderRadius:7,background:aberto?C.primaryXLight:"none",border:`1px solid ${aberto?C.primary+"40":C.border}`,color:aberto?C.primary:C.textLight,cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                          {aberto?"−":"+"}
-                        </button>
-                      </div>
-                      {/* Raio-X do assunto */}
-                      {aberto&&(
-                        <div style={{padding:"4px 12px 12px",display:"flex",flexDirection:"column",gap:8}}>
-                          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
-                            {[
-                              {l:"Questões",v:td.total},
-                              {l:"Respostas",v:td.respTotal||"—"},
-                              {l:"Aproveitamento",v:aprov!==null?`${aprov}%`:"—"},
-                            ].map(s=>(
-                              <div key={s.l} style={{background:C.bg,borderRadius:8,padding:"8px",textAlign:"center"}}>
-                                <div style={{fontSize:14,fontWeight:800,color:C.text}}>{s.v}</div>
-                                <div style={{fontSize:9,color:C.textLight,marginTop:2}}>{s.l}</div>
-                              </div>
-                            ))}
-                          </div>
-                          <button onClick={()=>onIrQuestao&&onIrQuestao(td.qids)}
-                            style={{padding:"8px",background:C.primaryXLight,border:`1px solid ${C.primary}40`,color:C.primary,borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>
-                            Treinar {td.total} questões deste assunto →
+              {/* Assuntos — só aparecem quando a matéria está aberta */}
+              {matAberta&&(
+                <div style={{padding:"8px"}}>
+                  {/* Botão treinar matéria inteira */}
+                  <button onClick={()=>onTreinar&&onTreinar({materia:mat})}
+                    style={{width:"100%",padding:"9px",marginBottom:8,background:`linear-gradient(135deg,#1A1045,${C.primary})`,color:"white",border:"none",borderRadius:9,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                    ▶ Treinar toda a matéria ({dados.total} questões)
+                  </button>
+                  {/* Lista de assuntos */}
+                  {assuntosOrd.map(([top,td])=>{
+                    const aprov=td.respTotal>0?Math.round((td.respCertas/td.respTotal)*100):null;
+                    const aberto=assuntoAberto===`${mat}::${top}`;
+                    return(
+                      <div key={top} style={{borderTop:`1px solid ${C.border}`}}>
+                        <div style={{display:"flex",alignItems:"center",gap:4,padding:"2px 0"}}>
+                          {/* Clicar no assunto → treina */}
+                          <button onClick={()=>onTreinar&&onTreinar({materia:mat,topico:top})}
+                            style={{flex:1,display:"flex",alignItems:"center",gap:8,padding:"9px 8px",background:"none",border:"none",borderRadius:8,cursor:"pointer",textAlign:"left"}}
+                            onMouseEnter={e=>e.currentTarget.style.background=C.bg}
+                            onMouseLeave={e=>e.currentTarget.style.background="none"}>
+                            <span style={{fontSize:11,color:C.text,flex:1,fontWeight:500}}>{top}</span>
+                            {aprov!==null&&<span style={{fontSize:10,fontWeight:700,color:aprov>=70?"#10B981":aprov>=50?"#F59E0B":"#EF4444"}}>{aprov}%</span>}
+                            <span style={{fontSize:11,fontWeight:700,color:C.textMed}}>{td.total}</span>
+                          </button>
+                          {/* Botão raio-x */}
+                          <button onClick={()=>setAssuntoAberto(aberto?null:`${mat}::${top}`)}
+                            title="Ver estatísticas"
+                            style={{width:28,height:28,borderRadius:7,background:aberto?C.primaryXLight:"none",border:`1px solid ${aberto?C.primary+"40":C.border}`,color:aberto?C.primary:C.textLight,cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginRight:4}}>
+                            {aberto?"−":"+"}
                           </button>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                        {aberto&&(
+                          <div style={{padding:"4px 12px 12px",display:"flex",flexDirection:"column",gap:8}}>
+                            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
+                              {[{l:"Questões",v:td.total},{l:"Respostas",v:td.respTotal||"—"},{l:"Aproveitamento",v:aprov!==null?`${aprov}%`:"—"}].map(s=>(
+                                <div key={s.l} style={{background:C.bg,borderRadius:8,padding:"8px",textAlign:"center"}}>
+                                  <div style={{fontSize:14,fontWeight:800,color:C.text}}>{s.v}</div>
+                                  <div style={{fontSize:9,color:C.textLight,marginTop:2}}>{s.l}</div>
+                                </div>
+                              ))}
+                            </div>
+                            <button onClick={()=>onTreinar&&onTreinar({materia:mat,topico:top})}
+                              style={{padding:"8px",background:C.primaryXLight,border:`1px solid ${C.primary}40`,color:C.primary,borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                              Treinar {td.total} questões deste assunto →
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}
@@ -5232,10 +5238,18 @@ function TreinoSessao({user,filtro,onVoltar}){
 
                     {/* Mapa estratégico */}
                     <MapaEstrategico user={user} questoes={questoes}
-                      onIrQuestao={(qids)=>{
-                        const primeira=questoes.findIndex(q=>qids.includes(q.id));
-                        if(primeira>-1){setIdx(primeira);setSelecionada(null);setConfirmada(false);}
-                        setDetalharSessao(false);
+                      onTreinar={async(filtro)=>{
+                        // filtro = {materia} ou {materia,topico}
+                        let query=supabase.from("questoes").select("*").eq("ativa",true).eq("materia",filtro.materia);
+                        if(filtro.topico) query=query.eq("topico",filtro.topico);
+                        const {data}=await query.limit(500);
+                        if(data&&data.length>0){
+                          setQuestoes(data);
+                          setQuestoesOriginais(data);
+                          setTotal(data.length);
+                          setIdx(0);setSelecionada(null);setConfirmada(false);
+                          setDetalharSessao(false);
+                        }
                       }}/>
                   </div>
                 </div>
