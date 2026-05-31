@@ -2061,7 +2061,9 @@ function ImportarPrint({user,onSalvar}){
 }
 REGRAS:
 - Transcreva o enunciado EXATAMENTE como está, sem resumir.
-- Se houver diagrama/esquema/gráfico, descreva-o brevemente entre colchetes dentro do enunciado E marque tem_imagem como true.
+- PRESERVE A FORMATAÇÃO: quando o enunciado tiver itens, tópicos ou parágrafos separados (ex: I, II, III, IV ou listas), separe cada um com QUEBRA DE LINHA DUPLA (\n\n) no JSON. Mantenha a estrutura visual original do texto.
+- Cada item numerado (I, II, III...) ou cada parágrafo deve ficar em sua própria linha, separado por \n\n.
+- Marque tem_imagem como true APENAS se houver uma figura, gráfico, diagrama, tabela ou esquema VISUAL no print. NÃO marque true só porque o texto menciona ou descreve algo — só se existir imagem de verdade.
 - Para certo_errado, alternativas deve ser {}.
 - Não invente banca/ano/concurso se não estiverem visíveis.`},
           {type:"image_url",image_url:{url:`data:image/png;base64,${printImg}`}}
@@ -3200,7 +3202,7 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
               onMouseUp={handleEnuncSelect}
               onTouchEnd={handleEnuncSelect}
               onMouseDown={()=>setMarkPopup(null)}
-              style={{fontSize:enuncFontSize,lineHeight:enuncSpacing,color:'#111827',fontFamily:"'Lora',serif",userSelect:"text",marginBottom:24}}>
+              style={{fontSize:enuncFontSize,lineHeight:enuncSpacing,color:'#111827',fontFamily:"'Lora',serif",userSelect:"text",marginBottom:24,whiteSpace:"pre-wrap"}}>
               {(()=>{
                 const texto=q?.enunciado||"";
                 if(!enuncHighlights.length) return texto;
