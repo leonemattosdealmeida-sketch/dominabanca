@@ -4852,23 +4852,14 @@ IMPORTANTE: baseie-se nos dados reais fornecidos. Seja específico e útil.`;
                     const aberto=assuntoAberto===`${mat}::${top}`;
                     return(
                       <div key={top} style={{borderTop:`1px solid ${C.border}`}}>
-                        <div style={{display:"flex",alignItems:"center",gap:4,padding:"2px 0"}}>
-                          {/* Clicar no assunto → treina */}
-                          <button onClick={()=>onTreinar&&onTreinar({materia:mat,topico:top})}
-                            style={{flex:1,display:"flex",alignItems:"center",gap:8,padding:"9px 8px",background:"none",border:"none",borderRadius:8,cursor:"pointer",textAlign:"left"}}
-                            onMouseEnter={e=>e.currentTarget.style.background=C.bg}
-                            onMouseLeave={e=>e.currentTarget.style.background="none"}>
-                            <span style={{fontSize:11,color:C.text,flex:1,fontWeight:500}}>{top}</span>
-                            {aprov!==null&&<span style={{fontSize:10,fontWeight:700,color:aprov>=70?"#10B981":aprov>=50?"#F59E0B":"#EF4444"}}>{aprov}%</span>}
-                            <span style={{fontSize:11,fontWeight:700,color:C.textMed}}>{td.total}</span>
-                          </button>
-                          {/* Botão raio-x */}
-                          <button onClick={()=>setAssuntoAberto(aberto?null:`${mat}::${top}`)}
-                            title="Ver estatísticas"
-                            style={{width:28,height:28,borderRadius:7,background:aberto?C.primaryXLight:"none",border:`1px solid ${aberto?C.primary+"40":C.border}`,color:aberto?C.primary:C.textLight,cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginRight:4}}>
-                            {aberto?"−":"+"}
-                          </button>
-                        </div>
+                        {/* Clicar no assunto → abre detalhamento */}
+                        <button onClick={()=>setAssuntoAberto(aberto?null:`${mat}::${top}`)}
+                          style={{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"10px 8px",background:aberto?C.bg:"none",border:"none",cursor:"pointer",textAlign:"left",transition:"background 0.15s"}}>
+                          <span style={{fontSize:11,color:C.text,flex:1,fontWeight:aberto?700:500}}>{top}</span>
+                          {aprov!==null&&<span style={{fontSize:10,fontWeight:700,color:aprov>=70?"#10B981":aprov>=50?"#F59E0B":"#EF4444"}}>{aprov}%</span>}
+                          <span style={{fontSize:11,fontWeight:700,color:C.textMed}}>{td.total}</span>
+                          <span style={{fontSize:12,color:C.textLight,transform:aberto?"rotate(90deg)":"none",transition:"transform 0.15s",flexShrink:0}}>›</span>
+                        </button>
                         {aberto&&(
                           <div style={{padding:"4px 12px 12px",display:"flex",flexDirection:"column",gap:8}}>
                             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
@@ -4880,8 +4871,8 @@ IMPORTANTE: baseie-se nos dados reais fornecidos. Seja específico e útil.`;
                               ))}
                             </div>
                             <button onClick={()=>onTreinar&&onTreinar({materia:mat,topico:top})}
-                              style={{padding:"8px",background:C.primaryXLight,border:`1px solid ${C.primary}40`,color:C.primary,borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>
-                              Treinar {td.total} questões deste assunto →
+                              style={{padding:"10px",background:`linear-gradient(135deg,#1A1045,${C.primary})`,color:"white",border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                              ▶ Treinar {td.total} questões deste assunto
                             </button>
                           </div>
                         )}
