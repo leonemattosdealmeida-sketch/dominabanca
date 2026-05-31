@@ -7321,7 +7321,6 @@ function Onboarding({user,onComplete,onBack}){
 
   return(
     <div style={{minHeight:"100vh",background:`linear-gradient(135deg,#1A1045 0%,#2D1B69 50%,#1A1045 100%)`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px 16px",fontFamily:"'Sora',sans-serif"}}>
-    <div style={{minHeight:"100vh",background:`linear-gradient(135deg,#1A1045 0%,#2D1B69 50%,#1A1045 100%)`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px 16px",fontFamily:"'Sora',sans-serif"}}>
       {/* Card principal */}
       <div style={{width:"100%",maxWidth:560,background:"white",borderRadius:24,boxShadow:"0 24px 80px rgba(0,0,0,0.35)",overflow:"hidden"}}>
 
