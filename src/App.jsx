@@ -2160,7 +2160,6 @@ Use parágrafos separados por linha em branco. Comece títulos com número e pon
     }catch(e){console.error(e);setErro("Erro ao salvar: "+(e.message||""));setFase("revisar");}
   };
 
-  const Card=({children})=>(<div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:20,width:"100%"}}>{children}</div>);
 
   return(
     <div style={{flex:1,width:"100%",maxWidth:760,margin:"0 auto",display:"flex",flexDirection:"column",gap:16}}>
@@ -2171,7 +2170,7 @@ Use parágrafos separados por linha em branco. Comece títulos com número e pon
 
       {/* FASE UPLOAD */}
       {(fase==="upload"||fase==="erro")&&(
-        <Card>
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:20,width:"100%"}}>
           <div style={{fontFamily:"'Lora',serif",fontSize:18,fontWeight:700,color:C.text,marginBottom:6}}>Importar questão por print</div>
           <div style={{fontSize:13,color:C.textMed,marginBottom:20,lineHeight:1.6}}>
             Envie o print da questão. A IA vai extrair o enunciado, alternativas, banca, ano, matéria e assunto. Você informa o gabarito e gera o comentário.
@@ -2224,18 +2223,18 @@ Use parágrafos separados por linha em branco. Comece títulos com número e pon
             style={{width:"100%",padding:"14px",background:printImg?`linear-gradient(135deg,#1A1045,${C.primary})`:"#E5E7EB",color:printImg?"white":"#9CA3AF",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:printImg?"pointer":"not-allowed",fontFamily:"'Sora',sans-serif"}}>
             Analisar questão →
           </button>
-        </Card>
+        </div>
       )}
 
       {/* FASE ANALISANDO */}
       {fase==="analisando"&&(
-        <Card>
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:20,width:"100%"}}>
           <div style={{textAlign:"center",padding:"32px 0"}}>
             <div style={{fontSize:36,marginBottom:12}}>🔍</div>
             <div style={{fontSize:15,fontWeight:700,color:C.text,marginBottom:6}}>Lendo a questão...</div>
             <div style={{fontSize:12,color:C.textMed}}>Extraindo enunciado, alternativas e metadados</div>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* FASE REVISAR */}
@@ -2249,7 +2248,7 @@ Use parágrafos separados por linha em branco. Comece títulos com número e pon
             </div>
           )}
 
-          <Card>
+          <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:20,width:"100%"}}>
             <div style={{fontFamily:"'Lora',serif",fontSize:16,fontWeight:700,color:C.text,marginBottom:16}}>Revisar e confirmar</div>
 
             {/* Metadados editáveis */}
@@ -2353,18 +2352,18 @@ Use parágrafos separados por linha em branco. Comece títulos com número e pon
                 💾 Salvar no banco
               </button>
             </div>
-          </Card>
+          </div>
         </>
       )}
 
       {/* FASE SALVANDO / SALVOU */}
       {fase==="salvando"&&(
-        <Card>
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:20,width:"100%"}}>
           <div style={{textAlign:"center",padding:"32px 0"}}>
             <div style={{fontSize:36,marginBottom:12}}>{salvou?"✅":"💾"}</div>
             <div style={{fontSize:15,fontWeight:700,color:C.text}}>{salvou?"Questão salva!":"Salvando..."}</div>
           </div>
-        </Card>
+        </div>
       )}
     </div>
   );
