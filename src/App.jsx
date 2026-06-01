@@ -3763,6 +3763,7 @@ function SessaoEstudos({user,plano,onConcluir,onVoltar}){
   const [salvandoCaderno,setSalvandoCaderno]=React.useState(false);
   const [noCaderno,setNoCaderno]=React.useState(false);
   const [sessaoId,setSessaoId]=React.useState(null);
+  const respondidasRef=React.useRef(new Set(filtro.questoesRespondidas||[]));
 
   // Carrega questões baseadas no plano do dia
   React.useEffect(()=>{loadQuestoes();},[]);
@@ -4346,7 +4347,7 @@ function TreinoTab({user,plano,onIniciar}){
 
                     {/* Rodapé: ações */}
                     <div style={{padding:"10px 18px",borderTop:`1px solid ${C.border}`,background:C.bg,display:"flex",gap:8,alignItems:"center"}}>
-                      <button onClick={()=>onIniciar({topicos:cad.topicos,total:cad.total_questoes,cadernoId:cad.id,questoesRespondidas:cad.questoes_respondidas||[]})}
+                      <button onClick={async()=>{if(concluido){await resetarCaderno(cad.id);}onIniciar({topicos:cad.topicos,total:cad.total_questoes,cadernoId:cad.id,questoesRespondidas:concluido?[]:(cad.questoes_respondidas||[]),refazer:concluido});}}
                         style={{flex:1,padding:"9px 16px",background:`linear-gradient(135deg,#1E1B4B,${C.primary})`,color:"white",border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,boxShadow:"0 2px 8px rgba(108,60,225,0.25)"}}>
                         {concluido?"Refazer":emAndamento?"Continuar →":"Começar →"}
                       </button>
@@ -5005,6 +5006,7 @@ function TreinoSessao({user,filtro,onVoltar}){
   const [swiping,setSwiping]=React.useState(false);
   const swipeRef=React.useRef({x:0,y:0,active:false});
   const [sessaoId,setSessaoId]=React.useState(null);
+  const respondidasRef=React.useRef(new Set(filtro.questoesRespondidas||[]));
   const LETRAS=["A","B","C","D","E"];
 
   React.useEffect(()=>{
@@ -5063,15 +5065,28 @@ function TreinoSessao({user,filtro,onVoltar}){
       const{data}=await q;
       todasQuestoes=data||[];
     }
-    // Se vier com caderno, filtra questões já respondidas para mostrar por último
+    // Continuar de onde parou: não-respondidas primeiro; refazer tudo: embaralha geral
     const jaRespondidas=new Set(filtro.questoesRespondidas||[]);
-    const naoRespondidas=todasQuestoes.filter(q=>!jaRespondidas.has(q.id));
-    const respondidas=todasQuestoes.filter(q=>jaRespondidas.has(q.id));
-    const shuffled=[...naoRespondidas.sort(()=>Math.random()-0.5),...respondidas.sort(()=>Math.random()-0.5)];
+    let ordenadas;
+    if(filtro.refazer){
+      // Refazer todas — embaralha tudo do zero
+      ordenadas=[...todasQuestoes].sort(()=>Math.random()-0.5);
+      respondidasRef.current=new Set();
+    }else{
+      // Continuar — não-respondidas primeiro (mantém ordem para retomar)
+      const naoRespondidas=todasQuestoes.filter(q=>!jaRespondidas.has(q.id));
+      const respondidas=todasQuestoes.filter(q=>jaRespondidas.has(q.id));
+      ordenadas=[...naoRespondidas,...respondidas];
+    }
+    const shuffled=ordenadas;
     setQuestoes(shuffled);
     setQuestoesOriginais(shuffled);
     setTotal(shuffled.length);
     setLoading(false);
+    // Marca as já respondidas no estado para o contador
+    if(!filtro.refazer&&jaRespondidas.size>0){
+      setRespondidas(new Set(jaRespondidas));
+    }
     // Cria sessão para gravar respostas (sessao_id é obrigatório)
     if(shuffled.length>0){
       const mats=[...new Set(shuffled.map(q=>q.materia).filter(Boolean))];
@@ -5090,27 +5105,26 @@ function TreinoSessao({user,filtro,onVoltar}){
     if(correta) setAcertos(a=>a+1);
     setConfirmada(true);
     setNoCaderno(null);
-    // Marca como respondida
+    // Marca como respondida (estado + ref acumulado)
     setRespondidas(prev=>new Set([...prev,q.id]));
-    // Grava resposta para estatísticas do Mapa Estratégico (sessao_id é obrigatório)
-    if(sessaoId&&q.id&&!String(q.id).startsWith("ia_")){
-      supabase.from("respostas_sessao").insert({
-        sessao_id:sessaoId,user_id:user.id,questao_id:q.id,resposta:selecionada,correta
-      }).then(()=>{}).catch(e=>console.error("[resposta]",e));
+    respondidasRef.current.add(q.id);
+    // Grava resposta individual em respostas_sessao
+    if(q.id&&!String(q.id).startsWith("ia_")){
+      const payload={user_id:user.id,questao_id:q.id,resposta:selecionada,correta};
+      if(sessaoId) payload.sessao_id=sessaoId;
+      supabase.from("respostas_sessao").insert(payload).then(({error})=>{
+        if(error) console.error("[resposta]",error);
+      });
     }
-    // Salva progresso no caderno se existir
-    if(filtro.cadernoId){
-      const jaRespondidas=filtro.questoesRespondidas||[];
-      if(!jaRespondidas.includes(q.id)){
-        const novasRespondidas=[...jaRespondidas,q.id];
-        // Salva progresso sem mutar filtro diretamente
-        try{
-          await supabase.from("cadernos_treino").update({
-            questoes_respondidas:novasRespondidas,
-            updated_at:new Date().toISOString()
-          }).eq("id",filtro.cadernoId);
-        }catch(e){console.error("[CadernoProgresso]",e);}
-      }
+    // Salva progresso do caderno (lista completa acumulada pelo ref)
+    if(filtro.cadernoId&&q.id){
+      const novasRespondidas=[...respondidasRef.current];
+      supabase.from("cadernos_treino").update({
+        questoes_respondidas:novasRespondidas,
+        updated_at:new Date().toISOString()
+      }).eq("id",filtro.cadernoId).then(({error})=>{
+        if(error) console.error("[CadernoProgresso]",error);
+      });
     }
   };
 
