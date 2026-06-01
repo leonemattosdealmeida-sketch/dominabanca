@@ -3292,30 +3292,6 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
                     </div>
                   </div>
                 </div>
-                {/* Ações pós-resposta */}
-                <div className="acoes-pos-resp" style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                  {/* Ver explicação */}
-                  {!acertou&&abaQ!=='comentario_plataforma'&&(
-                    <button onClick={()=>setAbaQ('comentario_plataforma')}
-                      style={{flex:1,padding:'11px 14px',borderRadius:10,background:'white',color:C.text,border:`1px solid ${C.border}`,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:"'Sora',sans-serif",display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
-                      💡 Ver explicação
-                    </button>
-                  )}
-                  {/* Caderno de erros */}
-                  {errou&&<CadernoErrosBtn user={user} q={q}/>}
-                  {/* Próxima questão / Ver resultado */}
-                  {isLast?(
-                    <button onClick={onProxima}
-                      style={{flex:2,padding:'11px 14px',borderRadius:10,background:`linear-gradient(135deg,#1A1045,${C.primary})`,color:'white',border:'none',cursor:'pointer',fontSize:13,fontWeight:700,fontFamily:"'Sora',sans-serif"}}>
-                      🏁 Ver resultado
-                    </button>
-                  ):(
-                    <button onClick={onProxima}
-                      style={{flex:2,padding:'11px 14px',borderRadius:10,background:`linear-gradient(135deg,#1A1045,${C.primary})`,color:'white',border:'none',cursor:'pointer',fontSize:13,fontWeight:700,fontFamily:"'Sora',sans-serif"}}>
-                      Próxima questão →
-                    </button>
-                  )}
-                </div>
               </div>
             )}
           </div>
@@ -3453,6 +3429,26 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
           </div>
         ))}
       </div>
+
+      {/* Rodapé de ações — fixo abaixo, visível em qualquer aba após responder */}
+      {confirmada&&(
+        <div className="acoes-pos-resp" style={{display:'flex',gap:8,flexWrap:'wrap',padding:'14px',borderTop:`1px solid ${C.border}`,background:C.bg}}>
+          {/* Ver explicação */}
+          {!acertou&&abaQ!=='comentario_plataforma'&&(
+            <button onClick={()=>setAbaQ('comentario_plataforma')}
+              style={{flex:1,padding:'11px 14px',borderRadius:10,background:'white',color:C.text,border:`1px solid ${C.border}`,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:"'Sora',sans-serif",display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+              💡 Ver explicação
+            </button>
+          )}
+          {/* Caderno de erros */}
+          {errou&&<CadernoErrosBtn user={user} q={q}/>}
+          {/* Próxima questão / Ver resultado */}
+          <button onClick={onProxima}
+            style={{flex:2,padding:'11px 14px',borderRadius:10,background:`linear-gradient(135deg,#1A1045,${C.primary})`,color:'white',border:'none',cursor:'pointer',fontSize:13,fontWeight:700,fontFamily:"'Sora',sans-serif"}}>
+            {isLast?'🏁 Ver resultado':'Próxima questão →'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
