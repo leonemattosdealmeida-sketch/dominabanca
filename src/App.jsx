@@ -3309,11 +3309,16 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
                   )}
                   {/* Caderno de erros */}
                   {errou&&<CadernoErrosBtn user={user} q={q}/>}
-                  {/* Próxima — só aparece se for o fim da sessão */}
-                  {isLast&&(
+                  {/* Próxima questão / Ver resultado */}
+                  {isLast?(
                     <button onClick={onProxima}
                       style={{flex:2,padding:'11px 14px',borderRadius:10,background:`linear-gradient(135deg,#1A1045,${C.primary})`,color:'white',border:'none',cursor:'pointer',fontSize:13,fontWeight:700,fontFamily:"'Sora',sans-serif"}}>
-                      Ver resultado
+                      🏁 Ver resultado
+                    </button>
+                  ):(
+                    <button onClick={onProxima}
+                      style={{flex:2,padding:'11px 14px',borderRadius:10,background:`linear-gradient(135deg,#1A1045,${C.primary})`,color:'white',border:'none',cursor:'pointer',fontSize:13,fontWeight:700,fontFamily:"'Sora',sans-serif"}}>
+                      Próxima questão →
                     </button>
                   )}
                 </div>
