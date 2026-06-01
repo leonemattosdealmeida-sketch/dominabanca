@@ -2063,6 +2063,7 @@ REGRAS:
 - Transcreva o enunciado EXATAMENTE como está, sem resumir.
 - PRESERVE A FORMATAÇÃO: quando o enunciado tiver itens, tópicos ou parágrafos separados (ex: I, II, III, IV ou listas), separe cada um com QUEBRA DE LINHA DUPLA (\n\n) no JSON. Mantenha a estrutura visual original do texto.
 - Cada item numerado (I, II, III...) ou cada parágrafo deve ficar em sua própria linha, separado por \n\n.
+- Se houver TABELA, transcreva cada linha da tabela em uma linha separada (\n), usando " | " (espaço-barra-espaço) para separar as colunas. Ex: "Célula A1: Atendimento | Célula B1: Quantidade".
 - Marque tem_imagem como true APENAS se houver uma figura, gráfico, diagrama, tabela ou esquema VISUAL no print. NÃO marque true só porque o texto menciona ou descreve algo — só se existir imagem de verdade.
 - Para certo_errado, alternativas deve ser {}.
 - Não invente banca/ano/concurso se não estiverem visíveis.`},
@@ -3628,11 +3629,38 @@ function ApoioLateral({q,children}){
             <img src={q.imagem_base} alt="Apoio" onClick={()=>setZoomImg(true)} style={{maxWidth:"100%",borderRadius:8,cursor:"zoom-in",boxShadow:"0 2px 8px rgba(0,0,0,0.1)"}}/>
             <div style={{fontSize:10,color:C.textLight,marginTop:6}}>Clique para ampliar</div>
           </div>
-        ):(
-          <div style={{fontSize,lineHeight,color:sepia?"#3D2B1F":C.text,fontFamily:"'Lora',serif",whiteSpace:"pre-wrap"}}>
-            {renderTextoComHighlight(q?.texto_base||"")}
-          </div>
-        )}
+        ):(()=>{
+          const txt=q?.texto_base||"";
+          // Detecta se há linhas com separador | (formato tabela)
+          const linhas=txt.split("\n");
+          const linhasTabela=linhas.filter(l=>l.includes("|")).length;
+          const ehTabela=linhasTabela>=2;
+          if(ehTabela&&!highlights.length){
+            return(
+              <div style={{fontSize,lineHeight,color:sepia?"#3D2B1F":C.text,fontFamily:"'Lora',serif"}}>
+                {linhas.map((linha,i)=>{
+                  if(!linha.trim()) return <div key={i} style={{height:8}}/>;
+                  if(linha.includes("|")){
+                    const cols=linha.split("|").map(c=>c.trim());
+                    return(
+                      <div key={i} style={{display:"flex",gap:8,padding:"4px 0",borderBottom:`1px solid ${sepia?"#E5D9C3":C.border}`}}>
+                        {cols.map((c,j)=>(
+                          <div key={j} style={{flex:1,fontSize:fontSize-2}}>{c}</div>
+                        ))}
+                      </div>
+                    );
+                  }
+                  return <div key={i} style={{padding:"2px 0",fontWeight:linha.endsWith(":")?700:400}}>{linha}</div>;
+                })}
+              </div>
+            );
+          }
+          return(
+            <div style={{fontSize,lineHeight,color:sepia?"#3D2B1F":C.text,fontFamily:"'Lora',serif",whiteSpace:"pre-wrap"}}>
+              {renderTextoComHighlight(txt)}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
