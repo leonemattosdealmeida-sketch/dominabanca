@@ -3290,13 +3290,6 @@ function QuestaoInterativa({user,q,selecionada,confirmada,onSelect,onConfirmar,o
                       {acertou?'Ótimo! Clique em Próxima para continuar.':'Veja a explicação para entender o erro.'}
                     </div>
                   </div>
-                  {!acertou&&(
-                    <button onClick={()=>setAbaQ('comentario_plataforma')}
-                      style={{padding:'7px 14px',borderRadius:8,background:'#B91C1C',color:'#fff',border:'none',
-                        fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:"'Sora',sans-serif",flexShrink:0}}>
-                      Ver explicação
-                    </button>
-                  )}
                 </div>
                 {/* Ações pós-resposta */}
                 <div className="acoes-pos-resp" style={{display:'flex',gap:8,flexWrap:'wrap'}}>
