@@ -4609,6 +4609,7 @@ function MapaEstrategico({user,questoes,onTreinar}){
   const [loading,setLoading]=React.useState(true);
   const [assuntoAberto,setAssuntoAberto]=React.useState(null);
   const [materiaAberta,setMateriaAberta]=React.useState(null);
+  const [abaMapa,setAbaMapa]=React.useState("mapa"); // mapa | relatorio
   const [analiseIA,setAnaliseIA]=React.useState(null);
   const [gerandoIA,setGerandoIA]=React.useState(false);
 
@@ -4741,6 +4742,18 @@ IMPORTANTE: baseie-se nos dados reais fornecidos. Seja específico e útil.`;
         </div>
       </div>
 
+      {/* Abas internas: Mapa | Relatório */}
+      <div style={{display:"flex",gap:6,marginBottom:16,background:C.bg,padding:4,borderRadius:10}}>
+        {[{id:"mapa",l:"🗺️ Mapa de incidência"},{id:"relatorio",l:"📊 Relatório"}].map(a=>(
+          <button key={a.id} onClick={()=>setAbaMapa(a.id)}
+            style={{flex:1,padding:"9px",border:"none",borderRadius:8,background:abaMapa===a.id?"white":"transparent",color:abaMapa===a.id?C.primary:C.textMed,fontSize:12,fontWeight:abaMapa===a.id?700:500,cursor:"pointer",boxShadow:abaMapa===a.id?"0 1px 4px rgba(0,0,0,0.08)":"none",transition:"all 0.15s"}}>
+            {a.l}
+          </button>
+        ))}
+      </div>
+
+      {/* ═══ ABA MAPA DE INCIDÊNCIA ═══ */}
+      {abaMapa==="mapa"&&(<>
       {/* Resumo geral */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:20}}>
         {[
@@ -4885,6 +4898,106 @@ IMPORTANTE: baseie-se nos dados reais fornecidos. Seja específico e útil.`;
           );
         })}
       </div>
+      </>)}
+
+      {/* ═══ ABA RELATÓRIO ═══ */}
+      {abaMapa==="relatorio"&&(()=>{
+        // Calcula oportunidades: incidência alta + aproveitamento baixo
+        const analise=materiasOrdenadas.map(([mat,dados])=>{
+          const pct=totalFiltrado>0?(dados.total/totalFiltrado)*100:0;
+          const aprov=dados.respTotal>0?Math.round((dados.respCertas/dados.respTotal)*100):null;
+          // Ganho potencial: incidência alta + aproveitamento baixo = maior ganho
+          const ganho=aprov!==null?pct*(100-aprov)/100:pct*0.5;
+          const treinados=Object.values(dados.assuntos).filter(a=>a.respTotal>0).length;
+          const totalAssuntos=Object.keys(dados.assuntos).length;
+          return{mat,pct,aprov,ganho,total:dados.total,treinados,totalAssuntos};
+        });
+        const oportunidades=[...analise].sort((a,b)=>b.ganho-a.ganho);
+        const top=oportunidades[0];
+        // Cobertura geral do edital
+        const totalAssuntosGeral=analise.reduce((s,a)=>s+a.totalAssuntos,0);
+        const treinadosGeral=analise.reduce((s,a)=>s+a.treinados,0);
+        const cobertura=totalAssuntosGeral>0?Math.round((treinadosGeral/totalAssuntosGeral)*100):0;
+        const maxPct=Math.max(...analise.map(a=>a.pct),1);
+
+        return(
+          <div style={{display:"flex",flexDirection:"column",gap:16}}>
+
+            {/* Card: Onde focar agora */}
+            {top&&(
+              <div style={{background:`linear-gradient(135deg,#1A1045,${C.primary})`,borderRadius:16,padding:"20px",color:"white"}}>
+                <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>🎯 Onde focar agora</div>
+                <div style={{fontFamily:"'Lora',serif",fontSize:20,fontWeight:700,marginBottom:8}}>{top.mat}</div>
+                <div style={{fontSize:13,lineHeight:1.6,color:"rgba(255,255,255,0.9)",marginBottom:16}}>
+                  {top.aprov!==null
+                    ? `Esta matéria representa ${top.pct.toFixed(1)}% das questões e seu aproveitamento está em ${top.aprov}%. É onde você tem o maior potencial de ganho de pontos.`
+                    : `Esta matéria representa ${top.pct.toFixed(1)}% das questões e você ainda não treinou. Comece por aqui para maximizar seus pontos.`}
+                </div>
+                <button onClick={()=>onTreinar&&onTreinar({materia:top.mat})}
+                  style={{padding:"11px 18px",background:"white",color:C.primary,border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                  ▶ Treinar {top.mat} ({top.total} questões)
+                </button>
+              </div>
+            )}
+
+            {/* Cobertura do edital */}
+            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:"18px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:700,color:C.text}}>Cobertura do edital</div>
+                  <div style={{fontSize:11,color:C.textLight,marginTop:2}}>{treinadosGeral} de {totalAssuntosGeral} assuntos treinados</div>
+                </div>
+                <div style={{fontSize:24,fontWeight:800,color:C.primary}}>{cobertura}%</div>
+              </div>
+              <div style={{height:8,background:C.bg,borderRadius:100,overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${cobertura}%`,background:`linear-gradient(90deg,${C.primary},#A78BFA)`,borderRadius:100,transition:"width 0.5s"}}/>
+              </div>
+            </div>
+
+            {/* Gráfico de distribuição */}
+            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:"18px"}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:14}}>Distribuição da prova</div>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {analise.slice(0,8).map(a=>(
+                  <div key={a.mat}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                      <span style={{fontSize:11,color:C.text,fontWeight:500}}>{a.mat}</span>
+                      <span style={{fontSize:11,fontWeight:700,color:C.textMed}}>{a.pct.toFixed(1)}%</span>
+                    </div>
+                    <div style={{height:8,background:C.bg,borderRadius:100,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${(a.pct/maxPct)*100}%`,background:a.pct>=15?"#EF4444":a.pct>=6?"#F59E0B":"#10B981",borderRadius:100}}/>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Ranking de oportunidades */}
+            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:"18px"}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:4}}>Maiores oportunidades de pontos</div>
+              <div style={{fontSize:11,color:C.textLight,marginBottom:14}}>Matérias muito cobradas onde você ainda pode melhorar</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {oportunidades.slice(0,5).map((a,i)=>(
+                  <div key={a.mat} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:C.bg,borderRadius:10}}>
+                    <div style={{width:24,height:24,borderRadius:7,background:i===0?C.primary:C.white,color:i===0?"white":C.textMed,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:800,flexShrink:0,border:i===0?"none":`1px solid ${C.border}`}}>{i+1}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:600,color:C.text}}>{a.mat}</div>
+                      <div style={{fontSize:10,color:C.textLight,marginTop:1}}>
+                        {a.pct.toFixed(1)}% da prova{a.aprov!==null?` · ${a.aprov}% acertos`:" · não treinado"}
+                      </div>
+                    </div>
+                    <button onClick={()=>onTreinar&&onTreinar({materia:a.mat})}
+                      style={{padding:"6px 12px",background:C.primaryXLight,border:`1px solid ${C.primary}40`,color:C.primary,borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>
+                      Treinar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -4910,6 +5023,7 @@ function TreinoSessao({user,filtro,onVoltar}){
   const [swipeDx,setSwipeDx]=React.useState(0);
   const [swiping,setSwiping]=React.useState(false);
   const swipeRef=React.useRef({x:0,y:0,active:false});
+  const [sessaoId,setSessaoId]=React.useState(null);
   const LETRAS=["A","B","C","D","E"];
 
   React.useEffect(()=>{
@@ -4977,6 +5091,15 @@ function TreinoSessao({user,filtro,onVoltar}){
     setQuestoesOriginais(shuffled);
     setTotal(shuffled.length);
     setLoading(false);
+    // Cria sessão para gravar respostas (sessao_id é obrigatório)
+    if(shuffled.length>0){
+      const mats=[...new Set(shuffled.map(q=>q.materia).filter(Boolean))];
+      supabase.from("sessoes_estudo")
+        .insert({user_id:user.id,materias:mats,total_questoes:shuffled.length})
+        .select().single()
+        .then(({data:sessao})=>{if(sessao)setSessaoId(sessao.id);})
+        .catch(e=>console.error("[loadQuestoes] sessao:",e));
+    }
   };
 
   const confirmar=async()=>{
@@ -4988,6 +5111,12 @@ function TreinoSessao({user,filtro,onVoltar}){
     setNoCaderno(null);
     // Marca como respondida
     setRespondidas(prev=>new Set([...prev,q.id]));
+    // Grava resposta para estatísticas do Mapa Estratégico (sessao_id é obrigatório)
+    if(sessaoId&&q.id&&!String(q.id).startsWith("ia_")){
+      supabase.from("respostas_sessao").insert({
+        sessao_id:sessaoId,user_id:user.id,questao_id:q.id,resposta:selecionada,correta
+      }).then(()=>{}).catch(e=>console.error("[resposta]",e));
+    }
     // Salva progresso no caderno se existir
     if(filtro.cadernoId){
       const jaRespondidas=filtro.questoesRespondidas||[];
@@ -5232,22 +5361,28 @@ function TreinoSessao({user,filtro,onVoltar}){
                     {/* Mapa estratégico */}
                     <MapaEstrategico user={user} questoes={questoes}
                       onTreinar={async(filtro)=>{
-                        // filtro = {materia} ou {materia,topico}
-                        let query=supabase.from("questoes").select("*").eq("ativa",true).eq("materia",filtro.materia);
-                        if(filtro.topico) query=query.eq("topico",filtro.topico);
-                        const {data}=await query.limit(500);
-                        if(data&&data.length>0){
-                          // Cria sessão para gravar as respostas
-                          const {data:sessao}=await supabase.from("sessoes_estudo")
-                            .insert({user_id:user.id,materias:[filtro.materia],total_questoes:data.length})
-                            .select().single();
-                          if(sessao) setSessaoId(sessao.id);
-                          setQuestoes(data);
-                          setQuestoesOriginais(data);
-                          setTotal(data.length);
-                          setIdx(0);setSelecionada(null);setConfirmada(false);
-                          setDetalharSessao(false);
-                        }
+                        try{
+                          let query=supabase.from("questoes").select("*").eq("ativa",true).eq("materia",filtro.materia);
+                          if(filtro.topico) query=query.eq("topico",filtro.topico);
+                          const {data,error}=await query.limit(500);
+                          if(error){console.error("[onTreinar] query:",error);}
+                          if(data&&data.length>0){
+                            setQuestoes(data);
+                            setQuestoesOriginais(data);
+                            setTotal(data.length);
+                            setIdx(0);setSelecionada(null);setConfirmada(false);
+                            setLoading(false);
+                            setDetalharSessao(false);
+                            // Cria sessão (necessária para gravar respostas — sessao_id é NOT NULL)
+                            supabase.from("sessoes_estudo")
+                              .insert({user_id:user.id,materias:[filtro.materia],total_questoes:data.length})
+                              .select().single()
+                              .then(({data:sessao})=>{if(sessao)setSessaoId(sessao.id);})
+                              .catch(e=>console.error("[onTreinar] sessao:",e));
+                          }else{
+                            console.warn("[onTreinar] sem questões para",filtro);
+                          }
+                        }catch(e){console.error("[onTreinar]",e);}
                       }}/>
                   </div>
                 </div>
