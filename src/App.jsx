@@ -5669,6 +5669,261 @@ function RevisaoTab({user}){
   );
 }
 
+
+/* ─── ESTRATÉGIA PARETO (plano de estudos por IA) ────────────────────────── */
+function EstrategiaPareto({user,plano}){
+  const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
+  const [form,setForm]=React.useState({
+    concurso:"",cargo:"",data_prova:"",horas:"3",dias:"5",niveis:""
+  });
+  const [gerando,setGerando]=React.useState(false);
+  const [resultado,setResultado]=React.useState(null);
+  const [erro,setErro]=React.useState("");
+  const [historico,setHistorico]=React.useState([]);
+
+  // Pré-preenche com dados do onboarding/plano
+  React.useEffect(()=>{
+    if(plano){
+      setForm(f=>({
+        ...f,
+        concurso:plano.orgao||plano.area_nome||"",
+        cargo:plano.cargo||"",
+        data_prova:plano.data_prova||"",
+        horas:String(plano.horas_dia||plano.horas||"3"),
+      }));
+    }
+    // Carrega último plano salvo
+    if(user?.id){
+      supabase.from("planos_pareto").select("*").eq("user_id",user.id).order("created_at",{ascending:false}).limit(5)
+        .then(({data})=>{if(data)setHistorico(data);})
+        .catch(()=>{});
+    }
+  },[plano,user]);
+
+  const F=(k,v)=>setForm(p=>({...p,[k]:v}));
+
+  const gerar=async()=>{
+    if(!form.concurso||!form.cargo){setErro("Informe ao menos o concurso e o cargo.");return;}
+    setGerando(true);setErro("");setResultado(null);
+    try{
+      const prompt=`Você é um especialista em preparação para concursos públicos brasileiros. Aplique o Princípio de Pareto de forma RECURSIVA sobre o edital para identificar o que tem maior probabilidade de cair em prova e montar um cronograma otimizado por subtópico.
+
+## CONTEXTO
+- Concurso alvo: ${form.concurso}
+- Cargo: ${form.cargo}
+- Data da prova: ${form.data_prova||"não informada"}
+- Horas disponíveis por dia: ${form.horas}
+- Dias disponíveis por semana: ${form.dias}
+- Nível atual por disciplina: ${form.niveis||"não informado"}
+
+## METODOLOGIA: PARETO RECURSIVO (3 camadas)
+CAMADA 1 (macro): disciplinas do edital + pesos (% questões), identifique os 20% que valem ~80%, classifique PRIORITÁRIA/COMPLEMENTAR/RESIDUAL, defina % de tempo.
+CAMADA 2 (meso): por disciplina, liste tópicos, analise frequência histórica do órgão/banca, aplique Pareto, classifique QUENTE/MORNO/FRIO.
+CAMADA 3 (micro): por tópico quente/morno, quebre em subtópicos avaliando frequência, dificuldade e custo-benefício.
+
+## RESTRIÇÕES
+- Direto, nada de teoria longa.
+- Se não souber a frequência histórica, sinalize com [VERIFICAR]. Não invente dados.
+- Priorize maior retorno de questões corretas por hora.
+- Cronograma realista para as horas informadas.
+
+Retorne APENAS JSON puro (sem markdown), nesta estrutura:
+{
+  "mapa_prioridades": [
+    {"disciplina":"...","pct_questoes":"X%","prioridade":"PRIORITÁRIA|COMPLEMENTAR|RESIDUAL","pct_tempo":"X%",
+     "topicos":[{"topico":"...","frequencia":"Alta|Média|Baixa","temperatura":"QUENTE|MORNO|FRIO","ordem":1,
+        "subtopicos":[{"nome":"...","frequencia":"Alta|Média|Baixa","dificuldade":"Fácil|Médio|Difícil","custo_beneficio":"Alto|Médio|Baixo","incluir":true}]}]}
+  ],
+  "cronograma": [
+    {"semana":1,"blocos":[{"subtopico":"...","carga_horaria":"Xh","atividade":"teoria|exercícios|revisão","revisao_em":"semana X"}]}
+  ],
+  "regua_corte": ["item que NÃO estudar e por quê"],
+  "alertas_banca": {"estilo":"...","ajustes":["..."]}
+}`;
+
+      const resp=await fetch("/api/index",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"gpt-4o",max_tokens:8000,
+          system:"Você é especialista em concursos. Retorne sempre JSON puro válido, sem markdown.",
+          messages:[{role:"user",content:prompt}]})});
+      const d=await resp.json();
+      const txt=(d.content?.[0]?.text||"{}").replace(/```json|```/g,"").trim();
+      const parsed=JSON.parse(txt);
+      setResultado(parsed);
+      // Salva no banco
+      if(user?.id){
+        supabase.from("planos_pareto").insert({
+          user_id:user.id,concurso:form.concurso,cargo:form.cargo,
+          data_prova:form.data_prova||null,plano:parsed
+        }).then(()=>{}).catch(()=>{});
+      }
+    }catch(e){console.error(e);setErro("Não consegui gerar o plano. Tente novamente.");}
+    setGerando(false);
+  };
+
+  const tempCor=(t)=>t==="QUENTE"?"#EF4444":t==="MORNO"?"#F59E0B":"#10B981";
+  const prioCor=(p)=>p==="PRIORITÁRIA"?"#EF4444":p==="COMPLEMENTAR"?"#F59E0B":"#9CA3AF";
+
+  return(
+    <div style={{maxWidth:820,margin:"0 auto",padding:"0 4px"}}>
+      {/* Cabeçalho */}
+      <div style={{marginBottom:20}}>
+        <div style={{fontFamily:"'Lora',serif",fontSize:22,fontWeight:700,color:C.text,marginBottom:4}}>🎯 Estratégia Pareto</div>
+        <div style={{fontSize:13,color:C.textMed,lineHeight:1.6}}>Aplica o princípio 80/20 de forma recursiva no seu edital e gera um cronograma otimizado por subtópico — o que mais cai, na melhor ordem de estudo.</div>
+      </div>
+
+      {/* Formulário */}
+      {!resultado&&(
+        <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:16,padding:"20px"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+            <div>
+              <label style={{fontSize:11,fontWeight:700,color:C.textLight,display:"block",marginBottom:5}}>Concurso / Órgão *</label>
+              <input value={form.concurso} onChange={e=>F("concurso",e.target.value)} placeholder="Ex: Banco do Brasil"
+                style={{width:"100%",padding:"10px 12px",border:`1px solid ${C.border}`,borderRadius:9,fontSize:13,fontFamily:"'Sora',sans-serif",boxSizing:"border-box"}}/>
+            </div>
+            <div>
+              <label style={{fontSize:11,fontWeight:700,color:C.textLight,display:"block",marginBottom:5}}>Cargo *</label>
+              <input value={form.cargo} onChange={e=>F("cargo",e.target.value)} placeholder="Ex: Escriturário"
+                style={{width:"100%",padding:"10px 12px",border:`1px solid ${C.border}`,borderRadius:9,fontSize:13,fontFamily:"'Sora',sans-serif",boxSizing:"border-box"}}/>
+            </div>
+            <div>
+              <label style={{fontSize:11,fontWeight:700,color:C.textLight,display:"block",marginBottom:5}}>Data da prova</label>
+              <input type="date" value={form.data_prova} onChange={e=>F("data_prova",e.target.value)}
+                style={{width:"100%",padding:"10px 12px",border:`1px solid ${C.border}`,borderRadius:9,fontSize:13,fontFamily:"'Sora',sans-serif",boxSizing:"border-box"}}/>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <div>
+                <label style={{fontSize:11,fontWeight:700,color:C.textLight,display:"block",marginBottom:5}}>Horas/dia</label>
+                <input value={form.horas} onChange={e=>F("horas",e.target.value)} placeholder="3"
+                  style={{width:"100%",padding:"10px 12px",border:`1px solid ${C.border}`,borderRadius:9,fontSize:13,fontFamily:"'Sora',sans-serif",boxSizing:"border-box"}}/>
+              </div>
+              <div>
+                <label style={{fontSize:11,fontWeight:700,color:C.textLight,display:"block",marginBottom:5}}>Dias/semana</label>
+                <input value={form.dias} onChange={e=>F("dias",e.target.value)} placeholder="5"
+                  style={{width:"100%",padding:"10px 12px",border:`1px solid ${C.border}`,borderRadius:9,fontSize:13,fontFamily:"'Sora',sans-serif",boxSizing:"border-box"}}/>
+              </div>
+            </div>
+          </div>
+          <div style={{marginBottom:16}}>
+            <label style={{fontSize:11,fontWeight:700,color:C.textLight,display:"block",marginBottom:5}}>Seu nível por disciplina (opcional)</label>
+            <input value={form.niveis} onChange={e=>F("niveis",e.target.value)} placeholder="Ex: Português - fraco, Matemática - médio, Direito - forte"
+              style={{width:"100%",padding:"10px 12px",border:`1px solid ${C.border}`,borderRadius:9,fontSize:13,fontFamily:"'Sora',sans-serif",boxSizing:"border-box"}}/>
+          </div>
+          {erro&&<div style={{background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:9,padding:"9px 12px",fontSize:12,color:"#991B1B",marginBottom:12}}>{erro}</div>}
+          <button onClick={gerar} disabled={gerando}
+            style={{width:"100%",padding:"14px",background:gerando?"#9CA3AF":`linear-gradient(135deg,#1A1045,${C.primary})`,color:"white",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:gerando?"not-allowed":"pointer",fontFamily:"'Sora',sans-serif"}}>
+            {gerando?"Analisando edital e montando plano...":"🚀 Gerar estratégia"}
+          </button>
+          <div style={{fontSize:11,color:C.textLight,textAlign:"center",marginTop:10,lineHeight:1.5}}>
+            A IA analisa o perfil da banca e do cargo. Dados de frequência marcados como [VERIFICAR] devem ser confirmados em provas reais.
+          </div>
+        </div>
+      )}
+
+      {/* Resultado */}
+      {resultado&&(
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          <button onClick={()=>setResultado(null)}
+            style={{alignSelf:"flex-start",padding:"8px 14px",background:C.bg,border:`1px solid ${C.border}`,borderRadius:9,fontSize:12,fontWeight:600,color:C.textMed,cursor:"pointer"}}>
+            ← Gerar novo plano
+          </button>
+
+          {/* Alertas de banca */}
+          {resultado.alertas_banca&&(
+            <div style={{background:`linear-gradient(135deg,#1A1045,${C.primary})`,borderRadius:14,padding:"16px 18px",color:"white"}}>
+              <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.6)",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>⚡ Perfil da banca</div>
+              <div style={{fontSize:13,lineHeight:1.6,marginBottom:resultado.alertas_banca.ajustes?.length?10:0}}>{resultado.alertas_banca.estilo}</div>
+              {resultado.alertas_banca.ajustes?.map((a,i)=>(
+                <div key={i} style={{fontSize:12,color:"rgba(255,255,255,0.85)",lineHeight:1.5,marginBottom:3}}>• {a}</div>
+              ))}
+            </div>
+          )}
+
+          {/* Mapa de prioridades */}
+          <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:"18px"}}>
+            <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:14}}>📊 Mapa de prioridades</div>
+            {resultado.mapa_prioridades?.map((disc,i)=>(
+              <div key={i} style={{marginBottom:16,paddingBottom:16,borderBottom:i<resultado.mapa_prioridades.length-1?`1px solid ${C.border}`:"none"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+                  <span style={{fontSize:13,fontWeight:700,color:C.text}}>{disc.disciplina}</span>
+                  <span style={{fontSize:10,fontWeight:700,color:"white",background:prioCor(disc.prioridade),padding:"2px 8px",borderRadius:100}}>{disc.prioridade}</span>
+                  <span style={{fontSize:11,color:C.textMed}}>{disc.pct_questoes} · {disc.pct_tempo} do tempo</span>
+                </div>
+                {disc.topicos?.map((top,j)=>(
+                  <div key={j} style={{marginLeft:8,marginBottom:8,paddingLeft:10,borderLeft:`2px solid ${tempCor(top.temperatura)}`}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3,flexWrap:"wrap"}}>
+                      <span style={{fontSize:12,fontWeight:600,color:C.text}}>{top.topico}</span>
+                      <span style={{fontSize:9,fontWeight:700,color:tempCor(top.temperatura)}}>{top.temperatura}</span>
+                      <span style={{fontSize:10,color:C.textLight}}>freq: {top.frequencia}</span>
+                    </div>
+                    {top.subtopicos?.filter(s=>s.incluir).map((sub,k)=>(
+                      <div key={k} style={{fontSize:11,color:C.textMed,padding:"2px 0",display:"flex",gap:6,flexWrap:"wrap"}}>
+                        <span>→ {sub.nome}</span>
+                        <span style={{color:C.textLight}}>({sub.frequencia} freq · {sub.dificuldade} · CB {sub.custo_beneficio})</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {/* Cronograma */}
+          {resultado.cronograma?.length>0&&(
+            <div style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:14,padding:"18px"}}>
+              <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:14}}>📅 Cronograma por subtópico</div>
+              {resultado.cronograma.map((sem,i)=>(
+                <div key={i} style={{marginBottom:14}}>
+                  <div style={{fontSize:12,fontWeight:700,color:C.primary,marginBottom:6}}>Semana {sem.semana}</div>
+                  {sem.blocos?.map((b,j)=>(
+                    <div key={j} style={{display:"flex",gap:8,alignItems:"flex-start",padding:"8px 10px",background:C.bg,borderRadius:8,marginBottom:5}}>
+                      <span style={{fontSize:15,flexShrink:0}}>{b.atividade==="teoria"?"📖":b.atividade==="exercícios"?"✏️":"🔁"}</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:12,fontWeight:600,color:C.text}}>{b.subtopico}</div>
+                        <div style={{fontSize:10,color:C.textLight,marginTop:1}}>{b.carga_horaria} · {b.atividade}{b.revisao_em?` · revisar na ${b.revisao_em}`:""}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Régua de corte */}
+          {resultado.regua_corte?.length>0&&(
+            <div style={{background:"#FFFBEB",border:"1px solid #FCD34D",borderRadius:14,padding:"16px 18px"}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#92400E",marginBottom:10}}>✂️ Régua de corte — o que deixar por último</div>
+              {resultado.regua_corte.map((item,i)=>(
+                <div key={i} style={{fontSize:12,color:"#92400E",lineHeight:1.6,marginBottom:5}}>• {item}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Histórico */}
+      {!resultado&&historico.length>0&&(
+        <div style={{marginTop:20}}>
+          <div style={{fontSize:12,fontWeight:700,color:C.textLight,textTransform:"uppercase",letterSpacing:0.8,marginBottom:10}}>Planos anteriores</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {historico.map(h=>(
+              <button key={h.id} onClick={()=>setResultado(h.plano)}
+                style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",background:C.white,border:`1px solid ${C.border}`,borderRadius:10,cursor:"pointer",textAlign:"left"}}>
+                <span style={{fontSize:18}}>🎯</span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,fontWeight:600,color:C.text}}>{h.concurso} — {h.cargo}</div>
+                  <div style={{fontSize:10,color:C.textLight,marginTop:1}}>{new Date(h.created_at).toLocaleDateString("pt-BR")}</div>
+                </div>
+                <span style={{fontSize:12,color:C.textLight}}>›</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 /* ─── ABA REDAÇÃO ────────────────────────────────────────────── */
 function RedacaoTab({user,plano}){
   const dark=useDarkMode();const C=dark?C_DARK:C_LIGHT;
@@ -7186,6 +7441,7 @@ function Dashboard({user,onLogout}){
     {id:"questoes",icon:"🎯",label:"Treino"},
     {id:"revisao",icon:"📓",label:"Revisão"},
     {id:"redacao",icon:"✍️",label:"Redação"},
+    {id:"pareto",icon:"🎯",label:"Estratégia"},
     {id:"evolucao",icon:"📊",label:"Evolução"},
   ];
 
@@ -7550,6 +7806,9 @@ function Dashboard({user,onLogout}){
         )}
         {tab==="redacao"&&(
           <RedacaoTab user={user} plano={plan}/>
+        )}
+        {tab==="pareto"&&(
+          <EstrategiaPareto user={user} plano={plan}/>
         )}
         {tab==="evolucao"&&(
           <EvolucaoTab userId={user?.id} plano={plan}/>
